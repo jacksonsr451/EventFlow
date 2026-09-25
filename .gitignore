@@ -1,0 +1,366 @@
+# ============================================================
+# EventFlow
+# Monorepo: Python + Java + Docker + Infrastructure
+# ============================================================
+
+
+# ============================================================
+# Operating Systems
+# ============================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+
+# ============================================================
+# IDEs / Editors
+# ============================================================
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+
+
+# ============================================================
+# Environment / Secrets
+# ============================================================
+
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+secrets/
+**/secrets/
+
+credentials.json
+
+# Local configuration containing secrets
+application-local.yml
+application-local.yaml
+application-local.properties
+
+
+# ============================================================
+# Python
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.so
+
+.Python
+
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# pytest
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Pyright
+.pyright/
+
+# tox / nox
+.tox/
+.nox/
+
+# Hypothesis
+.hypothesis/
+
+# Python tooling
+.python-version
+
+# Jupyter
+.ipynb_checkpoints/
+
+
+# ============================================================
+# Java / Maven / Gradle
+# ============================================================
+
+# Compiled classes
+*.class
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# Maven wrapper binaries/logs
+.mvn/timing.properties
+
+# Gradle
+.gradle/
+**/build/
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+
+# ============================================================
+# Spring Boot
+# ============================================================
+
+spring-shell.log
+
+# Local Spring configuration
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+
+
+# ============================================================
+# Logs
+# ============================================================
+
+*.log
+logs/
+**/logs/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# ============================================================
+# Runtime / Temporary Files
+# ============================================================
+
+tmp/
+temp/
+.tmp/
+.cache/
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+
+
+# ============================================================
+# PID / Runtime State
+# ============================================================
+
+*.pid
+*.pid.lock
+
+
+# ============================================================
+# Databases / Local Persistent Data
+# ============================================================
+
+*.db
+*.sqlite
+*.sqlite3
+
+data/
+**/data/
+
+postgres-data/
+redpanda-data/
+prometheus-data/
+grafana-data/
+
+
+# ============================================================
+# Docker
+# ============================================================
+
+# Docker Compose override is intended for developer-specific
+# configuration only.
+docker-compose.override.yml
+compose.override.yml
+
+
+# ============================================================
+# Terraform
+# ============================================================
+
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+*.tfvars
+*.tfvars.json
+
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+.terraformrc
+terraform.rc
+
+# IMPORTANT:
+# .terraform.lock.hcl MUST be committed.
+# Do not add it here.
+
+
+# ============================================================
+# Kubernetes / Helm
+# ============================================================
+
+# Local kubeconfig may contain credentials.
+kubeconfig
+kubeconfig.*
+.kube/
+
+# Helm generated packages
+*.tgz
+
+
+# ============================================================
+# Testcontainers
+# ============================================================
+
+.testcontainers.properties
+
+
+# ============================================================
+# Test Results
+# ============================================================
+
+test-results/
+reports/
+
+junit.xml
+junit-*.xml
+
+
+# ============================================================
+# Generated Documentation
+# ============================================================
+
+site/
+docs/_build/
+
+
+# ============================================================
+# Profiling / Benchmarking
+# ============================================================
+
+*.prof
+*.lprof
+
+benchmark-results/
+
+
+# ============================================================
+# Local Development
+# ============================================================
+
+.local/
+.local-data/
+dev-data/
+scratch/
+
+
+# ============================================================
+# Backup Files
+# ============================================================
+
+*.orig
+*.rej
+
+
+# ============================================================
+# EventFlow specific runtime data
+# ============================================================
+
+runtime/
+outbox-debug/
+dlq-debug/
+
+
+# ============================================================
+# Keep important empty directories
+# ============================================================
+
+!.gitkeep
