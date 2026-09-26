@@ -1,0 +1,41 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: EventFlow common message envelope
+type: object
+additionalProperties: true
+required:
+  - event_id
+  - event_type
+  - schema_version
+  - occurred_at
+  - producer
+  - correlation_id
+  - causation_id
+  - aggregate_type
+  - aggregate_id
+  - payload
+properties:
+  event_id:
+    $ref: 'common.yaml#/$defs/UUID'
+  event_type:
+    $ref: 'common.yaml#/$defs/EventType'
+  schema_version:
+    type: integer
+    minimum: 1
+  occurred_at:
+    $ref: 'common.yaml#/$defs/Timestamp'
+  producer:
+    type: string
+    minLength: 1
+  correlation_id:
+    $ref: 'common.yaml#/$defs/UUID'
+  causation_id:
+    oneOf:
+      - $ref: 'common.yaml#/$defs/UUID'
+      - type: 'null'
+  aggregate_type:
+    type: string
+    minLength: 1
+  aggregate_id:
+    $ref: 'common.yaml#/$defs/UUID'
+  payload:
+    type: object

@@ -1,0 +1,348 @@
+asyncapi: 3.0.0
+info:
+  title: EventFlow Order Workflow
+  version: 1.0.0
+  description: >-
+    Initial asynchronous workflow contract. Messages use the common envelope,
+    assume at-least-once delivery and use order_id as the partition key for
+    Order workflow messages where applicable. Broker ordering does not enforce
+    the Inventory stock invariant. Consumers must acknowledge only after their
+    local Inbox/domain transaction succeeds, tolerate duplicate and delayed
+    messages, and route invalid or exhausted messages according to DLQ policy.
+    correlation_id remains stable for the business workflow; causation_id is
+    the event_id of the immediate cause when applicable.
+defaultContentType: application/json
+servers:
+  broker:
+    host: broker.example.invalid:9092
+    protocol: kafka
+    description: Planned Kafka-compatible broker endpoint
+channels:
+  orderWorkflow:
+    address: eventflow.order.workflow.v1
+    description: Commands and events for the Order Saga.
+    messages:
+      orderCreated:
+        $ref: '#/components/messages/OrderCreated'
+      reservationRequested:
+        $ref: '#/components/messages/ReservationRequested'
+      reservationReserved:
+        $ref: '#/components/messages/ReservationReserved'
+      reservationRejected:
+        $ref: '#/components/messages/ReservationRejected'
+      paymentRequested:
+        $ref: '#/components/messages/PaymentRequested'
+      paymentApproved:
+        $ref: '#/components/messages/PaymentApproved'
+      paymentDeclined:
+        $ref: '#/components/messages/PaymentDeclined'
+      paymentProcessing:
+        $ref: '#/components/messages/PaymentProcessing'
+      paymentUnknown:
+        $ref: '#/components/messages/PaymentUnknown'
+      releaseRequested:
+        $ref: '#/components/messages/ReleaseRequested'
+      released:
+        $ref: '#/components/messages/Released'
+      compensationRequested:
+        $ref: '#/components/messages/CompensationRequested'
+      compensated:
+        $ref: '#/components/messages/Compensated'
+      orderConfirmed:
+        $ref: '#/components/messages/OrderConfirmed'
+      orderCancelled:
+        $ref: '#/components/messages/OrderCancelled'
+operations:
+  publishOrderCreated:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderCreated'
+  publishReservationRequested:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/reservationRequested'
+  consumeReservationRequested:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/reservationRequested'
+  publishReservationReserved:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/reservationReserved'
+  publishReservationRejected:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/reservationRejected'
+  ordersConsumeReservationReserved:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/reservationReserved'
+  ordersConsumeReservationRejected:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/reservationRejected'
+  publishPaymentRequested:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentRequested'
+  consumePaymentRequested:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentRequested'
+  publishPaymentApproved:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentApproved'
+  publishPaymentDeclined:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentDeclined'
+  ordersConsumePaymentApproved:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentApproved'
+  ordersConsumePaymentDeclined:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentDeclined'
+  publishPaymentProcessing:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentProcessing'
+  ordersConsumePaymentProcessing:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentProcessing'
+  publishPaymentUnknown:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentUnknown'
+  ordersConsumePaymentUnknown:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/paymentUnknown'
+  publishReleaseRequested:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/releaseRequested'
+  consumeReleaseRequested:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/releaseRequested'
+  publishReleased:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/released'
+  ordersConsumeReleased:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/released'
+  publishCompensationRequested:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/compensationRequested'
+  consumeCompensationRequested:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/compensationRequested'
+  publishCompensated:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/compensated'
+  ordersConsumeCompensated:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/compensated'
+  publishOrderConfirmed:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderConfirmed'
+  consumeOrderConfirmed:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderConfirmed'
+  notificationsConsumeOrderConfirmed:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderConfirmed'
+  publishOrderCancelled:
+    action: send
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderCancelled'
+  consumeOrderCancelled:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderCancelled'
+  notificationsConsumeOrderCancelled:
+    action: receive
+    channel:
+      $ref: '#/channels/orderWorkflow'
+    messages:
+      - $ref: '#/channels/orderWorkflow/messages/orderCancelled'
+components:
+  messages:
+    OrderCreated:
+      name: order.created
+      title: Order created
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/OrderCreated'
+      x-producer: Orders
+      x-partition-key: order_id
+    ReservationRequested:
+      name: inventory.reservation.requested
+      title: Inventory reservation requested
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/ReservationRequested'
+      x-producer: Orders
+      x-partition-key: order_id
+    ReservationReserved:
+      name: inventory.reserved
+      title: Inventory reservation accepted
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/ReservationReserved'
+      x-producer: Inventory
+      x-partition-key: order_id
+    ReservationRejected:
+      name: inventory.rejected
+      title: Inventory reservation rejected
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/ReservationRejected'
+      x-producer: Inventory
+      x-partition-key: order_id
+    PaymentRequested:
+      name: payment.requested
+      title: Payment requested
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/PaymentRequested'
+      x-producer: Orders
+      x-partition-key: order_id
+    PaymentApproved:
+      name: payment.approved
+      title: Payment approved
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/PaymentApproved'
+      x-producer: Payments
+      x-partition-key: order_id
+    PaymentDeclined:
+      name: payment.declined
+      title: Payment declined
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/PaymentDeclined'
+      x-producer: Payments
+      x-partition-key: order_id
+    PaymentProcessing:
+      name: payment.processing
+      title: Payment is still processing
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/PaymentProcessing'
+      x-producer: Payments
+      x-partition-key: order_id
+    PaymentUnknown:
+      name: payment.unknown
+      title: Payment result is unknown
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/PaymentUnknown'
+      x-producer: Payments
+      x-partition-key: order_id
+    ReleaseRequested:
+      name: inventory.release.requested
+      title: Inventory release requested
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/ReleaseRequested'
+      x-producer: Orders
+      x-partition-key: order_id
+    Released:
+      name: inventory.released
+      title: Inventory released
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/Released'
+      x-producer: Inventory
+      x-partition-key: order_id
+    CompensationRequested:
+      name: payment.compensation.requested
+      title: Payment compensation requested
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/CompensationRequested'
+      x-producer: Orders
+      x-partition-key: order_id
+    Compensated:
+      name: payment.compensated
+      title: Payment compensation completed
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/Compensated'
+      x-producer: Payments
+      x-partition-key: order_id
+    OrderConfirmed:
+      name: order.confirmed
+      title: Order confirmed
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/OrderConfirmed'
+      x-producer: Orders
+      x-partition-key: order_id
+    OrderCancelled:
+      name: order.cancelled
+      title: Order cancelled
+      payload:
+        $ref: '../schemas/events.yaml#/$defs/OrderCancelled'
+      x-producer: Orders
+      x-partition-key: order_id

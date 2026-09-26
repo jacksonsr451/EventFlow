@@ -1,0 +1,355 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: EventFlow workflow event schemas
+type: object
+$defs:
+  BaseEvent:
+    $ref: 'envelope.yaml'
+  OrderCreatedPayload:
+    type: object
+    additionalProperties: true
+    required: [order_id, status, items]
+    properties:
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: PENDING
+      items:
+        type: array
+        minItems: 1
+        items:
+          $ref: 'common.yaml#/$defs/AcceptedOrderItem'
+  ReservationRequestedPayload:
+    type: object
+    additionalProperties: true
+    required: [reservation_id, order_id, items]
+    properties:
+      reservation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      items:
+        type: array
+        minItems: 1
+        items:
+          $ref: 'common.yaml#/$defs/ReservationItem'
+  ReservationResultPayload:
+    type: object
+    additionalProperties: true
+    required: [reservation_id, order_id, status, items, expires_at]
+    properties:
+      reservation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: ACTIVE
+      items:
+        type: array
+        minItems: 1
+        items:
+          $ref: 'common.yaml#/$defs/ReservationItem'
+      expires_at:
+        $ref: 'common.yaml#/$defs/Timestamp'
+  ReservationRejectedPayload:
+    type: object
+    additionalProperties: true
+    required: [reservation_id, order_id, reason]
+    properties:
+      reservation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      reason:
+        type: string
+        minLength: 1
+  PaymentRequestedPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, order_id, amount]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      amount:
+        $ref: 'common.yaml#/$defs/Money'
+  PaymentApprovedPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, order_id, status, amount]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        enum: [AUTHORIZED, CAPTURED]
+      amount:
+        $ref: 'common.yaml#/$defs/Money'
+  PaymentDeclinedPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, order_id, status]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: DECLINED
+  PaymentProcessingPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, order_id, status]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: PROCESSING
+  PaymentUnknownPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, order_id, status]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: UNKNOWN
+  ReleaseRequestedPayload:
+    type: object
+    additionalProperties: true
+    required: [reservation_id, order_id]
+    properties:
+      reservation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+  ReleasedPayload:
+    type: object
+    additionalProperties: true
+    required: [reservation_id, order_id, status]
+    properties:
+      reservation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: RELEASED
+  CompensationRequestedPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, compensation_id, order_id]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      compensation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+  CompensatedPayload:
+    type: object
+    additionalProperties: true
+    required: [payment_id, compensation_id, order_id, result]
+    properties:
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      compensation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      result:
+        const: COMPLETED
+  OrderConfirmedPayload:
+    type: object
+    additionalProperties: true
+    required: [order_id, status, reservation_id, payment_id]
+    properties:
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: CONFIRMED
+      reservation_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      payment_id:
+        $ref: 'common.yaml#/$defs/UUID'
+  OrderCancelledPayload:
+    type: object
+    additionalProperties: true
+    required: [order_id, status]
+    properties:
+      order_id:
+        $ref: 'common.yaml#/$defs/UUID'
+      status:
+        const: CANCELLED
+      reason:
+        type: string
+        minLength: 1
+  OrderCreated:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: order.created
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/OrderCreatedPayload'
+  ReservationRequested:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: inventory.reservation.requested
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/ReservationRequestedPayload'
+  ReservationReserved:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: inventory.reserved
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/ReservationResultPayload'
+  ReservationRejected:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: inventory.rejected
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/ReservationRejectedPayload'
+  PaymentRequested:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.requested
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/PaymentRequestedPayload'
+  PaymentApproved:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.approved
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/PaymentApprovedPayload'
+  PaymentDeclined:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.declined
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/PaymentDeclinedPayload'
+  PaymentProcessing:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.processing
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/PaymentProcessingPayload'
+  PaymentUnknown:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.unknown
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/PaymentUnknownPayload'
+  ReleaseRequested:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: inventory.release.requested
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/ReleaseRequestedPayload'
+  Released:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: inventory.released
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/ReleasedPayload'
+  CompensationRequested:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.compensation.requested
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/CompensationRequestedPayload'
+  Compensated:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: payment.compensated
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/CompensatedPayload'
+  OrderConfirmed:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: order.confirmed
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/OrderConfirmedPayload'
+  OrderCancelled:
+    allOf:
+      - $ref: '#/$defs/BaseEvent'
+      - type: object
+        properties:
+          event_type:
+            const: order.cancelled
+          schema_version:
+            const: 1
+          payload:
+            $ref: '#/$defs/OrderCancelledPayload'

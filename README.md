@@ -124,8 +124,9 @@ future work.
 
 ## Future Development Sequence
 
-Architecture and ADRs come first, followed by OpenAPI, AsyncAPI, event schemas,
-domain tests, service implementation and infrastructure. Commands such as
+Architecture, ADRs and the initial machine-readable contracts come first,
+followed by contract/domain tests, service implementation and infrastructure.
+Commands such as
 `make up` and `make test` are not available until their implementations exist.
 
 ## License

@@ -1,0 +1,114 @@
+[
+  {
+    "event_id": "10000000-0000-4000-8000-000000000001",
+    "event_type": "order.created",
+    "schema_version": 1,
+    "occurred_at": "2026-01-01T12:00:00Z",
+    "producer": "orders",
+    "correlation_id": "20000000-0000-4000-8000-000000000001",
+    "causation_id": null,
+    "aggregate_type": "order",
+    "aggregate_id": "30000000-0000-4000-8000-000000000001",
+    "payload": {
+      "order_id": "30000000-0000-4000-8000-000000000001",
+      "status": "PENDING",
+      "items": [
+        {
+          "sku": "SKU-KEYBOARD",
+          "quantity": 1,
+          "quote_id": "40000000-0000-4000-8000-000000000001",
+          "unit_price": "199.90",
+          "currency": "BRL"
+        }
+      ]
+    }
+  },
+  {
+    "event_id": "10000000-0000-4000-8000-000000000002",
+    "event_type": "inventory.reservation.requested",
+    "schema_version": 1,
+    "occurred_at": "2026-01-01T12:00:01Z",
+    "producer": "orders",
+    "correlation_id": "20000000-0000-4000-8000-000000000001",
+    "causation_id": "10000000-0000-4000-8000-000000000001",
+    "aggregate_type": "order",
+    "aggregate_id": "30000000-0000-4000-8000-000000000001",
+    "payload": {
+      "reservation_id": "50000000-0000-4000-8000-000000000001",
+      "order_id": "30000000-0000-4000-8000-000000000001",
+      "items": [
+        {"sku": "SKU-KEYBOARD", "quantity": 1}
+      ]
+    }
+  },
+  {
+    "event_id": "10000000-0000-4000-8000-000000000003",
+    "event_type": "inventory.reserved",
+    "schema_version": 1,
+    "occurred_at": "2026-01-01T12:00:02Z",
+    "producer": "inventory",
+    "correlation_id": "20000000-0000-4000-8000-000000000001",
+    "causation_id": "10000000-0000-4000-8000-000000000002",
+    "aggregate_type": "reservation",
+    "aggregate_id": "50000000-0000-4000-8000-000000000001",
+    "payload": {
+      "reservation_id": "50000000-0000-4000-8000-000000000001",
+      "order_id": "30000000-0000-4000-8000-000000000001",
+      "status": "ACTIVE",
+      "items": [
+        {"sku": "SKU-KEYBOARD", "quantity": 1}
+      ],
+      "expires_at": "2026-01-01T12:10:00Z"
+    }
+  },
+  {
+    "event_id": "10000000-0000-4000-8000-000000000004",
+    "event_type": "payment.requested",
+    "schema_version": 1,
+    "occurred_at": "2026-01-01T12:00:03Z",
+    "producer": "orders",
+    "correlation_id": "20000000-0000-4000-8000-000000000001",
+    "causation_id": "10000000-0000-4000-8000-000000000003",
+    "aggregate_type": "order",
+    "aggregate_id": "30000000-0000-4000-8000-000000000001",
+    "payload": {
+      "payment_id": "60000000-0000-4000-8000-000000000001",
+      "order_id": "30000000-0000-4000-8000-000000000001",
+      "amount": {"amount": "199.90", "currency": "BRL"}
+    }
+  },
+  {
+    "event_id": "10000000-0000-4000-8000-000000000005",
+    "event_type": "payment.approved",
+    "schema_version": 1,
+    "occurred_at": "2026-01-01T12:00:04Z",
+    "producer": "payments",
+    "correlation_id": "20000000-0000-4000-8000-000000000001",
+    "causation_id": "10000000-0000-4000-8000-000000000004",
+    "aggregate_type": "payment",
+    "aggregate_id": "60000000-0000-4000-8000-000000000001",
+    "payload": {
+      "payment_id": "60000000-0000-4000-8000-000000000001",
+      "order_id": "30000000-0000-4000-8000-000000000001",
+      "status": "AUTHORIZED",
+      "amount": {"amount": "199.90", "currency": "BRL"}
+    }
+  },
+  {
+    "event_id": "10000000-0000-4000-8000-000000000006",
+    "event_type": "order.confirmed",
+    "schema_version": 1,
+    "occurred_at": "2026-01-01T12:00:05Z",
+    "producer": "orders",
+    "correlation_id": "20000000-0000-4000-8000-000000000001",
+    "causation_id": "10000000-0000-4000-8000-000000000005",
+    "aggregate_type": "order",
+    "aggregate_id": "30000000-0000-4000-8000-000000000001",
+    "payload": {
+      "order_id": "30000000-0000-4000-8000-000000000001",
+      "status": "CONFIRMED",
+      "reservation_id": "50000000-0000-4000-8000-000000000001",
+      "payment_id": "60000000-0000-4000-8000-000000000001"
+    }
+  }
+]

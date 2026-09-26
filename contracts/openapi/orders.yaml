@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: EventFlow Orders API
+  version: 1.0.0
+  description: >-
+    Initial HTTP contract for Cart reads, checkout/order creation and Order
+    status queries. The workflow continues asynchronously after creation.
+servers:
+  - url: https://api.example.invalid
+    description: Placeholder for the planned Gateway endpoint
+tags:
+  - name: Cart
+  - name: Orders
+paths:
+  /v1/carts/{cart_id}:
+    get:
+      operationId: getCart
+      tags: [Cart]
+      summary: Read a Cart with current Catalog and Inventory information
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Cart view. Availability and current commercial data may be temporarily unavailable.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/CartView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: An authoritative read dependency is temporarily unavailable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+  /v1/orders:
+    post:
+      operationId: createOrderFromCheckout
+      tags: [Orders]
+      summary: Accept a valid checkout and create an Order
+      description: >-
+        The request accepts server-controlled quote identifiers and desired
+        quantities. It never accepts client payment, Reservation or Order
+        status. A successful response represents an Order initially in PENDING;
+        Inventory and Payments continue through the asynchronous Saga.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/http.yaml#/$defs/CheckoutRequest'
+      responses:
+        '201':
+          description: Order accepted and created in PENDING.
+          headers:
+            Location:
+              description: URI of the created Order resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/CheckoutResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Idempotency key conflict, invalid state or quote conflict.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: A required authoritative dependency is temporarily unavailable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+  /v1/orders/{order_id}:
+    get:
+      operationId: getOrder
+      tags: [Orders]
+      summary: Read the current local Order and Saga status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Current Order representation.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Orders is temporarily unavailable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        JWT validation and authorization are enforced by the Gateway. Required
+        issuer, audience, algorithms and claims remain deployment configuration;
+        resource ownership is checked server-side.
+  parameters:
+    CartId:
+      name: cart_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common.yaml#/$defs/UUID'
+    OrderId:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common.yaml#/$defs/UUID'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        Stable client key for one checkout operation. It is scoped to the
+        authenticated principal and operation. Repeating the same key with an
+        equivalent request replays the original result; using it with a
+        different request is an idempotency conflict. Retention is an
+        implementation concern.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._~-]{1,255}$'
+        minLength: 1
+        maxLength: 255
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: >-
+        Existing business workflow identifier when applicable. Gateway generates
+        one when absent, validates a supplied UUID and returns the effective
+        value in X-Correlation-ID.
+      schema:
+        $ref: '../schemas/common.yaml#/$defs/UUID'
+  responses:
+    BadRequest:
+      description: Malformed request or invalid syntax.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid JWT.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+    Forbidden:
+      description: Authenticated principal is not authorized for the resource or operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+    NotFound:
+      description: Resource does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+    UnprocessableEntity:
+      description: Validation failed, including expired or invalid quote data.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/http.yaml#/$defs/ErrorResponse'
+  headers:
+    CorrelationId:
+      description: Business workflow correlation identifier.
+      schema:
+        $ref: '../schemas/common.yaml#/$defs/UUID'
+    RequestId:
+      description: Identifier for this HTTP request.
+      schema:
+        $ref: '../schemas/common.yaml#/$defs/UUID'
