@@ -28,7 +28,10 @@ def make_item(sku="SKU-KEYBOARD", quantity=1, price="199.90"):
 def make_order(items=None):
     from eventflow_orders.domain.order import Order
 
-    return Order.create(ORDER_ID, CORRELATION_ID, items or [make_item()])
+    return Order.create(
+        correlation_id=CORRELATION_ID,
+        items=items or [make_item()],
+    )
 
 
 def reserved_order(expires_at=VALID_RESERVATION):
