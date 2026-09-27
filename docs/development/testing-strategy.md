@@ -23,6 +23,23 @@ restart, provider timeout and DLQ reprocessing. Future contract tests will
 extend the existing CI validation of OpenAPI, AsyncAPI and schema artifacts
 under `contracts/`.
 
+## Quality Tooling Strategy
+
+| Area | Pre-commit | CI | Status |
+|---|---|---|---|
+| Repository | whitespace, EOF, YAML/JSON syntax, conflicts, large files, case conflicts and private-key detection | contract/documentation validation | Active |
+| Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples | Active |
+| Python | None until service code and project tooling exist; repository tooling is not treated as FastAPI code | Ruff, type checking and tests when services exist | Future |
+| Java | The service build's fast formatter/checks when Inventory exists | Maven/Gradle compile, analysis and tests | Future |
+| Go | `gofmt` and possibly fast `go vet` when a module exists | `gofmt -l`, `go vet` and tests | Future |
+| Docker | Parser/lint checks when Dockerfiles exist | Image build and scanning | Future |
+| Kubernetes | Manifest/chart checks when manifests exist | Full manifest/chart validation | Future |
+| Terraform | `terraform fmt -check` when `.tf` files exist | Format, validate and security checks | Future |
+
+Python type checking is **TO BE DECIDED**. Maven versus Gradle and Java
+analysis tools are intentionally left to the Inventory project. The existing
+CI remains authoritative; pre-commit is only fast local feedback.
+
 Operational tests should also verify trace propagation across asynchronous
 boundaries, bounded Outbox recovery, retry exhaustion, DLQ metadata and safe
 reconciliation. Exact metric names, thresholds and alert rules belong to the

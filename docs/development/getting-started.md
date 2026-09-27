@@ -28,6 +28,9 @@ openapi-spec-validator contracts/openapi/orders.yaml
 npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
 ```
 
+The AsyncAPI command additionally requires Node.js and npm; they are not
+needed for the pre-commit hooks themselves.
+
 Service tests, container builds and Continuous Deployment will be added only
 after corresponding implementations and deployable environments exist.
 
@@ -48,3 +51,5 @@ The configuration uses the pinned `pre-commit-hooks` `v6.0.0` release. The
 full OpenAPI and AsyncAPI validators remain in CI rather than downloading npm
 tooling during every commit. Update hook revisions deliberately with
 `pre-commit autoupdate --freeze` and review the resulting configuration changes.
+The whitespace and EOF hooks may modify files; review and stage those fixes
+before committing.
