@@ -27,7 +27,7 @@ under `contracts/`.
 
 | Area | Pre-commit | CI | Status |
 |---|---|---|---|
-| Repository | whitespace, EOF, YAML/JSON syntax, conflicts, large files, case conflicts and private-key detection | contract/documentation validation | Active |
+| Repository | whitespace, EOF, YAML/JSON syntax, conflicts, large files, case conflicts and private-key detection | Same repository hooks plus contract/documentation validation | Active |
 | Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples | Active |
 | Python | None until service code and project tooling exist; repository tooling is not treated as FastAPI code | Ruff, type checking and tests when services exist | Future |
 | Java | The service build's fast formatter/checks when Inventory exists | Maven/Gradle compile, analysis and tests | Future |

@@ -48,6 +48,7 @@ and how future implementations should be validated.
 - [Getting started](development/getting-started.md): current repository status and future workflow.
 - [Conventions](development/conventions.md): terminology and architectural constraints.
 - [Testing strategy](development/testing-strategy.md): planned invariant, contract and resilience coverage.
+- [CI/CD strategy](development/ci-cd.md): active validation and future delivery stages.
 
 ## Documentation Boundaries
 
