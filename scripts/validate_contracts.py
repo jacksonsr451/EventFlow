@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -146,10 +147,21 @@ def validate_schemas_and_example() -> None:
             raise AssertionError(f"workflow example changes {name} during one operation")
 
 
-def validate_markdown_links() -> None:
+def repository_files() -> list[Path]:
+    result = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return [ROOT / line for line in result.stdout.splitlines() if (ROOT / line).is_file()]
+
+
+def validate_markdown_links(paths: list[Path]) -> None:
     link_pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-    for source in ROOT.rglob("*.md"):
-        if ".git" in source.parts:
+    for source in paths:
+        if source.suffix != ".md":
             continue
         for target in link_pattern.findall(source.read_text(encoding="utf-8")):
             target = target.split("#", 1)[0].strip()
@@ -159,10 +171,8 @@ def validate_markdown_links() -> None:
                 raise AssertionError(f"broken Markdown link: {source}: {target}")
 
 
-def validate_text_whitespace() -> None:
-    for path in ROOT.rglob("*"):
-        if not path.is_file() or ".git" in path.parts:
-            continue
+def validate_text_whitespace(paths: list[Path]) -> None:
+    for path in paths:
         if path.suffix not in TEXT_SUFFIXES and path.name not in {".gitattributes", "Makefile"}:
             continue
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -177,8 +187,9 @@ def main() -> int:
     load_document(WORKFLOW)
     validate_local_refs(contract_files)
     validate_schemas_and_example()
-    validate_markdown_links()
-    validate_text_whitespace()
+    files = repository_files()
+    validate_markdown_links(files)
+    validate_text_whitespace(files)
     print("Contract, reference, example, Markdown-link, and whitespace validation passed.")
     return 0
 

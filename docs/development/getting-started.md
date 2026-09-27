@@ -30,3 +30,21 @@ npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
 
 Service tests, container builds and Continuous Deployment will be added only
 after corresponding implementations and deployable environments exist.
+
+## Pre-commit
+
+Pre-commit provides fast local checks before a commit; CI remains the
+authoritative validation. Python 3.10 or newer is required. Install the pinned
+framework and the already documented contract-tooling dependencies in the same
+Python environment, then enable and run the hooks:
+
+```text
+python -m pip install "pre-commit==4.6.2" "PyYAML==6.0.3" "jsonschema==4.26.0" "jsonschema-specifications==2025.9.1" "referencing==0.37.0"
+python -m pre_commit install
+python -m pre_commit run --all-files
+```
+
+The configuration uses the pinned `pre-commit-hooks` `v6.0.0` release. The
+full OpenAPI and AsyncAPI validators remain in CI rather than downloading npm
+tooling during every commit. Update hook revisions deliberately with
+`pre-commit autoupdate --freeze` and review the resulting configuration changes.
