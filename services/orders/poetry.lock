@@ -326,6 +326,28 @@ files = [
 ]
 
 [[package]]
+name = "jsr-testrunner"
+version = "0.1.0"
+description = "testrunner: simple powerful testing with Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+files = [
+    {file = "jsr_testrunner-0.1.0-py3-none-any.whl", hash = "sha256:def27a371ebcc570cf7efeb93e023410ce4cf94dd5c3a59938f4c6ecacfdcb27"},
+    {file = "jsr_testrunner-0.1.0.tar.gz", hash = "sha256:49a429418546997a57be973cbc568310b0a4ee5758b15c9c28fa39333550139f"},
+]
+
+[package.dependencies]
+colorama = {version = ">=0.4", markers = "sys_platform == \"win32\""}
+iniconfig = ">=2"
+packaging = ">=24"
+pluggy = ">=1.5,<2"
+pygments = ">=2.15"
+
+[package.extras]
+dev = ["argcomplete", "asynctest ; python_version < \"3.11\"", "attrs (>=23.1)", "coverage (>=7.5)", "hypothesis (>=6.75)", "mock", "numpy (>=1.26)", "pexpect (>=4.9)", "pytest-xdist (>=3.5)", "pyyaml", "requests", "setuptools", "xmlschema"]
+
+[[package]]
 name = "packaging"
 version = "26.3"
 description = "Core utilities for Python packages"
@@ -1034,4 +1056,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "86df4fc1d90617806123b33cb219c451969bf0f04b3e0cec138be0a1330995a1"
+content-hash = "1af581fee4a25702ed0673c43835667d6761e083b871ba994162d139980b016b"
