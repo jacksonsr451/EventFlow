@@ -1,0 +1,27 @@
+[project]
+name = "eventflow-orders"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Jackson Severino da Rocha",email = "jackson.severino.rocha@escola.pr.gov.br"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi (>=0.141.1,<0.142.0)",
+    "uvicorn[standard] (>=0.54.0,<0.55.0)"
+]
+
+[tool.poetry]
+packages = [{include = "eventflow_orders", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.1.1,<10.0.0)",
+    "pytest-cov (>=7.1.0,<8.0.0)",
+    "ruff (>=0.16.9,<0.17.0)"
+]
