@@ -17,7 +17,9 @@ EventFlow is in **Phase 0: architecture and contract preparation**. The
 service implementations and local infrastructure are not present yet. The
 machine-readable contract baseline now exists under `contracts/`. The documentation describes accepted architectural
 decisions and planned behavior; it does not claim those decisions are already
-implemented.
+implemented. Basic contract validation runs in GitHub Actions for pull
+requests and pushes to `main`. Continuous Deployment is not configured because
+deployable services and environments do not exist yet.
 
 ## Planned Architecture
 

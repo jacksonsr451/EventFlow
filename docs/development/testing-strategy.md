@@ -20,7 +20,8 @@ exist in the current repository.
 
 Resilience scenarios should include broker outage, publisher crash, consumer
 restart, provider timeout and DLQ reprocessing. Future contract tests will
-validate OpenAPI, AsyncAPI and schema artifacts under `contracts/`.
+extend the existing CI validation of OpenAPI, AsyncAPI and schema artifacts
+under `contracts/`.
 
 Operational tests should also verify trace propagation across asynchronous
 boundaries, bounded Outbox recovery, retry exhaustion, DLQ metadata and safe

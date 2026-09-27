@@ -14,3 +14,19 @@ Future contributors will need Python, Java and Go toolchains for the planned
 services. Exact language versions are not formally decided here. Each service
 may have its own toolchain and dependency management, while contracts,
 observability and reliability conventions remain shared at the system level.
+
+## Contract Validation
+
+The current CI validates the contract baseline only. It uses Python 3.12 and
+Node.js 22 on GitHub-hosted Linux runners. Run the same local checks with the
+pinned tooling below:
+
+```text
+python -m pip install "PyYAML==6.0.3" "jsonschema==4.26.0" "jsonschema-specifications==2025.9.1" "referencing==0.37.0" "openapi-spec-validator==0.9.0"
+python scripts/validate_contracts.py
+openapi-spec-validator contracts/openapi/orders.yaml
+npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
+```
+
+Service tests, container builds and Continuous Deployment will be added only
+after corresponding implementations and deployable environments exist.

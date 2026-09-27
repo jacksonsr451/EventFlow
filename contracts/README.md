@@ -45,7 +45,8 @@ strings.
 
 ## Validation
 
-Contract validation should include YAML/JSON parsing, OpenAPI and AsyncAPI
-validation, JSON Schema validation, `$ref` resolution and example validation.
-The current repository does not yet contain a configured contract validator;
-the initial files are designed for validation by the next tooling phase.
+Contract validation includes YAML/JSON parsing, OpenAPI and AsyncAPI validation,
+JSON Schema validation, `$ref` resolution, event-to-schema mapping and example
+validation. GitHub Actions runs these checks for pull requests and pushes to
+`main`; the local commands are documented in
+`docs/development/getting-started.md`.
