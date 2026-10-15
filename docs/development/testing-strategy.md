@@ -1,8 +1,9 @@
 # Testing Strategy
 
 Testing will combine unit, integration, contract, end-to-end and resilience
-tests. This document defines future coverage; it does not claim that tests
-exist in the current repository.
+tests. Repository-level contract tests already exist under `tests/contracts/`
+and run in CI; unit, integration, end-to-end and resilience tests do not exist
+yet.
 
 ## Required Invariants
 
@@ -19,16 +20,17 @@ exist in the current repository.
 - Ambiguous divergence is recorded and not silently corrected.
 
 Resilience scenarios should include broker outage, publisher crash, consumer
-restart, provider timeout and DLQ reprocessing. Future contract tests will
-extend the existing CI validation of OpenAPI, AsyncAPI and schema artifacts
-under `contracts/`.
+restart, provider timeout and DLQ reprocessing. The existing CI validation of
+OpenAPI, AsyncAPI and schema artifacts under `contracts/` plus the
+`tests/contracts/` suite (run via `python -m testrunner`) is extended by future
+implementation-level contract tests once services and clients exist.
 
 ## Quality Tooling Strategy
 
 | Area | Pre-commit | CI | Status |
 |---|---|---|---|
 | Repository | whitespace, EOF, YAML/JSON syntax, conflicts, large files, case conflicts and private-key detection | Same repository hooks plus contract/documentation validation | Active |
-| Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples | Active |
+| Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples; `tests/contracts` via `python -m testrunner` | Active |
 | Python | None until service code and project tooling exist; repository tooling is not treated as FastAPI code | Ruff, type checking and tests when services exist | Future |
 | Java | The service build's fast formatter/checks when Inventory exists | Maven/Gradle compile, analysis and tests | Future |
 | Go | `gofmt` and possibly fast `go vet` when a module exists | `gofmt -l`, `go vet` and tests | Future |

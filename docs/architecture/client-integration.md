@@ -60,6 +60,28 @@ On `401`, all clients attempt a silent token refresh using `refresh_token`
 before showing a login prompt. If the refresh also fails, the user is
 redirected to login.
 
+## Error Handling in Clients
+
+Every client implements **one** error handler against the target model described
+in [ADR-007](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md)
+section 3.4: RFC 9457 problem details (`type`, `title`, `status`, `detail`,
+`instance`) plus `correlation_id`, `request_id`, and optional `errors[]`.
+
+| Status | Client Behaviour |
+|---|---|
+| `400` | Show field-level validation errors from `errors[]` |
+| `401` | Silent token refresh, then login prompt on failure |
+| `403` | Show a role-insufficient message; do not retry |
+| `404` | Show "not found"; drop the local reference |
+| `409` | Conflict (optimistic locking or idempotency); reload and re-confirm |
+| `5xx` | Transient error; offer retry with exponential backoff |
+
+Work Management currently returns a different error shape
+(`error_code`, `message`, `details`, `timestamp`). Until Amendment A-01 aligns
+it, `packages/api-client` maps that shape into the unified client error model at
+the transport boundary; no application code consumes the raw Work Management
+error fields.
+
 ## Consultation Submission Flow
 
 ### Webapp and Desktop
@@ -145,11 +167,22 @@ Client (offline)                     Backend
 (1 s, 2 s, 4 s, …, max 60 s). 4xx responses are removed from the queue
 and surfaced to the user as errors.
 
-> **Idempotency scope:** only the approval decision endpoint currently declares
-> an `Idempotency-Key` in the contract. Replaying queued create operations
-> (consultation, proposal) safely requires backend deduplication or the contract
-> amendment described in [ADR-007](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md)
-> section 3.6.
+Only operations with a defined idempotency contract may be replayed
+automatically. Until [Amendment A-02](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md#amendment-a-02--idempotency-for-mutating-endpoints)
+extends `Idempotency-Key` to the remaining endpoints, queued create/triage/move
+operations stay pending and require explicit user confirmation on reconnect.
+
+| Operation | `Idempotency-Key` today | Auto-replay |
+|---|---|---|
+| Approval decision (`.../decide`) | Yes | Yes |
+| Consultation create | No | No — confirm on reconnect |
+| Triage | No | No — confirm on reconnect |
+| Proposal create / submit | No | No — confirm on reconnect |
+| Board card move | No | No — not supported offline |
+
+Conflict handling uses **optimistic locking**: approval decisions submit
+`proposal_version`. On `409`, the client reloads the entity and asks the user to
+re-confirm instead of overwriting silently.
 
 ## Editor Context and Consent Model (VS Code)
 

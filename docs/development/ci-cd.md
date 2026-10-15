@@ -13,12 +13,13 @@ feature branch -> pull request -> CI -> review -> main
 ```
 
 The current `.github/workflows/ci.yml` has one active `contracts` job. It runs
-the repository-quality hooks with the local contract hook skipped, then runs
-`scripts/validate_contracts.py` and the pinned OpenAPI and AsyncAPI validators.
-It runs on pull requests and pushes to `main`, uses read-only repository
-permissions, and cancels obsolete runs for the same PR or branch. GitHub
-Actions execution is not implied by local runs; remote status is determined by
-the GitHub workflow itself.
+the repository-quality hooks with the local contract hook skipped, runs
+`scripts/validate_contracts.py`, the pinned OpenAPI and AsyncAPI validators, and
+the repository contract, schema, and bounded-context boundary tests through
+`python -m testrunner tests -v`. It runs on pull requests and pushes to `main`,
+uses read-only repository permissions, and cancels obsolete runs for the same PR
+or branch. GitHub Actions execution is not implied by local runs; remote status
+is determined by the GitHub workflow itself.
 
 Pre-commit remains complementary. Its common hooks and fast contract check are
 not a replacement for the CI job or for the official OpenAPI/AsyncAPI checks.
@@ -32,6 +33,7 @@ the authoritative contract validator runs once through
 |---|---|---|---|---|---|---|---|
 | Repository quality | Common hooks | Common hooks plus contract/documentation validation | Same CI workflow | N/A | N/A | N/A | ACTIVE |
 | Static contracts | Fast local validator | Full validation | Full validation | Required gate | Required gate | Required gate | ACTIVE |
+| Contract/schema/boundary tests (jsr-testrunner) | Local run | `python -m testrunner tests -v` | Same CI workflow | Gate when present | Gate when present | Gate when present | ACTIVE |
 | Python quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
 | Python unit tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
 | Java quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
@@ -90,10 +92,14 @@ module and its runtime support make race testing applicable. The module's
 
 ## Contract And Distributed Tests
 
-Static contract validation is active today. It is not an executable contract
-test. Once implementations exist, HTTP tests must exercise implementation
-against OpenAPI, and event producer/consumer tests must exercise payloads
-against AsyncAPI and JSON Schema.
+Static contract validation is active today, and the repository's executable
+contract suite (`tests/contracts`, run in CI via `python -m testrunner tests -v`)
+verifies JSON Schema Draft 2020-12 validity, positive and negative payload
+fixtures, OpenAPI document validity, bounded-context boundary rules, and
+documentation/reference integrity. This suite does not yet exercise an
+implementation: HTTP tests must run a real service against OpenAPI, and event
+producer/consumer tests must run against AsyncAPI and JSON Schema. Those
+implementation-level executable tests remain PLANNED until services exist.
 
 Integration tests should use disposable PostgreSQL and Kafka/Redpanda
 dependencies when enough services exist to execute a real workflow. Future
