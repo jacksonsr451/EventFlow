@@ -103,10 +103,18 @@ defense.
 
 - `approvals` has `UNIQUE (proposal_id, proposal_version)`: at most one decision
   per proposal version.
+- `work_items` has `UNIQUE (origin_proposal_id)`: at most one WorkItem per
+  Proposal, matching workflow step 7 ("Insert WorkItem (Unique constraint on
+  `origin_proposal_id`)").
 - Composite foreign keys keep a Proposal in the same project as its Consultation
   and a WorkItem in the same project as its origin Proposal:
   `fk_proposals_workspace_project_consultation` and
   `fk_work_items_workspace_project_proposal`.
+- `board_cards` carries an internal `project_id` and two composite foreign keys,
+  `fk_board_cards_workspace_project_board` and
+  `fk_board_cards_workspace_project_work_item`, so a card's Board and WorkItem
+  must belong to the same project. The column is functionally determined by the
+  board and kept consistent by the constraints, so it cannot drift.
 - A `BEFORE INSERT OR UPDATE` trigger on `work_items` requires that the
   referenced `origin_approval_id` exists in the same workspace, targets the same
   `origin_proposal_id` and `origin_proposal_version`, and has

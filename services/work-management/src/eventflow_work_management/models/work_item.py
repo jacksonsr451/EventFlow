@@ -79,6 +79,12 @@ class WorkItem(TimestampMixin, Base):
             ondelete="CASCADE",
         ),
         UniqueConstraint("workspace_id", "id", name="uq_work_items_workspace_id"),
+        UniqueConstraint(
+            "workspace_id", "project_id", "id", name="uq_work_items_workspace_project_id"
+        ),
+        UniqueConstraint(
+            "origin_proposal_id", name="uq_work_items_origin_proposal"
+        ),
         CheckConstraint("origin_proposal_version >= 1", name="proposal_version_positive"),
         CheckConstraint("char_length(title) >= 5", name="title_min_length"),
         CheckConstraint("char_length(description) >= 10", name="description_min_length"),

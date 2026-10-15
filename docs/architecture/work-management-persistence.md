@@ -28,8 +28,8 @@ and does not depend on Order Processing code or tables.
 | `consultations` | Submitted requests | enums; `(workspace_id, project_id)` FK to `projects`; unique `(workspace_id, project_id, id)` |
 | `proposals` | Versioned plans | unique `(consultation_id, version)`; project-bound consultation FK; array checks |
 | `approvals` | One decision per proposal version | unique `(proposal_id, proposal_version)`; `sha256` hash |
-| `work_items` | Execution work | origin trigger; project-bound proposal FK; composite FKs to project and approval |
-| `boards` / `board_cards` | Kanban placement | unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)` |
+| `work_items` | Execution work | unique `origin_proposal_id`; origin trigger; project-bound proposal FK; composite FKs to project and approval |
+| `boards` / `board_cards` | Kanban placement | card `project_id` bound to board and WorkItem by composite FKs; unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)` |
 | `audit_records` | Append-only audit trail | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; `sha256` snapshot hash |
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
 | `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
@@ -51,6 +51,15 @@ Application code validates first; the database is the last line of defense.
   therefore cannot belong to a different project than its Consultation, and a
   WorkItem cannot belong to a different project than the approved Proposal it
   came from.
+- **Board card project consistency.** `board_cards` stores an internal
+  `project_id` and references `boards` and `work_items` through the composite
+  foreign keys `fk_board_cards_workspace_project_board` and
+  `fk_board_cards_workspace_project_work_item`. A card's Board and WorkItem must
+  therefore belong to the same workspace *and* the same project; a card cannot
+  join a board in one project to a WorkItem in another. The column is
+  functionally dependent on the board and is kept consistent by the constraints.
+- **WorkItem cardinality.** `work_items` has `UNIQUE (origin_proposal_id)`: at
+  most one WorkItem can originate from a given Proposal, per workflow step 7.
 - **Proposal versioning.** `proposals` has `UNIQUE (consultation_id, version)`;
   `approvals` has `UNIQUE (proposal_id, proposal_version)`.
 - **WorkItem provenance.** A `BEFORE INSERT/UPDATE` trigger requires the
@@ -109,6 +118,8 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 |---|---|---|---|
 | Tenant isolation (cross-workspace) | composite FKs `fk_*_workspace_*` | workspace-scoped `get`/`list` methods | `test_cross_workspace_reference_is_rejected`, `test_reference_to_another_workspace_entity_is_rejected` |
 | Project consistency | `fk_proposals_workspace_project_consultation`, `fk_work_items_workspace_project_proposal` | callers pass matching `project_id` | `test_proposal_project_must_match_consultation_project`, `test_work_item_project_must_match_origin_proposal_project` |
+| Board card project consistency | `fk_board_cards_workspace_project_board`, `fk_board_cards_workspace_project_work_item` | `BoardCardRepository.add_card` derives `project_id` from the board | `test_board_card_cross_project_is_rejected`, `test_board_card_cross_project_direct_sql_is_rejected`, `test_board_card_cross_workspace_is_rejected`, `test_board_card_update_to_cross_project_work_item_is_rejected`, `test_changing_work_item_project_cannot_invalidate_existing_card` |
+| WorkItem cardinality | `uq_work_items_origin_proposal` | `WorkItemRepository.create_from_approved_proposal` conflict handling | `test_second_work_item_from_same_proposal_is_rejected`, `test_duplicate_work_item_via_direct_sql_is_rejected`, `test_concurrent_work_items_from_same_proposal_has_exactly_one_effect` |
 | WorkItem origin | `trg_work_items_origin_guard` | `WorkItemRepository.create_from_approved_proposal` | `test_work_item_requires_approved_proposal`, `test_work_item_rejects_mismatched_proposal_version`, `test_work_item_origin_cannot_be_updated_to_invalid_version` |
 | Audit immutability | `trg_audit_records_no_update/_no_delete/_no_truncate` | `AuditRepository.append` (insert only) | `test_audit_records_are_append_only`, `test_audit_records_cannot_be_truncated` |
 | Idempotency | `uq_idempotency_records_scope_key` | `ApprovalRepository.decide` + `IdempotencyRepository` | `test_same_key_replays_without_new_effects`, `test_same_key_different_request_conflicts`, `test_concurrent_same_key_has_exactly_one_effect` |
@@ -122,10 +133,12 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 - **Row-Level Security is deferred** until an authentication context exists
   (Issues #9/#10). Until then, application-layer scoping remains load-bearing and
   a missing `WHERE workspace_id = ...` is a real risk (Issue #47).
-- **Board card project equality is not enforced.** A card may reference a board
-  and a WorkItem from different projects in the same workspace. Enforcing this
-  would require an internal `project_id` column on `board_cards` and additional
-  composite keys; it is left to the board workflow issue.
+- **Test database configuration fails closed.** Integration tests require an
+  explicit `EVENTFLOW_TEST_DATABASE_URL`; they never fall back to
+  `EVENTFLOW_DATABASE_URL`, and destructive operations only target generated
+  `eventflow_test_<12 hex>` databases. A shared application/test URL is still
+  possible by configuration (as CI does), so point the test URL at a disposable
+  database.
 - **Remote references with unknown `entity_type`** are accepted without
   existence or workspace validation; provider integrations own those semantics.
 - **`updated_at`** is maintained by the ORM `onupdate`, not a database trigger,

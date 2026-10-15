@@ -59,9 +59,13 @@ class BoardCardRepository(Repository):
         category: str,
         assignee_id: UUID | None = None,
     ) -> BoardCard:
+        board = self._session.get(Board, board_id)
+        if board is None or board.workspace_id != workspace_id:
+            raise EntityNotFound("board not found in workspace")
         card = BoardCard(
             id=uuid4(),
             workspace_id=workspace_id,
+            project_id=board.project_id,
             board_id=board_id,
             work_item_id=work_item_id,
             column_id=column_id,

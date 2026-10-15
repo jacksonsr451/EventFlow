@@ -21,23 +21,28 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
+from eventflow_work_management import config
+
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_INI = SERVICE_ROOT / "alembic.ini"
 MIGRATIONS_DIR = SERVICE_ROOT / "src" / "eventflow_work_management" / "migrations"
 
-TEST_DATABASE_URL_ENV = "EVENTFLOW_TEST_DATABASE_URL"
-DATABASE_URL_ENV = "EVENTFLOW_DATABASE_URL"
+TEST_DATABASE_URL_ENV = config.TEST_DATABASE_URL_ENV
 
 
 def require_database_url() -> str:
-    """Return the configured admin URL or skip the calling test."""
-    url = os.environ.get(TEST_DATABASE_URL_ENV) or os.environ.get(DATABASE_URL_ENV)
+    """Return the explicitly configured test admin URL or skip the test.
+
+    There is deliberately no fallback to ``EVENTFLOW_DATABASE_URL``: destructive
+    test operations must be pointed at a test database on purpose.
+    """
+    url = os.environ.get(TEST_DATABASE_URL_ENV)
     if not url:
         testrunner.skip(
-            "no PostgreSQL URL set: configure EVENTFLOW_TEST_DATABASE_URL to run "
+            "no test database configured: set EVENTFLOW_TEST_DATABASE_URL to run "
             "integration tests"
         )
-    return url
+    return config.validate_test_admin_url(url)
 
 
 def _target_url(admin_url: str, database: str) -> str:
@@ -63,8 +68,16 @@ def run_downgrade(url: str, revision: str = "base") -> None:
 
 @contextmanager
 def temporary_empty_database(admin_url: str) -> Iterator[tuple[str, Engine]]:
-    """Create an empty throwaway database and drop it afterwards."""
-    name = f"eventflow_test_{uuid.uuid4().hex[:12]}"
+    """Create an empty throwaway database and drop it afterwards.
+
+    Fails closed: the admin URL must be explicitly configured and the throwaway
+    name is validated before any destructive statement runs, so a misconfigured
+    URL can never drop a non-test database.
+    """
+    admin_url = config.validate_test_admin_url(admin_url)
+    name = config.assert_safe_test_database_name(
+        f"{config.TEST_DATABASE_NAME_PREFIX}{uuid.uuid4().hex[:12]}"
+    )
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT", future=True)
     try:
         with admin_engine.connect() as connection:
@@ -76,6 +89,7 @@ def temporary_empty_database(admin_url: str) -> Iterator[tuple[str, Engine]]:
         finally:
             engine.dispose()
     finally:
+        config.assert_safe_test_database_name(name)
         try:
             with admin_engine.connect() as connection:
                 connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))

@@ -46,6 +46,9 @@ class Board(TimestampMixin, Base):
             ondelete="CASCADE",
         ),
         UniqueConstraint("workspace_id", "id", name="uq_boards_workspace_id"),
+        UniqueConstraint(
+            "workspace_id", "project_id", "id", name="uq_boards_workspace_project_id"
+        ),
         CheckConstraint("char_length(name) >= 1", name="name_min_length"),
         CheckConstraint("jsonb_typeof(columns) = 'array'", name="columns_is_array"),
         Index("ix_boards_workspace_id", "workspace_id"),
@@ -65,6 +68,7 @@ class BoardCard(TimestampMixin, Base):
         server_default=text("gen_random_uuid()"),
     )
     workspace_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     board_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     column_id: Mapped[str] = mapped_column(String(80), nullable=False)
     work_item_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -76,15 +80,15 @@ class BoardCard(TimestampMixin, Base):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ["workspace_id", "board_id"],
-            ["boards.workspace_id", "boards.id"],
-            name="fk_board_cards_workspace_board",
+            ["workspace_id", "project_id", "board_id"],
+            ["boards.workspace_id", "boards.project_id", "boards.id"],
+            name="fk_board_cards_workspace_project_board",
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(
-            ["workspace_id", "work_item_id"],
-            ["work_items.workspace_id", "work_items.id"],
-            name="fk_board_cards_workspace_work_item",
+            ["workspace_id", "project_id", "work_item_id"],
+            ["work_items.workspace_id", "work_items.project_id", "work_items.id"],
+            name="fk_board_cards_workspace_project_work_item",
             ondelete="CASCADE",
         ),
         UniqueConstraint("board_id", "work_item_id", name="uq_board_cards_board_work_item"),
@@ -96,6 +100,7 @@ class BoardCard(TimestampMixin, Base):
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
         CheckConstraint(check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"),
         Index("ix_board_cards_workspace_id", "workspace_id"),
+        Index("ix_board_cards_project_id", "project_id"),
         Index("ix_board_cards_board_id", "board_id"),
         Index("ix_board_cards_column_id", "column_id"),
     )

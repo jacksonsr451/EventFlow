@@ -64,6 +64,38 @@ def test_work_item_origin_columns_are_required():
         assert not table.columns[column].nullable
 
 
+def test_work_item_origin_proposal_is_unique():
+    table = Base.metadata.tables["work_items"]
+    unique_columns = {
+        tuple(column.name for column in constraint.columns)
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+    assert ("origin_proposal_id",) in unique_columns
+
+
+def test_board_cards_carry_project_id():
+    table = Base.metadata.tables["board_cards"]
+    assert "project_id" in table.columns
+    assert not table.columns["project_id"].nullable
+
+
+def test_board_card_project_foreign_keys_share_project():
+    table = Base.metadata.tables["board_cards"]
+    foreign_keys = {
+        (constraint.name, tuple(column.name for column in constraint.columns))
+        for constraint in table.foreign_key_constraints
+    }
+    assert (
+        "fk_board_cards_workspace_project_board",
+        ("workspace_id", "project_id", "board_id"),
+    ) in foreign_keys
+    assert (
+        "fk_board_cards_workspace_project_work_item",
+        ("workspace_id", "project_id", "work_item_id"),
+    ) in foreign_keys
+
+
 def test_audit_records_are_required_and_hashed():
     table = Base.metadata.tables["audit_records"]
     assert not table.columns["snapshot_hash"].nullable

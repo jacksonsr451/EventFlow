@@ -184,6 +184,7 @@ def seed(session: Session) -> dict[str, UUID]:
         BoardCard(
             id=CARD_ID,
             workspace_id=WORKSPACE_ID,
+            project_id=PROJECT_ID,
             board_id=BOARD_ID,
             column_id="ready",
             work_item_id=WORK_ITEM_ID,

@@ -60,6 +60,23 @@ def _functions(engine: Engine) -> set[str]:
         return set(connection.execute(query).scalars())
 
 
+def _constraints(engine: Engine) -> set[str]:
+    query = text(
+        "SELECT conname FROM pg_constraint WHERE connamespace = 'public'::regnamespace"
+    )
+    with engine.connect() as connection:
+        return set(connection.execute(query).scalars())
+
+
+EXPECTED_CONSTRAINTS = {
+    "uq_work_items_origin_proposal",
+    "uq_work_items_workspace_project_id",
+    "uq_boards_workspace_project_id",
+    "fk_board_cards_workspace_project_board",
+    "fk_board_cards_workspace_project_work_item",
+}
+
+
 def _revision(engine: Engine) -> str | None:
     with engine.connect() as connection:
         return connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
@@ -78,6 +95,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         assert _revision(engine) == "0001_initial"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
+        assert EXPECTED_CONSTRAINTS <= _constraints(engine)
 
 
 def test_upgrade_is_idempotent():
