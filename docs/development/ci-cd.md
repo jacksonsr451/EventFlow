@@ -15,7 +15,8 @@ feature branch -> pull request -> CI -> review -> main
 The current `.github/workflows/ci.yml` has one active `contracts` job. It runs
 the repository-quality hooks with the local contract hook skipped, runs
 `scripts/validate_contracts.py`, the pinned OpenAPI and AsyncAPI validators, and
-the repository contract, schema, and bounded-context boundary tests through
+the repository contract, schema, bounded-context boundary, and security
+documentation/contract tests through
 `testrunner tests -v --disable-plugin-autoload`. The autoload flag keeps the
 runner from loading third-party `pytest11` plugins (for example `platformdirs`,
 pulled in transitively by `pre-commit`), which would otherwise fail because
@@ -97,11 +98,12 @@ module and its runtime support make race testing applicable. The module's
 ## Contract And Distributed Tests
 
 Static contract validation is active today, and the repository's executable
-contract suite (`tests/contracts`, run in CI via
+contract suite (`tests/contracts` and `tests/security`, run in CI via
 `testrunner tests -v --disable-plugin-autoload`)
 verifies JSON Schema Draft 2020-12 validity, positive and negative payload
-fixtures, OpenAPI document validity, bounded-context boundary rules, and
-documentation/reference integrity. This suite does not yet exercise an
+fixtures, OpenAPI document validity, bounded-context boundary rules, security
+documentation integrity, and documentation/reference integrity. This suite does
+not yet exercise an
 implementation: HTTP tests must run a real service against OpenAPI, and event
 producer/consumer tests must run against AsyncAPI and JSON Schema. Those
 implementation-level executable tests remain PLANNED until services exist.

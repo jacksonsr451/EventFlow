@@ -2,8 +2,8 @@
 
 Testing will combine unit, integration, contract, end-to-end and resilience
 tests. Repository-level contract tests already exist under `tests/contracts/`
-and run in CI; unit, integration, end-to-end and resilience tests do not exist
-yet.
+and security specification tests under `tests/security/`; both run in CI. Unit,
+integration, end-to-end and resilience tests do not exist yet.
 
 ## Required Invariants
 
@@ -31,7 +31,7 @@ clients exist.
 | Area | Pre-commit | CI | Status |
 |---|---|---|---|
 | Repository | whitespace, EOF, YAML/JSON syntax, conflicts, large files, case conflicts and private-key detection | Same repository hooks plus contract/documentation validation | Active |
-| Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples; `tests/contracts` via `testrunner tests -v --disable-plugin-autoload` | Active |
+| Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples; `tests/contracts` and `tests/security` via `testrunner tests -v --disable-plugin-autoload` | Active |
 | Python | None until service code and project tooling exist; repository tooling is not treated as FastAPI code | Ruff, type checking and tests when services exist | Future |
 | Java | The service build's fast formatter/checks when Inventory exists | Maven/Gradle compile, analysis and tests | Future |
 | Go | `gofmt` and possibly fast `go vet` when a module exists | `gofmt -l`, `go vet` and tests | Future |
