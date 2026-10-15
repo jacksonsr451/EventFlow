@@ -29,6 +29,14 @@ EXPECTED_TRIGGERS = {
     "trg_work_items_origin_guard",
     "trg_audit_records_no_update",
     "trg_audit_records_no_delete",
+    "trg_audit_records_no_truncate",
+    "trg_remote_references_entity_guard",
+}
+
+EXPECTED_FUNCTIONS = {
+    "eventflow_validate_work_item_origin",
+    "eventflow_validate_remote_reference",
+    "eventflow_audit_records_block_mutation",
 }
 
 
@@ -69,7 +77,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         assert "alembic_version" in tables
         assert _revision(engine) == "0001_initial"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
-        assert {"eventflow_validate_work_item_origin", "eventflow_audit_records_block_mutation"} <= _functions(engine)
+        assert EXPECTED_FUNCTIONS <= _functions(engine)
 
 
 def test_upgrade_is_idempotent():
@@ -88,5 +96,5 @@ def test_downgrade_removes_tables_triggers_and_functions():
 
         remaining = EXPECTED_TABLES & _tables(engine)
         assert not remaining
-        assert not (_functions(engine) & {"eventflow_validate_work_item_origin", "eventflow_audit_records_block_mutation"})
+        assert not (_functions(engine) & EXPECTED_FUNCTIONS)
         assert not (_triggers(engine) & EXPECTED_TRIGGERS)

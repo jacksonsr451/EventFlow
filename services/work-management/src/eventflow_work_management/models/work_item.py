@@ -67,9 +67,9 @@ class WorkItem(TimestampMixin, Base):
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(
-            ["workspace_id", "origin_proposal_id"],
-            ["proposals.workspace_id", "proposals.id"],
-            name="fk_work_items_workspace_proposal",
+            ["workspace_id", "project_id", "origin_proposal_id"],
+            ["proposals.workspace_id", "proposals.project_id", "proposals.id"],
+            name="fk_work_items_workspace_project_proposal",
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(

@@ -190,3 +190,60 @@ def test_audit_records_are_append_only():
 
         remaining = session.execute(text("SELECT count(*) FROM audit_records")).scalar_one()
         assert remaining == 1
+
+
+def test_audit_records_cannot_be_truncated():
+    admin_url = require_database_url()
+    with migrated_engine(admin_url) as engine, session_scope(engine) as session:
+        workspace = create_workspace(session)
+        AuditRepository(session).append(
+            workspace_id=workspace.id,
+            action="workspace.created",
+            entity_type="workspace",
+            entity_id=workspace.id,
+            snapshot={"slug": workspace.slug},
+        )
+        session.commit()
+
+        with testrunner.raises(Exception):
+            session.execute(text("TRUNCATE audit_records"))
+            session.commit()
+        session.rollback()
+
+        remaining = session.execute(text("SELECT count(*) FROM audit_records")).scalar_one()
+        assert remaining == 1
+
+
+def test_work_item_origin_cannot_be_updated_to_invalid_version():
+    admin_url = require_database_url()
+    with migrated_engine(admin_url) as engine, session_scope(engine) as session:
+        workspace = create_workspace(session)
+        project = create_project(session, workspace)
+        consultation = create_consultation(session, workspace, project)
+        proposal, decision = _approve(session, workspace, consultation)
+        work_item = WorkItemRepository(session).create_from_approved_proposal(
+            workspace_id=workspace.id,
+            project_id=project.id,
+            proposal_id=proposal.id,
+            proposal_version=proposal.version,
+            approval_id=decision.approval.id,
+            title="Guarded work item",
+            description="Origin must stay bound to the approved version.",
+            acceptance_criteria=["origin remains valid"],
+            category="feature",
+            priority="medium",
+        )
+
+        with testrunner.raises(Exception):
+            session.execute(
+                text("UPDATE work_items SET origin_proposal_version = :v WHERE id = :id"),
+                {"v": proposal.version + 1, "id": work_item.id},
+            )
+            session.commit()
+        session.rollback()
+
+        stored = session.execute(
+            text("SELECT origin_proposal_version FROM work_items WHERE id = :id"),
+            {"id": work_item.id},
+        ).scalar_one()
+        assert stored == proposal.version

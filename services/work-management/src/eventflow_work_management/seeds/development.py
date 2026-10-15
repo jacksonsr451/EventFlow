@@ -52,7 +52,7 @@ def _seed_proposal_snapshot() -> dict:
     return {
         "proposal_id": str(PROPOSAL_ID),
         "version": 1,
-        "status": "draft",
+        "status": "approved",
         "title": "Seed proposal",
         "category": "feature",
         "priority": "medium",

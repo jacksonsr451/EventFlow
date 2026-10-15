@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from eventflow_work_management.models import Consultation, Proposal, WorkItem, Workspace
 from eventflow_work_management.repositories import (
+    ApprovalRepository,
     BoardCardRepository,
     BoardRepository,
     ProposalRepository,
@@ -16,6 +17,7 @@ from eventflow_work_management.repositories import (
 from support import (
     create_consultation,
     create_project,
+    create_proposal,
     create_workspace,
     migrated_engine,
     require_database_url,
@@ -172,10 +174,76 @@ def test_duplicate_board_card_rank_is_rejected():
         session.rollback()
 
 
+def test_proposal_project_must_match_consultation_project():
+    admin_url = require_database_url()
+    with migrated_engine(admin_url) as engine, session_scope(engine) as session:
+        workspace = create_workspace(session)
+        project_a = create_project(session, workspace, name="Project A")
+        project_b = create_project(session, workspace, name="Project B")
+        consultation = create_consultation(session, workspace, project_a)
+
+        with testrunner.raises(IntegrityError):
+            session.add(
+                Proposal(
+                    id=uuid4(),
+                    workspace_id=workspace.id,
+                    project_id=project_b.id,
+                    consultation_id=consultation.id,
+                    version=1,
+                    title="Cross-project proposal",
+                    technical_description="Project must match the consultation.",
+                    scope="Scope.",
+                    justification="Justification.",
+                    acceptance_criteria=["criteria"],
+                    category="feature",
+                    priority="medium",
+                    proposer_id=uuid4(),
+                )
+            )
+            session.commit()
+        session.rollback()
+
+
+def test_work_item_project_must_match_origin_proposal_project():
+    admin_url = require_database_url()
+    with migrated_engine(admin_url) as engine, session_scope(engine) as session:
+        workspace = create_workspace(session)
+        project_a = create_project(session, workspace, name="Project A")
+        project_b = create_project(session, workspace, name="Project B")
+        consultation = create_consultation(session, workspace, project_a)
+        proposal = create_proposal(session, workspace, project_a, consultation)
+        decision = ApprovalRepository(session).decide(
+            workspace_id=workspace.id,
+            proposal_id=proposal.id,
+            proposal_version=proposal.version,
+            decider_id=uuid4(),
+            decision="approved",
+            justification="Approved for cross-project test.",
+            idempotency_key=f"cross-project-{uuid4().hex[:12]}",
+        )
+
+        with testrunner.raises(IntegrityError):
+            session.add(
+                WorkItem(
+                    id=uuid4(),
+                    workspace_id=workspace.id,
+                    project_id=project_b.id,
+                    origin_proposal_id=proposal.id,
+                    origin_proposal_version=proposal.version,
+                    origin_approval_id=decision.approval.id,
+                    title="Cross-project work item",
+                    description="Project must match the origin proposal.",
+                    acceptance_criteria=["criteria"],
+                    category="feature",
+                    priority="medium",
+                )
+            )
+            session.commit()
+        session.rollback()
+
+
 def _persist_work_item(session, workspace, project):
     """Create a minimal approved-proposal-backed WorkItem for card tests."""
-    from support import create_proposal
-    from eventflow_work_management.repositories import ApprovalRepository
     from uuid import uuid4 as _uuid4
 
     consultation = create_consultation(session, workspace, project)

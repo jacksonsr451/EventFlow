@@ -63,6 +63,9 @@ class Consultation(TimestampMixin, Base):
             ondelete="CASCADE",
         ),
         UniqueConstraint("workspace_id", "id", name="uq_consultations_workspace_id"),
+        UniqueConstraint(
+            "workspace_id", "project_id", "id", name="uq_consultations_workspace_project_id"
+        ),
         CheckConstraint(check_in("origin", ORIGIN_VALUES), name="origin_values"),
         CheckConstraint(check_in("status", CONSULTATION_STATUS_VALUES), name="status_values"),
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),

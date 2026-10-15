@@ -150,7 +150,8 @@ def upgrade() -> None:
     sa.CheckConstraint('char_length(title) >= 3', name=op.f('ck_consultations_title_min_length')),
     sa.ForeignKeyConstraint(['workspace_id', 'project_id'], ['projects.workspace_id', 'projects.id'], name='fk_consultations_workspace_project', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_consultations')),
-    sa.UniqueConstraint('workspace_id', 'id', name='uq_consultations_workspace_id')
+    sa.UniqueConstraint('workspace_id', 'id', name='uq_consultations_workspace_id'),
+    sa.UniqueConstraint('workspace_id', 'project_id', 'id', name='uq_consultations_workspace_project_id')
     )
     op.create_index('ix_consultations_project_id', 'consultations', ['project_id'], unique=False)
     op.create_index('ix_consultations_status', 'consultations', ['status'], unique=False)
@@ -189,11 +190,12 @@ def upgrade() -> None:
     sa.CheckConstraint('estimated_hours IS NULL OR estimated_hours >= 0.5', name=op.f('ck_proposals_estimated_hours_minimum')),
     sa.CheckConstraint('jsonb_array_length(acceptance_criteria) >= 1', name=op.f('ck_proposals_criteria_not_empty')),
     sa.CheckConstraint('version >= 1', name=op.f('ck_proposals_version_positive')),
-    sa.ForeignKeyConstraint(['workspace_id', 'consultation_id'], ['consultations.workspace_id', 'consultations.id'], name='fk_proposals_workspace_consultation', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['workspace_id', 'project_id', 'consultation_id'], ['consultations.workspace_id', 'consultations.project_id', 'consultations.id'], name='fk_proposals_workspace_project_consultation', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['workspace_id', 'project_id'], ['projects.workspace_id', 'projects.id'], name='fk_proposals_workspace_project', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_proposals')),
     sa.UniqueConstraint('consultation_id', 'version', name='uq_proposals_consultation_version'),
-    sa.UniqueConstraint('workspace_id', 'id', name='uq_proposals_workspace_id')
+    sa.UniqueConstraint('workspace_id', 'id', name='uq_proposals_workspace_id'),
+    sa.UniqueConstraint('workspace_id', 'project_id', 'id', name='uq_proposals_workspace_project_id')
     )
     op.create_index('ix_proposals_consultation_id', 'proposals', ['consultation_id'], unique=False)
     op.create_index('ix_proposals_status', 'proposals', ['status'], unique=False)
@@ -249,7 +251,7 @@ def upgrade() -> None:
     sa.CheckConstraint('jsonb_array_length(acceptance_criteria) >= 1', name=op.f('ck_work_items_criteria_not_empty')),
     sa.CheckConstraint('origin_proposal_version >= 1', name=op.f('ck_work_items_proposal_version_positive')),
     sa.ForeignKeyConstraint(['workspace_id', 'origin_approval_id'], ['approvals.workspace_id', 'approvals.id'], name='fk_work_items_workspace_approval', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['workspace_id', 'origin_proposal_id'], ['proposals.workspace_id', 'proposals.id'], name='fk_work_items_workspace_proposal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['workspace_id', 'project_id', 'origin_proposal_id'], ['proposals.workspace_id', 'proposals.project_id', 'proposals.id'], name='fk_work_items_workspace_project_proposal', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['workspace_id', 'project_id'], ['projects.workspace_id', 'projects.id'], name='fk_work_items_workspace_project', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_work_items')),
     sa.UniqueConstraint('workspace_id', 'id', name='uq_work_items_workspace_id')
@@ -348,6 +350,88 @@ def upgrade() -> None:
         FOR EACH ROW EXECUTE FUNCTION eventflow_audit_records_block_mutation();
         """
     )
+    op.execute(
+        """
+        CREATE TRIGGER trg_audit_records_no_truncate
+        BEFORE TRUNCATE ON audit_records
+        FOR EACH STATEMENT EXECUTE FUNCTION eventflow_audit_records_block_mutation();
+        """
+    )
+
+    # --- Remote integration references must point at a local entity in the
+    # --- same workspace (ADR-008 section 3, tenant isolation).
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION eventflow_validate_remote_reference()
+        RETURNS trigger AS $$
+        DECLARE
+            entity_ok boolean;
+        BEGIN
+            IF NEW.entity_type = 'workspace' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM workspaces
+                    WHERE id = NEW.entity_id AND id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'project' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM projects
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'consultation' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM consultations
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'proposal' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM proposals
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'approval' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM approvals
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'work_item' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM work_items
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'board' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM boards
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSIF NEW.entity_type = 'board_card' THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM board_cards
+                    WHERE id = NEW.entity_id AND workspace_id = NEW.workspace_id
+                ) INTO entity_ok;
+            ELSE
+                -- Unknown entity types are forward-compatible and not validated
+                -- here; provider integrations own their semantics.
+                RETURN NEW;
+            END IF;
+
+            IF entity_ok IS DISTINCT FROM true THEN
+                RAISE EXCEPTION
+                    'remote reference entity must exist in the referenced workspace'
+                    USING ERRCODE = '23514';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_remote_references_entity_guard
+        BEFORE INSERT OR UPDATE OF
+            entity_type, entity_id, workspace_id
+        ON remote_integration_references
+        FOR EACH ROW EXECUTE FUNCTION eventflow_validate_remote_reference();
+        """
+    )
 
 
 def downgrade() -> None:
@@ -388,4 +472,5 @@ def downgrade() -> None:
     # ### end Alembic commands ###
 
     op.execute("DROP FUNCTION IF EXISTS eventflow_validate_work_item_origin();")
+    op.execute("DROP FUNCTION IF EXISTS eventflow_validate_remote_reference();")
     op.execute("DROP FUNCTION IF EXISTS eventflow_audit_records_block_mutation();")

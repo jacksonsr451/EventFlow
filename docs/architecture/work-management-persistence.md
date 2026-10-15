@@ -25,14 +25,14 @@ and does not depend on Order Processing code or tables.
 |---|---|---|
 | `workspaces` | Tenant boundary | unique `slug` (format checked) |
 | `projects` | Grouping inside a workspace | unique `(workspace_id, key)`, unique `(workspace_id, id)` |
-| `consultations` | Submitted requests | enums; `(workspace_id, project_id)` FK to `projects` |
-| `proposals` | Versioned plans | unique `(consultation_id, version)`; array checks |
+| `consultations` | Submitted requests | enums; `(workspace_id, project_id)` FK to `projects`; unique `(workspace_id, project_id, id)` |
+| `proposals` | Versioned plans | unique `(consultation_id, version)`; project-bound consultation FK; array checks |
 | `approvals` | One decision per proposal version | unique `(proposal_id, proposal_version)`; `sha256` hash |
-| `work_items` | Execution work | origin trigger; composite FKs to project, proposal and approval |
+| `work_items` | Execution work | origin trigger; project-bound proposal FK; composite FKs to project and approval |
 | `boards` / `board_cards` | Kanban placement | unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)` |
-| `audit_records` | Append-only audit trail | block `UPDATE`/`DELETE` triggers; `sha256` snapshot hash |
+| `audit_records` | Append-only audit trail | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; `sha256` snapshot hash |
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
-| `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key |
+| `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
 
 ## Invariants Enforced by the Database
 
@@ -43,14 +43,28 @@ Application code validates first; the database is the last line of defense.
   `(workspace_id, parent_id) -> parent(workspace_id, id)`, so a row can never
   point at another workspace's data. This supports the
   [tenant isolation](../security/tenant-isolation.md) invariants.
+- **Project consistency.** A Proposal's `(workspace_id, project_id,
+  consultation_id)` must match an existing Consultation through the composite FK
+  `fk_proposals_workspace_project_consultation`, and a WorkItem's
+  `(workspace_id, project_id, origin_proposal_id)` must match its origin
+  Proposal through `fk_work_items_workspace_project_proposal`. A Proposal
+  therefore cannot belong to a different project than its Consultation, and a
+  WorkItem cannot belong to a different project than the approved Proposal it
+  came from.
 - **Proposal versioning.** `proposals` has `UNIQUE (consultation_id, version)`;
   `approvals` has `UNIQUE (proposal_id, proposal_version)`.
 - **WorkItem provenance.** A `BEFORE INSERT/UPDATE` trigger requires the
   referenced approval to exist in the same workspace, to match the proposal and
   version, and to be `approved`. A WorkItem cannot come from a Consultation or
-  an unapproved Proposal.
-- **Append-only audit.** `BEFORE UPDATE` and `BEFORE DELETE` triggers on
-  `audit_records` raise, preserving history.
+  an unapproved Proposal, and the origin columns cannot be updated to an
+  invalid Proposal/version.
+- **Append-only audit.** `BEFORE UPDATE`, `BEFORE DELETE` and `BEFORE TRUNCATE`
+  triggers on `audit_records` raise, preserving history against row and
+  whole-table mutation.
+- **Remote reference integrity.** A `BEFORE INSERT/UPDATE` trigger requires a
+  `remote_integration_references` row whose `entity_type` names a Work
+  Management entity to reference an entity that exists in the same workspace.
+  Unknown entity types are forward-compatible and are not validated here.
 - **Idempotency.** The decision and its `idempotency_records` row are written in
   one transaction; a retry with the same key and fingerprint returns the stored
   result, a different request under the same key conflicts.
@@ -85,3 +99,39 @@ Local PostgreSQL is provided by the root `docker-compose.yml`. CI runs the same
 migrations and the PostgreSQL-backed suite; see
 [ci-cd.md](../development/ci-cd.md) and
 [testing-strategy.md](../development/testing-strategy.md).
+
+## Traceability
+
+Each control is traced from its requirement to the database object that enforces
+it, the repository behavior, and the PostgreSQL-backed test that proves it.
+
+| Requirement | Database object | Repository behavior | Test |
+|---|---|---|---|
+| Tenant isolation (cross-workspace) | composite FKs `fk_*_workspace_*` | workspace-scoped `get`/`list` methods | `test_cross_workspace_reference_is_rejected`, `test_reference_to_another_workspace_entity_is_rejected` |
+| Project consistency | `fk_proposals_workspace_project_consultation`, `fk_work_items_workspace_project_proposal` | callers pass matching `project_id` | `test_proposal_project_must_match_consultation_project`, `test_work_item_project_must_match_origin_proposal_project` |
+| WorkItem origin | `trg_work_items_origin_guard` | `WorkItemRepository.create_from_approved_proposal` | `test_work_item_requires_approved_proposal`, `test_work_item_rejects_mismatched_proposal_version`, `test_work_item_origin_cannot_be_updated_to_invalid_version` |
+| Audit immutability | `trg_audit_records_no_update/_no_delete/_no_truncate` | `AuditRepository.append` (insert only) | `test_audit_records_are_append_only`, `test_audit_records_cannot_be_truncated` |
+| Idempotency | `uq_idempotency_records_scope_key` | `ApprovalRepository.decide` + `IdempotencyRepository` | `test_same_key_replays_without_new_effects`, `test_same_key_different_request_conflicts`, `test_concurrent_same_key_has_exactly_one_effect` |
+| Approval uniqueness | `uq_approvals_proposal_version` | `ApprovalRepository.decide` conflict handling | `test_new_key_for_decided_version_is_rejected` |
+| Remote reference uniqueness and integrity | `uq_remote_integration_references_resource`, `trg_remote_references_entity_guard` | `RemoteReferenceRepository.link` | `test_duplicate_remote_resource_is_rejected`, `test_reference_to_unknown_entity_is_rejected` |
+| Proposal version uniqueness | `uq_proposals_consultation_version` | `ProposalRepository._next_version` | `test_duplicate_proposal_version_is_rejected`, `test_concurrent_proposals_never_duplicate_versions` |
+| Migration reproducibility | Alembic `0001_initial` | `support.run_migrations` | `test_migrations_integration.py` |
+
+## Residual Risks and Deferred Controls
+
+- **Row-Level Security is deferred** until an authentication context exists
+  (Issues #9/#10). Until then, application-layer scoping remains load-bearing and
+  a missing `WHERE workspace_id = ...` is a real risk (Issue #47).
+- **Board card project equality is not enforced.** A card may reference a board
+  and a WorkItem from different projects in the same workspace. Enforcing this
+  would require an internal `project_id` column on `board_cards` and additional
+  composite keys; it is left to the board workflow issue.
+- **Remote references with unknown `entity_type`** are accepted without
+  existence or workspace validation; provider integrations own those semantics.
+- **`updated_at`** is maintained by the ORM `onupdate`, not a database trigger,
+  so a direct SQL `UPDATE` does not refresh it.
+- **Migration and application use the same PostgreSQL role** in development.
+  A production deployment must separate the migration administrator from the
+  least-privilege application role; that separation is not implemented here.
+- **`downgrade base` drops populated tables**, so it is technically reversible
+  but not data-preserving. It must never run against production data.

@@ -103,13 +103,21 @@ defense.
 
 - `approvals` has `UNIQUE (proposal_id, proposal_version)`: at most one decision
   per proposal version.
+- Composite foreign keys keep a Proposal in the same project as its Consultation
+  and a WorkItem in the same project as its origin Proposal:
+  `fk_proposals_workspace_project_consultation` and
+  `fk_work_items_workspace_project_proposal`.
 - A `BEFORE INSERT OR UPDATE` trigger on `work_items` requires that the
   referenced `origin_approval_id` exists in the same workspace, targets the same
   `origin_proposal_id` and `origin_proposal_version`, and has
   `decision = 'approved'`. A WorkItem therefore cannot be created directly from
-  a Consultation or an unapproved Proposal.
-- `audit_records` has `BEFORE UPDATE`/`BEFORE DELETE` triggers that raise, making
-  the table append-only.
+  a Consultation or an unapproved Proposal, and its origin columns cannot be
+  updated to an invalid Proposal/version.
+- `audit_records` has `BEFORE UPDATE`/`BEFORE DELETE`/`BEFORE TRUNCATE` triggers
+  that raise, making the table append-only.
+- A `BEFORE INSERT OR UPDATE` trigger on `remote_integration_references` requires
+  a reference whose `entity_type` names a Work Management entity to point at an
+  entity in the same workspace.
 - Workflow status columns are constrained to the contract enum values.
 
 ### 5. Idempotency

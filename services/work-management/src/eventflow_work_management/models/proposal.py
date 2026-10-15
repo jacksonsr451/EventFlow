@@ -61,9 +61,9 @@ class Proposal(TimestampMixin, Base):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ["workspace_id", "consultation_id"],
-            ["consultations.workspace_id", "consultations.id"],
-            name="fk_proposals_workspace_consultation",
+            ["workspace_id", "project_id", "consultation_id"],
+            ["consultations.workspace_id", "consultations.project_id", "consultations.id"],
+            name="fk_proposals_workspace_project_consultation",
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(
@@ -74,6 +74,9 @@ class Proposal(TimestampMixin, Base):
         ),
         UniqueConstraint("consultation_id", "version", name="uq_proposals_consultation_version"),
         UniqueConstraint("workspace_id", "id", name="uq_proposals_workspace_id"),
+        UniqueConstraint(
+            "workspace_id", "project_id", "id", name="uq_proposals_workspace_project_id"
+        ),
         CheckConstraint("version >= 1", name="version_positive"),
         CheckConstraint("char_length(title) >= 5", name="title_min_length"),
         CheckConstraint("char_length(technical_description) >= 10", name="description_min_length"),
