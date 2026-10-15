@@ -1,0 +1,104 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://contracts.eventflow.invalid/schemas/security_events.yaml
+title: EventFlow Security Event Schemas
+description: >-
+  Machine-readable taxonomy for security-relevant audit events. This document
+  specifies the event envelope and its approved event types. It is a
+  documentation-grade contract: it defines no identity, credential, or payload
+  data, and its fields are opaque references only.
+
+$defs:
+  UUID:
+    type: string
+    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+
+  RFC3339DateTime:
+    type: string
+    format: date-time
+
+  SecuritySeverity:
+    type: string
+    enum: [info, low, medium, high, critical]
+
+  SecurityOutcome:
+    type: string
+    enum: [success, denied, failure]
+
+  SecurityEventType:
+    type: string
+    enum:
+      - auth.failure
+      - authz.denial
+      - tenant.cross_access_attempt
+      - webhook.verification_failure
+      - webhook.replay_detected
+      - credential.revoked
+      - attachment.rejected
+      - security.config_change
+      - data.export
+      - data.deletion
+
+  SecurityActorType:
+    type: string
+    enum: [user, service, integration, system, unknown]
+
+  SecuritySource:
+    type: string
+    enum: [web, desktop, vscode, webhook, backend, scheduler]
+
+  SecurityActor:
+    type: object
+    additionalProperties: false
+    required: [actor_type]
+    properties:
+      actor_type:
+        $ref: '#/$defs/SecurityActorType'
+      actor_id:
+        type: string
+        description: Opaque actor reference; never an email, token, or secret.
+      workspace_id:
+        $ref: '#/$defs/UUID'
+
+  SecurityDetails:
+    type: object
+    additionalProperties: false
+    description: >-
+      Redacted, non-sensitive context only. Never credentials, authorization
+      headers, request bodies, or captured source code.
+    properties:
+      reason:
+        type: string
+      resource_type:
+        type: string
+      count:
+        type: integer
+        minimum: 0
+
+  SecurityEvent:
+    type: object
+    additionalProperties: false
+    required: [event_id, event_type, severity, outcome, occurred_at, actor]
+    properties:
+      event_id:
+        $ref: '#/$defs/UUID'
+      event_type:
+        $ref: '#/$defs/SecurityEventType'
+      severity:
+        $ref: '#/$defs/SecuritySeverity'
+      outcome:
+        $ref: '#/$defs/SecurityOutcome'
+      occurred_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      actor:
+        $ref: '#/$defs/SecurityActor'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      subject:
+        type: string
+        description: Opaque reference to the affected resource.
+      correlation_id:
+        $ref: '#/$defs/UUID'
+      source:
+        $ref: '#/$defs/SecuritySource'
+      details:
+        $ref: '#/$defs/SecurityDetails'

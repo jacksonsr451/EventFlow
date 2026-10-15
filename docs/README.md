@@ -18,6 +18,22 @@ domains interact.
 - [Work management workflow](architecture/work-management-workflow.md): Consultation, triage, proposal, approval, WorkItem and BoardCard.
 - [Client integration](architecture/client-integration.md): how Web, Desktop and VS Code consume the API and share contracts.
 
+## Security
+
+Security documents describe the threat model, policies and data governance rules
+that future implementations must satisfy.
+
+- [Security index](security/README.md): overview, identifier conventions and trust boundaries.
+- [Threat model](security/threat-model.md): STRIDE scenario catalog for the Work Management domain and clients.
+- [Risk register](security/risk-register.md): residual risks, owners and verification.
+- [Tenant isolation](security/tenant-isolation.md): workspace isolation invariants.
+- [OAuth and credentials](security/oauth-and-credentials.md): authentication, token storage and revocation.
+- [Webhooks](security/webhooks.md): signature verification, replay protection and tenant routing.
+- [Untrusted content](security/untrusted-content.md): source code, integration text and attachment handling.
+- [Data governance](security/data-governance.md): classification, retention, deletion and data subject rights.
+- [Security observability](security/security-observability.md): security event taxonomy and redaction.
+- [Open decisions](security/open-decisions.md): security decisions awaiting an owner.
+
 ## Architecture Decision Records
 
 ADRs explain why important architectural choices were made, including
@@ -61,8 +77,10 @@ and how future implementations should be validated.
 - `docs/adr/` answers: “Why was this architectural choice made?”
 - `docs/concepts/` answers: “How does this mechanism work?”
 - `docs/development/` answers: “How should contributors work and validate it?”
+- `docs/security/` answers: “What must be protected, and how?”
 - `contracts/` contains machine-readable interfaces; contract validation tests
-  exist under `tests/contracts/`, but service implementations are not present yet.
+  exist under `tests/contracts/` and `tests/security/`, but service
+  implementations are not present yet.
 
 Avoid documenting planned features as implemented. Update the relevant section
 when an architectural decision or public contract changes.

@@ -22,6 +22,7 @@ EventFlow/
 │   │   ├── envelope.yaml    ← Event envelope structure
 │   │   ├── events.yaml      ← Order Processing event payload schemas
 │   │   ├── http.yaml        ← HTTP request/response schemas for Orders
+│   │   ├── security_events.yaml  ← Security event envelope and taxonomy
 │   │   └── work_management.yaml  ← Work Management entity and enum schemas
 │   └── examples/            ← Non-production coherent workflow examples
 │
@@ -30,6 +31,7 @@ EventFlow/
 │   ├── architecture/        ← Descriptive system architecture documents
 │   ├── concepts/            ← Educational concept explanations
 │   ├── development/         ← Developer how-to guides (this file lives here)
+│   ├── security/            ← Threat model, security policies and data governance
 │   └── roadmap/             ← Issue dependency mindmap and critical path
 │
 ├── services/                ← Backend microservices
@@ -54,7 +56,8 @@ EventFlow/
 │   └── validate_contracts.py ← Contract validation (run by pre-commit)
 │
 ├── tests/                   ← Root-level cross-domain tests
-│   └── contracts/           ← Contract boundary and schema validation tests
+│   ├── contracts/           ← Contract boundary and schema validation tests
+│   └── security/            ← Security documentation and contract tests
 │
 ├── .pre-commit-config.yaml  ← Pre-commit hook configuration
 ├── Makefile                 ← Common developer commands
@@ -149,6 +152,7 @@ Run manually: `pre-commit run --all-files`
 | #1 ADR-006 | `docs/adr/ADR-006-*.md` |
 | #2 Workflow Specification | `docs/architecture/work-management-workflow.md`, `contracts/openapi/work-management.yaml`, `contracts/schemas/work_management.yaml` |
 | #3 Monorepo Layout (this issue) | `docs/adr/ADR-007-*.md`, `docs/architecture/client-integration.md`, `docs/development/monorepo-layout.md` |
+| #35 Threat model and data governance | `docs/security/`, `contracts/schemas/security_events.yaml`, `tests/security/` |
 | #9 Workspaces + RBAC | `services/work-management/` (planned) |
 | #10 Authentication | `services/auth/` or `services/work-management/auth/` (planned) |
 | #11 Versioned API + codegen | `packages/` configuration (planned) |

@@ -9,7 +9,7 @@ tests and service implementations. No service implementation is included here.
 - `openapi/`: HTTP interfaces used by the current Order and Cart use cases.
 - `asyncapi/`: asynchronous workflow channel, messages and delivery metadata.
 - `schemas/`: reusable JSON Schema documents for shared values, HTTP models,
-  event envelopes and event payloads.
+  event envelopes, event payloads and security events.
 - `examples/`: coherent, non-production examples used to inspect the workflow
   across messages.
 
@@ -29,6 +29,10 @@ HTTP checkout uses `Idempotency-Key`. Repeating the same key and equivalent
 request represents the same operation; reusing it with a different request is
 an idempotency conflict. The storage and retention mechanism are implementation
 concerns.
+
+`schemas/security_events.yaml` defines the security event envelope and its
+taxonomy. It is a documentation-grade contract and intentionally defines no
+credential, identity or payload fields; see `docs/security/README.md`.
 
 All workflow messages assume at-least-once delivery. `event_id` identifies one
 message, while business operation IDs such as `reservation_id`, `payment_id`
