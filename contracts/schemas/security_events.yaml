@@ -5,7 +5,9 @@ description: >-
   Machine-readable taxonomy for security-relevant audit events. This document
   specifies the event envelope and its approved event types. It is a
   documentation-grade contract: it defines no identity, credential, or payload
-  data, and its fields are opaque references only.
+  data, and its fields are opaque references only. Free-text fields are length
+  bounded and the details object forbids additional properties so that secrets
+  and payloads cannot be smuggled into an event.
 
 $defs:
   UUID:
@@ -15,6 +17,11 @@ $defs:
   RFC3339DateTime:
     type: string
     format: date-time
+
+  SecuritySchemaVersion:
+    type: integer
+    const: 1
+    description: Envelope schema major version; changes require a new $id.
 
   SecuritySeverity:
     type: string
@@ -55,6 +62,8 @@ $defs:
         $ref: '#/$defs/SecurityActorType'
       actor_id:
         type: string
+        minLength: 1
+        maxLength: 128
         description: Opaque actor reference; never an email, token, or secret.
       workspace_id:
         $ref: '#/$defs/UUID'
@@ -64,12 +73,15 @@ $defs:
     additionalProperties: false
     description: >-
       Redacted, non-sensitive context only. Never credentials, authorization
-      headers, request bodies, or captured source code.
+      headers, request bodies, or captured source code. Additional properties
+      are forbidden so this object cannot carry arbitrary secrets or payloads.
     properties:
       reason:
         type: string
+        maxLength: 256
       resource_type:
         type: string
+        maxLength: 64
       count:
         type: integer
         minimum: 0
@@ -77,10 +89,19 @@ $defs:
   SecurityEvent:
     type: object
     additionalProperties: false
-    required: [event_id, event_type, severity, outcome, occurred_at, actor]
+    required:
+      - event_id
+      - schema_version
+      - event_type
+      - severity
+      - outcome
+      - occurred_at
+      - actor
     properties:
       event_id:
         $ref: '#/$defs/UUID'
+      schema_version:
+        $ref: '#/$defs/SecuritySchemaVersion'
       event_type:
         $ref: '#/$defs/SecurityEventType'
       severity:
@@ -95,6 +116,8 @@ $defs:
         $ref: '#/$defs/UUID'
       subject:
         type: string
+        minLength: 1
+        maxLength: 256
         description: Opaque reference to the affected resource.
       correlation_id:
         $ref: '#/$defs/UUID'

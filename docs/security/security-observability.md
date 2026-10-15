@@ -49,10 +49,12 @@ Status: Specified (Phase 0). The machine-readable taxonomy is
 
 ## Event Fields
 
-Each event records: `event_id`, `event_type`, `severity`, `outcome`,
-`occurred_at`, `actor` (type and opaque id), optional `workspace_id`, optional
-`subject`, optional `correlation_id`, `source`, and a redacted `details` object.
-The full contract is in the schema referenced above.
+Each event records: `event_id`, `schema_version`, `event_type`, `severity`,
+`outcome`, `occurred_at`, `actor` (type and opaque id), optional `workspace_id`,
+optional `subject`, optional `correlation_id`, `source`, and a redacted `details`
+object. The `details` object forbids additional properties and every free-text
+field is length bounded, so an event cannot carry a credential or a payload. The
+full contract is in the schema referenced above.
 
 ## Redaction Rules
 

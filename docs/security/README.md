@@ -43,6 +43,8 @@ in [open-decisions.md](open-decisions.md) and, if accepted, become ADRs later.
   exports, and data subject rights.
 - [Security observability](security-observability.md): security event taxonomy
   and redacted telemetry rules.
+- [Traceability matrix](traceability.md): threats, risks, controls, policies,
+  verification, and owners in one cross-reference.
 - [Open decisions](open-decisions.md): decisions that require product or
   platform ownership before implementation.
 

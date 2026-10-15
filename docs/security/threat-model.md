@@ -13,12 +13,16 @@ for the issue that owns it.
 
 Each scenario is classified with STRIDE (Spoofing, Tampering, Repudiation,
 Information disclosure, Denial of service, Elevation of privilege). Every
-scenario records its preconditions, attack path, impact, likelihood, severity,
-preventive and detective controls, residual risk, owner, and verification.
+scenario records the asset it endangers, the actor and capability required, the
+attack surface, the trust boundary it crosses, its preconditions, a plausible
+attack path, the impact on confidentiality/integrity/availability, likelihood,
+severity, preventive and detective controls, residual risk, owner, and
+verification.
 
 Severity reflects the worst credible impact once the whole workflow is in use;
 likelihood reflects a motivated attacker against the specified design. Residual
-risk is tracked in the [risk register](risk-register.md).
+risk is tracked in the [risk register](risk-register.md). Cross-cutting
+traceability is in [traceability.md](traceability.md).
 
 ## Assets
 
@@ -62,12 +66,17 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Information disclosure, Elevation of privilege
+- **Asset:** A-01, A-06
+- **Actor:** U-04, U-06
+- **Attack surface:** Browser script-accessible storage
+- **Trust boundary:** TB-01
 - **Preconditions:** A user has authenticated in the Webapp; an XSS or malicious
   extension can run in the browser origin.
-- **Attack path:** A stolen access or refresh token is read from a script-readable
-  store and replayed from the attacker's host.
+- **Attack path:** A stolen access or refresh token is read from a
+  script-readable store and replayed from the attacker's host.
 - **Impact:** Full account takeover for the token lifetime; access to A-01, A-03,
   A-06.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** OA-07, OA-10
@@ -80,11 +89,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Spoofing, Information disclosure
+- **Asset:** A-01
+- **Actor:** U-04
+- **Attack surface:** Authorization redirect to a public client
+- **Trust boundary:** TB-01, TB-05
 - **Preconditions:** A public native or browser client initiates an authorization
   request; an attacker can observe or intercept the redirect.
 - **Attack path:** A captured authorization code is exchanged for tokens because
   no proof key binds the code to the initiating client.
 - **Impact:** Token issuance to the attacker; access to A-01.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** OA-01, OA-04
@@ -97,12 +111,17 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Spoofing, Tampering
+- **Asset:** A-01, A-06
+- **Actor:** U-04
+- **Attack surface:** Authorization response delivered to the browser
+- **Trust boundary:** TB-02
 - **Preconditions:** A login flows through a browser redirect and the response is
   not bound to the initiating session.
 - **Attack path:** An attacker forces a victim browser to complete an
   authorization response the attacker chose, binding the victim to the attacker's
   account or replaying a chosen code.
 - **Impact:** Session confusion and loss of action attribution.
+- **CIA impact:** Confidentiality, Integrity
 - **Likelihood:** low
 - **Severity:** medium
 - **Preventive controls:** OA-02
@@ -115,11 +134,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Spoofing, Information disclosure
+- **Asset:** A-01
+- **Actor:** U-04
+- **Attack surface:** Authorization redirect URI
+- **Trust boundary:** TB-05
 - **Preconditions:** The authorization server accepts a loosely matched redirect
   URI or a wildcard subdomain.
 - **Attack path:** The attacker registers a look-alike redirect target and
   receives authorization codes or tokens.
 - **Impact:** Code and token theft; access to A-01.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** OA-03
@@ -132,11 +156,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Elevation of privilege
+- **Asset:** A-01, A-09
+- **Actor:** U-05
+- **Attack surface:** Granted OAuth scopes
+- **Trust boundary:** TB-05
 - **Preconditions:** A client requests repository or organization scopes it does
   not need for its feature.
 - **Attack path:** A stolen token grants access far beyond EventFlow's needs,
   letting an attacker read unrelated repositories.
 - **Impact:** Excessive third-party data exposure; amplified blast radius.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** OA-05
@@ -149,10 +178,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Spoofing, Information disclosure
+- **Asset:** A-01
+- **Actor:** U-04
+- **Attack surface:** Token refresh endpoint
+- **Trust boundary:** TB-02
 - **Preconditions:** A refresh token is stolen and remains valid indefinitely.
 - **Attack path:** The attacker silently refreshes access tokens and keeps a
   parallel session alive.
 - **Impact:** Long-lived unauthorized access; detection is delayed.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** OA-06, OA-09
@@ -165,10 +199,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Information disclosure
+- **Asset:** A-01, A-02
+- **Actor:** U-06
+- **Attack surface:** Local client disk storage
+- **Trust boundary:** TB-01
 - **Preconditions:** A Desktop or VS Code client persists tokens to a plain file
   or an unencrypted store.
 - **Attack path:** Malware or another local user reads the token from disk.
 - **Impact:** Account takeover on the affected workstation; A-01, A-02 exposure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** OA-07, OA-08
@@ -181,11 +220,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Authentication and credentials
 - **STRIDE:** Information disclosure
+- **Asset:** A-01
+- **Actor:** U-04, U-06
+- **Attack surface:** URLs, logs, traces, telemetry, crash reports
+- **Trust boundary:** TB-02, TB-06
 - **Preconditions:** A token, code, or secret is placed in a query string, log
   line, trace attribute, or crash report.
 - **Attack path:** Anyone with access to logs, proxies, or telemetry reads the
   credential and replays it.
 - **Impact:** Credential compromise from an otherwise protected channel.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** OA-10, OA-08
@@ -200,11 +244,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Untrusted source content
 - **STRIDE:** Tampering, Elevation of privilege
+- **Asset:** A-03, A-09
+- **Actor:** U-05
+- **Attack surface:** Ingested issue, PR, commit, or ticket text
+- **Trust boundary:** TB-05
 - **Preconditions:** External issue, PR, commit, or ticket text is ingested into a
   consultation or an AI-assisted flow.
 - **Attack path:** An attacker embeds instructions in the content hoping the
   system treats them as commands rather than data.
 - **Impact:** Unauthorized actions, data exfiltration, or corrupted triage.
+- **CIA impact:** Integrity, Confidentiality
 - **Likelihood:** high
 - **Severity:** high
 - **Preventive controls:** SC-01, SC-07
@@ -217,11 +266,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Untrusted source content
 - **STRIDE:** Information disclosure
+- **Asset:** A-02
+- **Actor:** U-01
+- **Attack surface:** Editor context capture
+- **Trust boundary:** TB-01
 - **Preconditions:** A developer attaches a code selection that contains an API
   key, token, or password.
 - **Attack path:** The secret is stored as part of the consultation and later read
   by anyone with workspace access.
 - **Impact:** Leakage of A-02 and third-party credentials.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** SC-03
@@ -234,11 +288,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Untrusted source content
 - **STRIDE:** Tampering, Elevation of privilege
+- **Asset:** A-03, A-04
+- **Actor:** U-05
+- **Attack surface:** Integration ingestion pipeline
+- **Trust boundary:** TB-05
 - **Preconditions:** An integration automatically creates work items, comments, or
   state changes from external content without human confirmation.
 - **Attack path:** A crafted issue body causes the system to take an action the
   attacker is not authorized to perform directly.
 - **Impact:** Unauthorized state change and audit ambiguity.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** SC-04, SC-07
@@ -251,11 +310,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Untrusted source content
 - **STRIDE:** Tampering, Information disclosure
+- **Asset:** A-03, A-06
+- **Actor:** U-03
+- **Attack surface:** Rendered titles, descriptions, and comments
+- **Trust boundary:** TB-01
 - **Preconditions:** External or user content is rendered as HTML without output
   encoding.
 - **Attack path:** A script stored in a title, description, or comment executes in
   a victim's session.
 - **Impact:** Session theft and action forgery in the victim's workspace.
+- **CIA impact:** Confidentiality, Integrity
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** SC-05
@@ -268,11 +332,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Untrusted source content
 - **STRIDE:** Tampering
+- **Asset:** A-03
+- **Actor:** U-05
+- **Attack surface:** AI assistance input channel
+- **Trust boundary:** TB-05
 - **Preconditions:** An AI assistance feature learns from or is prompted by
   untrusted external content.
 - **Attack path:** An attacker biases classification or proposals with crafted
   content.
 - **Impact:** Degraded decisions and misallocated work; reputational harm.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** SC-06, SC-01
@@ -285,11 +354,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Untrusted source content
 - **STRIDE:** Information disclosure
+- **Asset:** A-03
+- **Actor:** U-03
+- **Attack surface:** Identifiers resolved from ingested content
+- **Trust boundary:** TB-04
 - **Preconditions:** Repository or issue content references identifiers that are
   resolved without a tenant check.
 - **Attack path:** An attacker supplies another workspace's identifier inside
   content to confirm existence or retrieve data.
 - **Impact:** Cross-tenant information disclosure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** SC-07, TI-03
@@ -304,11 +378,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Spoofing, Tampering
+- **Asset:** A-07
+- **Actor:** U-04
+- **Attack surface:** Public webhook endpoint
+- **Trust boundary:** TB-05
 - **Preconditions:** A webhook endpoint is reachable and a verification secret is
   configured.
 - **Attack path:** An attacker posts a crafted payload and relies on missing or
   broken signature verification.
 - **Impact:** Fabricated consultations or state changes.
+- **CIA impact:** Integrity
 - **Likelihood:** high
 - **Severity:** high
 - **Preventive controls:** WH-01, WH-02
@@ -321,10 +400,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Tampering, Repudiation
+- **Asset:** A-07, A-03
+- **Actor:** U-04
+- **Attack surface:** Captured webhook delivery
+- **Trust boundary:** TB-05
 - **Preconditions:** A previously valid delivery is captured and re-sent.
 - **Attack path:** The system processes the same delivery more than once without
   deduplication or a freshness window.
 - **Impact:** Duplicate work and inconsistent audit.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** WH-05, WH-06
@@ -337,10 +421,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Tampering
+- **Asset:** A-07
+- **Actor:** U-04
+- **Attack surface:** Webhook request body parsing
+- **Trust boundary:** TB-05
 - **Preconditions:** The endpoint re-serializes the payload before verifying.
 - **Attack path:** Parser differences let an attacker alter fields between the
   signature check and the parsed value.
 - **Impact:** Signature bypass; forged effect with a valid-looking signature.
+- **CIA impact:** Integrity
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** WH-03
@@ -353,9 +442,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Denial of service
+- **Asset:** A-07
+- **Actor:** U-04
+- **Attack surface:** Public webhook endpoint
+- **Trust boundary:** TB-05
 - **Preconditions:** The endpoint accepts unbounded request bodies.
 - **Attack path:** A large or deeply nested payload exhausts memory or CPU.
 - **Impact:** Availability loss for the integration path.
+- **CIA impact:** Availability
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** WH-04
@@ -368,11 +462,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Tampering, Information disclosure
+- **Asset:** A-03, A-06
+- **Actor:** U-04
+- **Attack surface:** Installation mapping and payload identifiers
+- **Trust boundary:** TB-04, TB-05
 - **Preconditions:** The tenant is derived from a payload field rather than from a
   verified installation mapping.
 - **Attack path:** An attacker supplies a foreign installation or workspace
   identifier so the event is applied to another tenant.
 - **Impact:** Cross-tenant data corruption and disclosure.
+- **CIA impact:** Integrity, Confidentiality
 - **Likelihood:** medium
 - **Severity:** critical
 - **Preventive controls:** WH-07
@@ -385,10 +484,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Spoofing
+- **Asset:** A-07
+- **Actor:** U-05, U-06
+- **Attack surface:** Webhook secret store
+- **Trust boundary:** TB-05, TB-06
 - **Preconditions:** A webhook secret is static, widely shared, or stored in
   plaintext.
 - **Attack path:** A leaked secret enables undetectable forged deliveries.
 - **Impact:** Full integrity loss for the webhook channel.
+- **CIA impact:** Integrity
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** WH-08, WH-10
@@ -401,11 +505,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Repudiation
+- **Asset:** A-03
+- **Actor:** U-04
+- **Attack surface:** Retry and dead-letter path
+- **Trust boundary:** TB-03
 - **Preconditions:** Failed deliveries are retried without deduplication or a
   dead-letter path.
 - **Attack path:** Retries create repeated consultations or repeated outbox
   events.
 - **Impact:** Duplicate work and unreliable audit.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** WH-09, WH-05
@@ -418,14 +527,42 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Webhooks and integrations
 - **STRIDE:** Information disclosure
+- **Asset:** A-09, A-02
+- **Actor:** U-06
+- **Attack surface:** Webhook logging
+- **Trust boundary:** TB-02
 - **Preconditions:** Full webhook payloads are logged for debugging.
 - **Attack path:** Payloads containing private repository data are read from logs.
 - **Impact:** Disclosure of A-02 and third-party metadata.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** WH-10
 - **Detective controls:** SO-02
 - **Residual risk:** R-022
+- **Owner:** Issues #27, #28
+- **Verification:** tests/security/test_security_docs.py
+
+#### TM-WH-09 — Over-scoped provider app installation permissions
+
+- **Area:** Webhooks and integrations
+- **STRIDE:** Elevation of privilege, Information disclosure
+- **Asset:** A-07, A-03
+- **Actor:** U-05, U-06
+- **Attack surface:** GitHub/GitLab App installation and its tokens
+- **Trust boundary:** TB-05
+- **Preconditions:** The app requests repository or organization permissions
+  broader than the feature requires.
+- **Attack path:** A compromised app token grants access to unrelated
+  repositories or organizations, or allows write actions the integration should
+  not perform.
+- **Impact:** Cross-organization exposure if the over-scoped app acts on an unintended repository.
+- **CIA impact:** Confidentiality, Integrity
+- **Likelihood:** medium
+- **Severity:** high
+- **Preventive controls:** WH-11, OA-05
+- **Detective controls:** SO-01
+- **Residual risk:** R-048
 - **Owner:** Issues #27, #28
 - **Verification:** tests/security/test_security_docs.py
 
@@ -435,10 +572,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Tampering, Elevation of privilege
+- **Asset:** A-05
+- **Actor:** U-04
+- **Attack surface:** Attachment upload
+- **Trust boundary:** TB-01
 - **Preconditions:** Attachments can be uploaded and later downloaded by a user.
 - **Attack path:** An attacker uploads a file carrying malware that a victim
   opens.
 - **Impact:** Endpoint compromise of the victim; reputational harm.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** AT-03, AT-02
@@ -451,10 +593,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Tampering
+- **Asset:** A-05
+- **Actor:** U-04
+- **Attack surface:** Attachment upload content type
+- **Trust boundary:** TB-01
 - **Preconditions:** File type is determined from the extension or client-supplied
   content type only.
 - **Attack path:** A polyglot or renamed file bypasses type restrictions.
 - **Impact:** Bypass of downstream handling assumptions.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** AT-01, AT-02
@@ -467,10 +614,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Tampering
+- **Asset:** A-05
+- **Actor:** U-04
+- **Attack surface:** Attachment storage key from filename
+- **Trust boundary:** TB-06
 - **Preconditions:** The stored object key is derived from the client filename.
 - **Attack path:** A filename containing `../` writes outside the intended
   per-tenant prefix.
 - **Impact:** Overwrite or exposure of other objects.
+- **CIA impact:** Integrity, Confidentiality
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** AT-07
@@ -483,10 +635,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Information disclosure
+- **Asset:** A-05
+- **Actor:** U-03
+- **Attack surface:** Attachment retrieval by object id
+- **Trust boundary:** TB-04
 - **Preconditions:** Attachment retrieval resolves a blob id without checking the
   caller's workspace.
 - **Attack path:** A guessed or leaked blob id returns another tenant's file.
 - **Impact:** Cross-tenant data disclosure of A-05.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** critical
 - **Preventive controls:** TI-04, AT-04
@@ -499,9 +656,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Elevation of privilege, Information disclosure
+- **Asset:** A-05
+- **Actor:** U-03
+- **Attack surface:** Attachment download link
+- **Trust boundary:** TB-04
 - **Preconditions:** Download links are public or long-lived.
 - **Attack path:** A leaked link is used by an actor without membership.
 - **Impact:** Disclosure of A-05.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** AT-05, TI-03
@@ -514,9 +676,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Tampering, Information disclosure
+- **Asset:** A-05, A-06
+- **Actor:** U-04
+- **Attack surface:** Inline attachment rendering
+- **Trust boundary:** TB-01
 - **Preconditions:** Attachments are rendered inline in the application origin.
 - **Attack path:** An SVG or HTML attachment executes script in the app context.
 - **Impact:** Session theft and action forgery.
+- **CIA impact:** Confidentiality, Integrity
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** AT-06
@@ -529,9 +696,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Denial of service
+- **Asset:** A-05
+- **Actor:** U-04
+- **Attack surface:** Attachment upload
+- **Trust boundary:** TB-01
 - **Preconditions:** Upload size and rate are unbounded.
 - **Attack path:** Repeated large uploads exhaust storage or bandwidth.
 - **Impact:** Availability and cost impact.
+- **CIA impact:** Availability
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** AT-02
@@ -544,10 +716,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Attachments
 - **STRIDE:** Information disclosure
+- **Asset:** A-05
+- **Actor:** U-06
+- **Attack surface:** Attachment storage and backups
+- **Trust boundary:** TB-06
 - **Preconditions:** Deletion removes metadata but not the stored object or its
   backups.
 - **Attack path:** A deleted attachment remains retrievable.
 - **Impact:** Failure to honor deletion; regulatory exposure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** AT-09, DG-04
@@ -562,9 +739,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Information disclosure, Elevation of privilege
+- **Asset:** A-03, A-04
+- **Actor:** U-03
+- **Attack surface:** Object retrieval by id
+- **Trust boundary:** TB-04
 - **Preconditions:** An endpoint fetches an object by id without a tenant filter.
 - **Attack path:** A user substitutes another workspace's object id and reads it.
 - **Impact:** Cross-tenant disclosure of A-03 and A-04.
+- **CIA impact:** Confidentiality
 - **Likelihood:** high
 - **Severity:** critical
 - **Preventive controls:** TI-01, TI-04
@@ -577,10 +759,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Tampering
+- **Asset:** A-03
+- **Actor:** U-03
+- **Attack surface:** Request path or body tenant identifier
+- **Trust boundary:** TB-04
 - **Preconditions:** The backend trusts a client-supplied `workspace_id` in the
   path or body.
 - **Attack path:** A user posts to a workspace they do not belong to.
 - **Impact:** Corruption of another tenant's state.
+- **CIA impact:** Integrity
 - **Likelihood:** high
 - **Severity:** critical
 - **Preventive controls:** TI-02, TI-04
@@ -593,9 +780,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Information disclosure
+- **Asset:** A-03
+- **Actor:** U-03
+- **Attack surface:** Error and status responses
+- **Trust boundary:** TB-04
 - **Preconditions:** Unauthorized access returns a distinguishable 403 versus 404.
 - **Attack path:** An attacker enumerates ids to learn which resources exist.
 - **Impact:** Confirmation of other tenants' resources.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** TI-03, TI-07
@@ -608,10 +800,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Information disclosure
+- **Asset:** A-03
+- **Actor:** U-03
+- **Attack surface:** Shared cache or pooled connection
+- **Trust boundary:** TB-04, TB-06
 - **Preconditions:** A shared cache key omits the tenant, or a connection reuses
   session state.
 - **Attack path:** A cached response for one tenant is served to another.
 - **Impact:** Cross-tenant data disclosure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** critical
 - **Preventive controls:** TI-05, TI-04
@@ -624,9 +821,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Elevation of privilege
+- **Asset:** A-06
+- **Actor:** U-03, U-06
+- **Attack surface:** Membership and RBAC administration
+- **Trust boundary:** TB-02
 - **Preconditions:** Role assignment can be changed without an owner/admin check.
 - **Attack path:** A member grants themselves an approver or admin role.
 - **Impact:** Unauthorized approvals and governance bypass.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** critical
 - **Preventive controls:** TI-06, TI-08
@@ -639,10 +841,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Information disclosure
+- **Asset:** A-03
+- **Actor:** U-06
+- **Attack surface:** Reporting, search, and export queries
+- **Trust boundary:** TB-04
 - **Preconditions:** A reporting, search, or export path queries without a tenant
   predicate.
 - **Attack path:** A bulk read returns rows from multiple workspaces.
 - **Impact:** Large-scale cross-tenant disclosure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** critical
 - **Preventive controls:** TI-04, DG-06
@@ -655,9 +862,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Multi-tenant isolation
 - **STRIDE:** Information disclosure
+- **Asset:** A-03
+- **Actor:** U-03
+- **Attack surface:** Error response body
+- **Trust boundary:** TB-02
 - **Preconditions:** Errors include resource owner or upstream identifiers.
 - **Attack path:** An attacker reads owner identifiers from error bodies.
 - **Impact:** Targeted follow-up attacks against a known tenant.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** low
 - **Preventive controls:** TI-03
@@ -666,16 +878,68 @@ risk is tracked in the [risk register](risk-register.md).
 - **Owner:** Issue #11
 - **Verification:** tests/security/test_security_contracts.py
 
+#### TM-MT-08 — Confused deputy through an integration service principal
+
+- **Area:** Multi-tenant isolation
+- **STRIDE:** Elevation of privilege, Spoofing
+- **Asset:** A-03, A-06
+- **Actor:** U-04, U-05
+- **Attack surface:** Integration service-principal endpoints
+- **Trust boundary:** TB-05
+- **Preconditions:** A webhook or integration service principal holds permissions
+  broader than a single operation and acts on a target selected from untrusted
+  input.
+- **Attack path:** An attacker causes the trusted integration to perform an action
+  with its own privilege against a tenant the attacker does not control, because
+  the target is taken from the payload rather than the verified binding.
+- **Impact:** A service principal performs an action outside its installation binding; cross-tenant effects executed with elevated privilege.
+- **CIA impact:** Integrity, Confidentiality
+- **Likelihood:** medium
+- **Severity:** high
+- **Preventive controls:** TI-10, WH-07, TI-02
+- **Detective controls:** SO-01, SO-04
+- **Residual risk:** R-046
+- **Owner:** Issues #27, #47
+- **Verification:** tests/security/test_security_docs.py
+
+#### TM-MT-09 — Tenant context lost or forged in asynchronous jobs and events
+
+- **Area:** Multi-tenant isolation
+- **STRIDE:** Tampering, Information disclosure
+- **Asset:** A-03
+- **Actor:** U-04, U-06
+- **Attack surface:** Outbox events, background jobs, and projections
+- **Trust boundary:** TB-03
+- **Preconditions:** A background job or event consumer determines the tenant from
+  the event payload or from mutable global state.
+- **Attack path:** A poisoned or replayed event carries a foreign workspace id, or
+  a job runs without tenant context and defaults to a shared scope, applying
+  effects to the wrong tenant.
+- **Impact:** Effects are written to the wrong tenant from an asynchronous job or event.
+- **CIA impact:** Integrity, Confidentiality
+- **Likelihood:** medium
+- **Severity:** critical
+- **Preventive controls:** TI-09, TI-04
+- **Detective controls:** SO-01
+- **Residual risk:** R-047
+- **Owner:** Issue #46
+- **Verification:** tests/security/test_security_docs.py
+
 ## Data governance (DG)
 
 #### TM-DG-01 — Excessive source code retention
 
 - **Area:** Data governance
 - **STRIDE:** Information disclosure
+- **Asset:** A-02
+- **Actor:** U-06
+- **Attack surface:** Consultation storage
+- **Trust boundary:** TB-06
 - **Preconditions:** Captured code snippets are stored indefinitely with the
   consultation.
 - **Attack path:** Historical snippets accumulate sensitive code that later leaks.
 - **Impact:** Long-tail disclosure of A-02.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** DG-10, DG-02
@@ -688,9 +952,14 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Information disclosure
+- **Asset:** A-08
+- **Actor:** U-06
+- **Attack surface:** Data stores without a retention policy
+- **Trust boundary:** TB-06
 - **Preconditions:** No retention period is defined for a data category.
 - **Attack path:** Data is kept forever because nothing deletes it.
 - **Impact:** Growing regulatory and breach exposure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** high
 - **Severity:** medium
 - **Preventive controls:** DG-03
@@ -703,10 +972,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Information disclosure
+- **Asset:** A-08
+- **Actor:** U-06
+- **Attack surface:** Backups, caches, and derived records
+- **Trust boundary:** TB-06
 - **Preconditions:** Deletion removes the primary row but not backups, caches, or
   derived records.
 - **Attack path:** Deleted personal data resurfaces from a backup or projection.
 - **Impact:** Failure to honor erasure; regulatory exposure.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** DG-04, DG-09
@@ -719,10 +993,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Information disclosure, Elevation of privilege
+- **Asset:** A-03, A-08
+- **Actor:** U-06
+- **Attack surface:** Export operation
+- **Trust boundary:** TB-02
 - **Preconditions:** Export can be triggered without elevated authorization or
   logging.
 - **Attack path:** An insider or compromised account exfiltrates workspace data.
 - **Impact:** Large-scale disclosure of A-03, A-08.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** high
 - **Preventive controls:** DG-06, DG-01
@@ -735,10 +1014,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Information disclosure
+- **Asset:** A-08
+- **Actor:** U-06
+- **Attack surface:** New data elements without classification
+- **Trust boundary:** TB-03
 - **Preconditions:** A new data element is added without a classification.
 - **Attack path:** Sensitive data is treated as internal and stored or shared
   weakly.
 - **Impact:** Inconsistent protection of A-08.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** DG-01, DG-05
@@ -751,11 +1035,16 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Repudiation
+- **Asset:** A-04
+- **Actor:** U-06
+- **Attack surface:** Audit log
+- **Trust boundary:** TB-06
 - **Preconditions:** An approval or security-relevant action is not recorded in a
   tamper-evident log.
 - **Attack path:** An actor denies performing an action that has no durable
   record.
 - **Impact:** Loss of accountability for A-04.
+- **CIA impact:** Integrity
 - **Likelihood:** medium
 - **Severity:** high
 - **Preventive controls:** DG-07, SO-06
@@ -768,10 +1057,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Information disclosure
+- **Asset:** A-08
+- **Actor:** U-06
+- **Attack surface:** Backup and replication targets
+- **Trust boundary:** TB-06
 - **Preconditions:** Backups or replicas are created in an unapproved location.
 - **Attack path:** Data is stored outside the jurisdiction or security boundary
   the tenant expects.
 - **Impact:** Compliance violation and unexpected exposure of A-08.
+- **CIA impact:** Confidentiality
 - **Likelihood:** low
 - **Severity:** medium
 - **Preventive controls:** DG-05, DG-09
@@ -784,10 +1078,15 @@ risk is tracked in the [risk register](risk-register.md).
 
 - **Area:** Data governance
 - **STRIDE:** Repudiation
+- **Asset:** A-08
+- **Actor:** U-04
+- **Attack surface:** Data subject request process
+- **Trust boundary:** TB-03
 - **Preconditions:** No process maps a data subject to their stored data.
 - **Attack path:** A lawful request cannot be answered within the required
   window.
 - **Impact:** Regulatory penalty and loss of trust.
+- **CIA impact:** Confidentiality
 - **Likelihood:** medium
 - **Severity:** medium
 - **Preventive controls:** DG-08
@@ -800,6 +1099,7 @@ risk is tracked in the [risk register](risk-register.md).
 
 - [Security index](README.md)
 - [Risk register](risk-register.md)
+- [Traceability matrix](traceability.md)
 - [Tenant isolation](tenant-isolation.md)
 - [OAuth and credentials](oauth-and-credentials.md)
 - [Webhooks](webhooks.md)

@@ -32,6 +32,7 @@ that future implementations must satisfy.
 - [Untrusted content](security/untrusted-content.md): source code, integration text and attachment handling.
 - [Data governance](security/data-governance.md): classification, retention, deletion and data subject rights.
 - [Security observability](security/security-observability.md): security event taxonomy and redaction.
+- [Traceability matrix](security/traceability.md): threats, risks, controls and verification.
 - [Open decisions](security/open-decisions.md): security decisions awaiting an owner.
 
 ## Architecture Decision Records

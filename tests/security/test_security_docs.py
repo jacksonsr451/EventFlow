@@ -23,15 +23,20 @@ SECURITY_SCHEMA = REPO_ROOT / "contracts" / "schemas" / "security_events.yaml"
 THREAT_AREA_MINIMUMS = {
     "OA": 8,
     "SC": 6,
-    "WH": 8,
+    "WH": 9,
     "AT": 8,
-    "MT": 7,
+    "MT": 9,
     "DG": 8,
 }
 
 CONTROL_PREFIXES = {"OA", "SC", "WH", "AT", "TI", "DG", "SO"}
 
 REQUIRED_THREAT_FIELDS = (
+    "**Asset:**",
+    "**Actor:**",
+    "**Attack surface:**",
+    "**Trust boundary:**",
+    "**CIA impact:**",
     "**Preconditions:**",
     "**Attack path:**",
     "**Impact:**",
@@ -44,12 +49,17 @@ REQUIRED_THREAT_FIELDS = (
     "**Verification:**",
 )
 
+CONTROL_PREFIXES = {"OA", "SC", "WH", "AT", "TI", "DG", "SO"}
+
 THREAT_HEADING = re.compile(r"^####\s+(TM-[A-Z]{2}-\d{2})\b", re.MULTILINE)
 CONTROL_DEF = re.compile(r"^- \*\*([A-Z]{2}-\d{2})\*\*", re.MULTILINE)
 CONTROL_REF = re.compile(r"(?<![A-Z-])([A-Z]{2}-\d{2})(?![0-9])")
 RISK_ROW = re.compile(r"^\|\s*(R-\d{3})\s*\|", re.MULTILINE)
 RISK_REF = re.compile(r"\b(R-\d{3})\b")
 EVENT_ROW = re.compile(r"`([a-z_]+\.[a-z_]+)`")
+TRACE_THREAT_ROW = re.compile(r"^\|\s*(TM-[A-Z]{2}-\d{2})\s*\|", re.MULTILINE)
+TRACE_CONTROL_ROW = re.compile(r"^\|\s*([A-Z]{2}-\d{2})\s*\|", re.MULTILINE)
+
 
 
 def read(name):
@@ -76,6 +86,15 @@ def threat_blocks():
 def security_event_types():
     schema = yaml.safe_load(SECURITY_SCHEMA.read_text(encoding="utf-8"))
     return schema["$defs"]["SecurityEventType"]["enum"]
+
+
+def table_rows(name, pattern):
+    rows = []
+    for line in read(name).splitlines():
+        if pattern.match(line):
+            rows.append([cell.strip() for cell in line.strip().strip("|").split("|")])
+    return rows
+
 
 
 # ---------------------------------------------------------------------------
@@ -227,3 +246,80 @@ def test_security_event_types_are_documented_and_in_schema():
         "documented event types do not match the schema enum: "
         f"{sorted(set(documented) ^ set(security_event_types()))}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Traceability matrix
+# ---------------------------------------------------------------------------
+
+
+def test_traceability_lists_every_threat():
+    """The traceability matrix must list every threat scenario exactly once."""
+    documented = {threat_id for threat_id, _ in threat_blocks()}
+    traced = [row[0] for row in table_rows("traceability.md", TRACE_THREAT_ROW)]
+    assert sorted(traced) == sorted(documented), (
+        f"traceability threats differ from the threat model: {sorted(set(traced) ^ documented)}"
+    )
+
+
+def test_traceability_lists_every_risk():
+    """The traceability matrix must map every registered risk to a threat."""
+    registered = set(RISK_ROW.findall(read("risk-register.md")))
+    traced = set()
+    for row in table_rows("traceability.md", TRACE_THREAT_ROW):
+        traced.update(RISK_REF.findall(row[1]))
+    assert traced == registered, (
+        f"traceability risks differ from the register: {sorted(traced ^ registered)}"
+    )
+
+
+def test_traceability_threat_rows_are_complete():
+    """Every threat row must populate threat, risk, controls, owner, verification."""
+    incomplete = [
+        row
+        for row in table_rows("traceability.md", TRACE_THREAT_ROW)
+        if len(row) != 5 or not all(row)
+    ]
+    assert not incomplete, f"incomplete traceability threat rows: {incomplete}"
+
+
+def test_traceability_references_existing_test_files():
+    """Every test path cited by the matrix must exist in the repository."""
+    missing = []
+    for row in table_rows("traceability.md", TRACE_THREAT_ROW):
+        for cell in row[4].split(","):
+            cell = cell.strip()
+            if "/" in cell and not (REPO_ROOT / cell).exists():
+                missing.append(cell)
+    assert not missing, f"traceability cites non-existent test files: {sorted(set(missing))}"
+
+
+def test_traceability_controls_are_registered():
+    """Every control cited by a threat row must appear in the control register."""
+    registered = {row[0] for row in table_rows("traceability.md", TRACE_CONTROL_ROW)}
+    referenced = set()
+    for row in table_rows("traceability.md", TRACE_THREAT_ROW):
+        referenced.update(cell.strip() for cell in row[2].split(",") if cell.strip())
+    undefined = sorted(referenced - registered)
+    assert not undefined, f"traceability cites unregistered controls: {undefined}"
+
+
+def test_traceability_control_register_is_complete():
+    """The control register must define exactly the documented controls."""
+    defined = set(CONTROL_DEF.findall(all_security_text()))
+    registered = {row[0] for row in table_rows("traceability.md", TRACE_CONTROL_ROW)}
+    assert registered == defined, (
+        "control register differs from policy definitions "
+        f"(only registered: {sorted(registered - defined)}, "
+        f"only defined: {sorted(defined - registered)})"
+    )
+
+
+def test_traceability_control_rows_have_acceptance_criteria():
+    """Every control row must carry state, acceptance criterion, verification, owner."""
+    incomplete = [
+        row
+        for row in table_rows("traceability.md", TRACE_CONTROL_ROW)
+        if len(row) != 6 or not all(row)
+    ]
+    assert not incomplete, f"control rows missing acceptance data: {incomplete}"

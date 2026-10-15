@@ -42,6 +42,22 @@ Status: Specified (Phase 0). No webhook endpoint exists yet.
   deliveries are never retried blindly in a way that duplicates effects.
 - **WH-10** — Webhook payloads are not logged in full. Logs record identifiers,
   delivery ids, and outcome, never tokens or full payload bodies.
+- **WH-11** — GitHub/GitLab App installation permissions are minimized to the
+  read-only scopes the feature needs; write scopes require an explicit,
+  documented justification and are reviewed.
+
+## Provider-Specific Verification
+
+| Provider | Authenticity | Delivery id | Deduplication key |
+|---|---|---|---|
+| GitHub | HMAC-SHA256 in `X-Hub-Signature-256` | `X-GitHub-Delivery` | delivery id |
+| GitLab | `X-Gitlab-Token` secret comparison | `X-Gitlab-Event-UUID` when present | event uuid or stable payload id |
+
+GitHub App installations are authorized by installation id, not by user tokens.
+The installation id maps to exactly one workspace (`WH-07`), and the processing
+service acts only within that mapping. A request that would make the service
+principal act outside its binding is rejected rather than executed with the
+service principal's privilege (see `TI-10` and `TM-MT-08`).
 
 ## Tenant Routing
 

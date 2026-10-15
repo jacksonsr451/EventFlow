@@ -117,6 +117,7 @@ def _parameter_name(spec, parameter):
 def _valid_event():
     return {
         "event_id": "c123e456-7890-1234-5678-90abcdef1234",
+        "schema_version": 1,
         "event_type": "auth.failure",
         "severity": "medium",
         "outcome": "failure",
@@ -174,6 +175,68 @@ def test_invalid_security_event_bad_enum(security_event_validator):
     payload["event_type"] = "auth.success"
     with testrunner.raises(ValidationError):
         security_event_validator.validate(payload)
+
+
+def test_invalid_security_event_missing_schema_version(security_event_validator):
+    """Omitting schema_version must raise a ValidationError."""
+    payload = _valid_event()
+    del payload["schema_version"]
+    with testrunner.raises(ValidationError):
+        security_event_validator.validate(payload)
+
+
+def test_invalid_security_event_wrong_schema_version(security_event_validator):
+    """A schema_version other than the pinned const must raise a ValidationError."""
+    payload = _valid_event()
+    payload["schema_version"] = 2
+    with testrunner.raises(ValidationError):
+        security_event_validator.validate(payload)
+
+
+def test_invalid_security_event_unknown_root_property(security_event_validator):
+    """An undeclared root property must raise a ValidationError."""
+    payload = _valid_event()
+    payload["access_token"] = "secret-value"
+    with testrunner.raises(ValidationError):
+        security_event_validator.validate(payload)
+
+
+def test_invalid_security_event_details_forbid_additional_properties(
+    security_event_validator,
+):
+    """An undeclared details key must raise a ValidationError."""
+    payload = _valid_event()
+    payload["details"]["token"] = "secret-value"
+    with testrunner.raises(ValidationError):
+        security_event_validator.validate(payload)
+
+
+def test_invalid_security_event_actor_id_is_length_bounded(
+    security_event_validator,
+):
+    """An oversized actor_id must raise a ValidationError."""
+    payload = _valid_event()
+    payload["actor"]["actor_id"] = "a" * 129
+    with testrunner.raises(ValidationError):
+        security_event_validator.validate(payload)
+
+
+def test_free_text_fields_declare_a_max_length(security_schema):
+    """Free-text security fields must be length bounded."""
+    defs = security_schema["$defs"]
+    expectations = {
+        "SecurityActor": "actor_id",
+        "SecurityDetails": "reason",
+        "SecurityDetails": "resource_type",
+        "SecurityEvent": "subject",
+    }
+    unbounded = []
+    for definition, field in expectations.items():
+        prop = defs[definition]["properties"].get(field, {})
+        if not isinstance(prop.get("maxLength"), int):
+            unbounded.append(f"{definition}.{field}")
+    assert not unbounded, f"free-text fields without maxLength: {unbounded}"
+
 
 
 def test_schema_defines_no_secret_properties(security_schema):

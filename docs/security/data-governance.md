@@ -55,12 +55,18 @@ are open decisions ([open-decisions.md](open-decisions.md)).
   and deletion rules of the primary data.
 - **DG-10** — Captured source code is kept only as long as needed to resolve the
   consultation, and never beyond the retention schedule.
+- **DG-11** — Where the purpose permits, data is anonymized or pseudonymized so
+  that it can no longer identify a data subject; identifiers used for
+  pseudonymization are stored separately and protected as restricted data.
 
 ## Retention Schedule
 
 The periods below are **PENDING DECISION** until a product owner and a legal
 reviewer approve them. The approval criteria are: a stated purpose, a legal
-basis, a maximum period, and a deletion mechanism.
+basis, a maximum period, and a deletion mechanism. This document does not assert
+a legal basis or a statutory period; whether each category rests on consent, a
+contract, a legitimate interest, or a legal obligation requires legal validation
+([OD-10](open-decisions.md)).
 
 | Category | Proposed period | Status |
 |---|---|---|

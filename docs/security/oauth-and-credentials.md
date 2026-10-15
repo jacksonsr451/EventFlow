@@ -75,6 +75,28 @@ scripting flaw cannot read it.
 - On logout or revocation, tokens are removed from the platform store and the
   server-side session is invalidated.
 
+## Delegated Authorization and Confused Deputy
+
+Authorization authority is not the same as provider permission. The two must be
+kept separate so that a client cannot borrow the service's privilege.
+
+- **Authorization authority** is decided by EventFlow RBAC within the user's
+  workspace ([tenant-isolation.md](tenant-isolation.md), `TI-07`). A user token
+  grants only what the user may do.
+- **Provider permission** is the scope EventFlow's own App or integration holds
+  from GitHub or GitLab. Holding a permission never grants an EventFlow user the
+  right to act; it only makes the action possible if RBAC also allows it.
+- A client-supplied `workspace_id`, installation id, or subject is a locator,
+  never an authority (`OA-05`, `TI-02`, `TI-10`). The effective tenant comes from
+  the verified installation mapping, not from the request.
+- The service acts as a principal in its own right only within the narrow action
+  its binding permits. A request that would make it act outside that binding is
+  rejected rather than executed with the service identity
+  ([confused deputy](https://en.wikipedia.org/wiki/Confused_deputy_problem),
+  `TM-MT-08`).
+- Elevated provider scopes are minimized and require an approved, documented
+  justification ([webhooks.md](webhooks.md), `WH-11`).
+
 ## Secrets Handling
 
 - Client secrets, when a confidential client exists, are stored server-side and
