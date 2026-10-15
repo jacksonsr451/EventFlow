@@ -27,6 +27,7 @@ alternatives and consequences.
 - [ADR-003: Transactional Outbox](adr/ADR-003-transactional-outbox.md)
 - [ADR-004: Order Workflow Orchestration](adr/ADR-004-order-orchestration.md)
 - [ADR-005: Polyglot Service Architecture](adr/ADR-005-polyglot-service-architecture.md)
+- [ADR-006: Product Scope, Bounded Contexts, and Monorepo Architecture](adr/ADR-006-product-scope-and-bounded-contexts.md)
 
 ## Concepts
 

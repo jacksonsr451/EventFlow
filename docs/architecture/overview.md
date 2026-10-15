@@ -1,4 +1,4 @@
-﻿# EventFlow Architecture Overview
+# EventFlow Architecture Overview
 
 ## Status
 
@@ -8,14 +8,16 @@ here are planned; this repository does not yet contain their implementations.
 ## Purpose and Trade-off
 
 EventFlow is an educational and portfolio platform for distributed order
-processing. Its purpose is to make asynchronous communication, eventual
-consistency, partial failure, idempotency, at-least-once delivery, Outbox,
-Inbox, Saga, compensation, concurrency, reconciliation, DLQ and distributed
-observability explicit and testable.
+processing and modern work management. Its purpose is to make asynchronous
+communication, eventual consistency, partial failure, idempotency, at-least-once
+delivery, Outbox, Inbox, Saga, compensation, concurrency, reconciliation, DLQ and
+distributed observability explicit and testable across isolated bounded contexts
+(formalized in [ADR-006](../adr/ADR-006-product-scope-and-bounded-contexts.md)).
 
-Microservices are a deliberate teaching choice, not a claim that they are
-better or more scalable than a modular monolith. The cost is operational and
-cognitive complexity; the benefit is visible ownership and failure boundaries.
+Microservices and domain separation are deliberate architectural choices, not a
+claim that they are better or more scalable than a monolithic approach. The cost
+is operational and cognitive complexity; the benefit is visible ownership and
+failure boundaries.
 
 ## Service View
 
@@ -87,3 +89,5 @@ is implemented in this repository.
 - [Data ownership](data-ownership.md)
 - [Communication](communication.md)
 - [Order workflow](order-workflow.md)
+- [Product scope and bounded contexts ADR](../adr/ADR-006-product-scope-and-bounded-contexts.md)
+- [Task mindmap](../roadmap/task-mindmap.md)
