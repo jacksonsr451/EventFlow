@@ -15,6 +15,7 @@ domains interact.
 - [Communication](architecture/communication.md): HTTP, commands, events, envelope and versioning.
 - [Data ownership](architecture/data-ownership.md): exclusive persistence ownership and access rules.
 - [Order workflow](architecture/order-workflow.md): Cart, PriceQuote, Order, Reservation, Saga and reconciliation.
+- [Order Processing preservation](architecture/order-processing/README.md): contract inventory, bounded-context separation, compatibility, reliability and execution plan for the Order Saga.
 - [Work management workflow](architecture/work-management-workflow.md): Consultation, triage, proposal, approval, WorkItem and BoardCard.
 - [Client integration](architecture/client-integration.md): how Web, Desktop and VS Code consume the API and share contracts.
 

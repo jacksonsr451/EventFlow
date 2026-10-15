@@ -1,0 +1,390 @@
+{
+  "asyncapi_channels": [
+    "orderWorkflow"
+  ],
+  "asyncapi_messages": [
+    "inventory.rejected",
+    "inventory.release.requested",
+    "inventory.released",
+    "inventory.reservation.requested",
+    "inventory.reserved",
+    "order.cancelled",
+    "order.confirmed",
+    "order.created",
+    "payment.approved",
+    "payment.compensated",
+    "payment.compensation.requested",
+    "payment.declined",
+    "payment.processing",
+    "payment.requested",
+    "payment.unknown"
+  ],
+  "asyncapi_operations": [
+    "consumeCompensationRequested",
+    "consumeOrderCancelled",
+    "consumeOrderConfirmed",
+    "consumePaymentRequested",
+    "consumeReleaseRequested",
+    "consumeReservationRequested",
+    "notificationsConsumeOrderCancelled",
+    "notificationsConsumeOrderConfirmed",
+    "ordersConsumeCompensated",
+    "ordersConsumePaymentApproved",
+    "ordersConsumePaymentDeclined",
+    "ordersConsumePaymentProcessing",
+    "ordersConsumePaymentUnknown",
+    "ordersConsumeReleased",
+    "ordersConsumeReservationRejected",
+    "ordersConsumeReservationReserved",
+    "publishCompensated",
+    "publishCompensationRequested",
+    "publishOrderCancelled",
+    "publishOrderConfirmed",
+    "publishOrderCreated",
+    "publishPaymentApproved",
+    "publishPaymentDeclined",
+    "publishPaymentProcessing",
+    "publishPaymentRequested",
+    "publishPaymentUnknown",
+    "publishReleaseRequested",
+    "publishReleased",
+    "publishReservationRejected",
+    "publishReservationRequested",
+    "publishReservationReserved"
+  ],
+  "error_code_enum": [
+    "VALIDATION_ERROR",
+    "NOT_FOUND",
+    "UNAUTHORIZED",
+    "FORBIDDEN",
+    "CONFLICT",
+    "IDEMPOTENCY_CONFLICT",
+    "QUOTE_EXPIRED",
+    "INVALID_QUOTE",
+    "DEPENDENCY_UNAVAILABLE",
+    "INVALID_STATE"
+  ],
+  "event_type_enum": [
+    "order.created",
+    "inventory.reservation.requested",
+    "inventory.reserved",
+    "inventory.rejected",
+    "payment.requested",
+    "payment.approved",
+    "payment.declined",
+    "payment.processing",
+    "payment.unknown",
+    "inventory.release.requested",
+    "inventory.released",
+    "payment.compensation.requested",
+    "payment.compensated",
+    "order.confirmed",
+    "order.cancelled"
+  ],
+  "events": {
+    "inventory.rejected": "ReservationRejected",
+    "inventory.release.requested": "ReleaseRequested",
+    "inventory.released": "Released",
+    "inventory.reservation.requested": "ReservationRequested",
+    "inventory.reserved": "ReservationReserved",
+    "order.cancelled": "OrderCancelled",
+    "order.confirmed": "OrderConfirmed",
+    "order.created": "OrderCreated",
+    "payment.approved": "PaymentApproved",
+    "payment.compensated": "Compensated",
+    "payment.compensation.requested": "CompensationRequested",
+    "payment.declined": "PaymentDeclined",
+    "payment.processing": "PaymentProcessing",
+    "payment.requested": "PaymentRequested",
+    "payment.unknown": "PaymentUnknown"
+  },
+  "openapi_operations": [
+    "createOrderFromCheckout",
+    "getCart",
+    "getOrder"
+  ],
+  "openapi_paths": [
+    "/v1/carts/{cart_id}",
+    "/v1/orders",
+    "/v1/orders/{order_id}"
+  ],
+  "schemas": {
+    "common.yaml": {
+      "enum": {
+        "common.yaml/$defs/CompensationResult": [
+          "COMPLETED"
+        ],
+        "common.yaml/$defs/Error/properties/code": [
+          "VALIDATION_ERROR",
+          "NOT_FOUND",
+          "UNAUTHORIZED",
+          "FORBIDDEN",
+          "CONFLICT",
+          "IDEMPOTENCY_CONFLICT",
+          "QUOTE_EXPIRED",
+          "INVALID_QUOTE",
+          "DEPENDENCY_UNAVAILABLE",
+          "INVALID_STATE"
+        ],
+        "common.yaml/$defs/EventType": [
+          "order.created",
+          "inventory.reservation.requested",
+          "inventory.reserved",
+          "inventory.rejected",
+          "payment.requested",
+          "payment.approved",
+          "payment.declined",
+          "payment.processing",
+          "payment.unknown",
+          "inventory.release.requested",
+          "inventory.released",
+          "payment.compensation.requested",
+          "payment.compensated",
+          "order.confirmed",
+          "order.cancelled"
+        ],
+        "common.yaml/$defs/NotificationOperation/properties/status": [
+          "PENDING",
+          "PROCESSING",
+          "SENT",
+          "FAILED"
+        ],
+        "common.yaml/$defs/OrderStatus": [
+          "PENDING",
+          "STOCK_RESERVED",
+          "PAYMENT_PROCESSING",
+          "CONFIRMED",
+          "CANCELLING",
+          "CANCELLED"
+        ],
+        "common.yaml/$defs/PaymentState": [
+          "AUTHORIZED",
+          "CAPTURED",
+          "UNKNOWN",
+          "PROCESSING",
+          "DECLINED"
+        ],
+        "common.yaml/$defs/ReservationStatus": [
+          "ACTIVE",
+          "CONSUMED",
+          "RELEASED",
+          "EXPIRED"
+        ]
+      },
+      "required": {
+        "common.yaml/$defs/AcceptedOrderItem": [
+          "currency",
+          "quantity",
+          "quote_id",
+          "sku",
+          "unit_price"
+        ],
+        "common.yaml/$defs/CartItem": [
+          "quantity",
+          "sku"
+        ],
+        "common.yaml/$defs/Error": [
+          "correlation_id",
+          "detail",
+          "status",
+          "title",
+          "type"
+        ],
+        "common.yaml/$defs/Error/properties/errors/items": [
+          "field",
+          "message"
+        ],
+        "common.yaml/$defs/IdentifierEnvelope": [
+          "order_id"
+        ],
+        "common.yaml/$defs/Money": [
+          "amount",
+          "currency"
+        ],
+        "common.yaml/$defs/NotificationOperation": [
+          "attempts",
+          "channel",
+          "correlation_id",
+          "notification_id",
+          "source_event_id",
+          "status"
+        ],
+        "common.yaml/$defs/Order": [
+          "correlation_id",
+          "created_at",
+          "items",
+          "order_id",
+          "status"
+        ],
+        "common.yaml/$defs/Payment": [
+          "order_id",
+          "payment_id",
+          "status"
+        ],
+        "common.yaml/$defs/PriceQuote": [
+          "currency",
+          "quote_id",
+          "sku",
+          "unit_price",
+          "valid_until"
+        ],
+        "common.yaml/$defs/Reservation": [
+          "created_at",
+          "expires_at",
+          "items",
+          "order_id",
+          "reservation_id",
+          "status"
+        ],
+        "common.yaml/$defs/ReservationItem": [
+          "quantity",
+          "sku"
+        ]
+      }
+    },
+    "envelope.yaml": {
+      "enum": {},
+      "required": {
+        "envelope.yaml": [
+          "aggregate_id",
+          "aggregate_type",
+          "causation_id",
+          "correlation_id",
+          "event_id",
+          "event_type",
+          "occurred_at",
+          "payload",
+          "producer",
+          "schema_version"
+        ]
+      }
+    },
+    "events.yaml": {
+      "enum": {
+        "events.yaml/$defs/PaymentApprovedPayload/properties/status": [
+          "AUTHORIZED",
+          "CAPTURED"
+        ]
+      },
+      "required": {
+        "events.yaml/$defs/CompensatedPayload": [
+          "compensation_id",
+          "order_id",
+          "payment_id",
+          "result"
+        ],
+        "events.yaml/$defs/CompensationRequestedPayload": [
+          "compensation_id",
+          "order_id",
+          "payment_id"
+        ],
+        "events.yaml/$defs/OrderCancelledPayload": [
+          "order_id",
+          "status"
+        ],
+        "events.yaml/$defs/OrderConfirmedPayload": [
+          "order_id",
+          "payment_id",
+          "reservation_id",
+          "status"
+        ],
+        "events.yaml/$defs/OrderCreatedPayload": [
+          "items",
+          "order_id",
+          "status"
+        ],
+        "events.yaml/$defs/PaymentApprovedPayload": [
+          "amount",
+          "order_id",
+          "payment_id",
+          "status"
+        ],
+        "events.yaml/$defs/PaymentDeclinedPayload": [
+          "order_id",
+          "payment_id",
+          "status"
+        ],
+        "events.yaml/$defs/PaymentProcessingPayload": [
+          "order_id",
+          "payment_id",
+          "status"
+        ],
+        "events.yaml/$defs/PaymentRequestedPayload": [
+          "amount",
+          "order_id",
+          "payment_id"
+        ],
+        "events.yaml/$defs/PaymentUnknownPayload": [
+          "order_id",
+          "payment_id",
+          "status"
+        ],
+        "events.yaml/$defs/ReleaseRequestedPayload": [
+          "order_id",
+          "reservation_id"
+        ],
+        "events.yaml/$defs/ReleasedPayload": [
+          "order_id",
+          "reservation_id",
+          "status"
+        ],
+        "events.yaml/$defs/ReservationRejectedPayload": [
+          "order_id",
+          "reason",
+          "reservation_id"
+        ],
+        "events.yaml/$defs/ReservationRequestedPayload": [
+          "items",
+          "order_id",
+          "reservation_id"
+        ],
+        "events.yaml/$defs/ReservationResultPayload": [
+          "expires_at",
+          "items",
+          "order_id",
+          "reservation_id",
+          "status"
+        ]
+      }
+    },
+    "http.yaml": {
+      "enum": {
+        "http.yaml/$defs/CartLineView/properties/availability": [
+          "AVAILABLE",
+          "UNAVAILABLE",
+          "TEMPORARILY_UNAVAILABLE"
+        ]
+      },
+      "required": {
+        "http.yaml/$defs/CartLineView": [
+          "availability",
+          "price",
+          "product",
+          "quantity",
+          "sku"
+        ],
+        "http.yaml/$defs/CartLineView/properties/product": [
+          "commercial_status",
+          "name"
+        ],
+        "http.yaml/$defs/CartView": [
+          "cart_id",
+          "items"
+        ],
+        "http.yaml/$defs/CheckoutItem": [
+          "quantity",
+          "quote_id",
+          "sku"
+        ],
+        "http.yaml/$defs/CheckoutRequest": [
+          "cart_id",
+          "items"
+        ],
+        "http.yaml/$defs/CheckoutResponse": [
+          "correlation_id",
+          "order"
+        ]
+      }
+    }
+  }
+}

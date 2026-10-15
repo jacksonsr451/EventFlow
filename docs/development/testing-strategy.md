@@ -26,6 +26,19 @@ OpenAPI, AsyncAPI and schema artifacts under `contracts/` plus the
 is extended by future implementation-level contract tests once services and
 clients exist.
 
+## Order Processing (Contract Level)
+
+The Order Processing bounded context has no service yet, so its coverage is
+contractual. `tests/contracts/test_order_processing_preservation.py` freezes the
+Orders, Inventory, Payments and Notifications contract surface against
+`tests/contracts/order_processing_baseline.json`, checks the event taxonomy and
+envelope, the `problem+json` errors and the Work Management boundary, and
+verifies the documentation set. The invariants above and the failure scenarios
+are detailed per transition in
+[order-processing/workflow.md](../architecture/order-processing/workflow.md) and
+[order-processing/reliability.md](../architecture/order-processing/reliability.md);
+runtime coverage begins with Issues #50–#54.
+
 ## Quality Tooling Strategy
 
 | Area | Pre-commit | CI | Status |
