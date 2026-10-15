@@ -52,7 +52,7 @@ and how future implementations should be validated.
 - [Getting started](development/getting-started.md): current repository status and future workflow.
 - [Conventions](development/conventions.md): terminology and architectural constraints.
 - [Monorepo layout](development/monorepo-layout.md): directories, contracts and bounded-context rules.
-- [Testing strategy](development/testing-strategy.md): planned invariant, contract and resilience coverage.
+- [Testing strategy](development/testing-strategy.md): implemented contract coverage plus planned invariant and resilience coverage.
 - [CI/CD strategy](development/ci-cd.md): active validation and future delivery stages.
 
 ## Documentation Boundaries
@@ -61,8 +61,8 @@ and how future implementations should be validated.
 - `docs/adr/` answers: “Why was this architectural choice made?”
 - `docs/concepts/` answers: “How does this mechanism work?”
 - `docs/development/` answers: “How should contributors work and validate it?”
-- `contracts/` contains machine-readable interfaces; service implementations
-  and contract-driven tests are not present yet.
+- `contracts/` contains machine-readable interfaces; contract validation tests
+  exist under `tests/contracts/`, but service implementations are not present yet.
 
 Avoid documenting planned features as implemented. Update the relevant section
 when an architectural decision or public contract changes.
