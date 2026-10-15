@@ -96,6 +96,14 @@ poetry run testrunner --verbose   # jsr-testrunner only; no pytest
 **Do not add pytest** to any Python service. The test framework is
 `jsr-testrunner` exclusively.
 
+`jsr-testrunner` is a pytest fork that can auto-load third-party plugins from
+the `pytest11` entry-point group. Because pytest is intentionally absent, such
+plugins fail to import (for example `platformdirs`, pulled in transitively by
+`pre-commit`). The repository sets `addopts = ["--disable-plugin-autoload"]` in
+`[tool.testrunner]` (`pyproject.toml`) so plain `testrunner` invocations stay
+pytest-free; the `--disable-plugin-autoload` flag can also be passed directly
+(same behavior). Do not install pytest to work around this.
+
 ## Working with Shared Packages (Planned)
 
 When `packages/` is implemented (Issue #33):

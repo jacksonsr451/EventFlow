@@ -16,10 +16,13 @@ The current `.github/workflows/ci.yml` has one active `contracts` job. It runs
 the repository-quality hooks with the local contract hook skipped, runs
 `scripts/validate_contracts.py`, the pinned OpenAPI and AsyncAPI validators, and
 the repository contract, schema, and bounded-context boundary tests through
-`python -m testrunner tests -v`. It runs on pull requests and pushes to `main`,
-uses read-only repository permissions, and cancels obsolete runs for the same PR
-or branch. GitHub Actions execution is not implied by local runs; remote status
-is determined by the GitHub workflow itself.
+`testrunner tests -v --disable-plugin-autoload`. The autoload flag keeps the
+runner from loading third-party `pytest11` plugins (for example `platformdirs`,
+pulled in transitively by `pre-commit`), which would otherwise fail because
+pytest is deliberately not installed. It runs on pull requests and pushes to
+`main`, uses read-only repository permissions, and cancels obsolete runs for the
+same PR or branch. GitHub Actions execution is not implied by local runs; remote
+status is determined by the GitHub workflow itself.
 
 Pre-commit remains complementary. Its common hooks and fast contract check are
 not a replacement for the CI job or for the official OpenAPI/AsyncAPI checks.
@@ -33,7 +36,7 @@ the authoritative contract validator runs once through
 |---|---|---|---|---|---|---|---|
 | Repository quality | Common hooks | Common hooks plus contract/documentation validation | Same CI workflow | N/A | N/A | N/A | ACTIVE |
 | Static contracts | Fast local validator | Full validation | Full validation | Required gate | Required gate | Required gate | ACTIVE |
-| Contract/schema/boundary tests (jsr-testrunner) | Local run | `python -m testrunner tests -v` | Same CI workflow | Gate when present | Gate when present | Gate when present | ACTIVE |
+| Contract/schema/boundary tests (jsr-testrunner) | Local run | `testrunner tests -v --disable-plugin-autoload` | Same CI workflow | Gate when present | Gate when present | Gate when present | ACTIVE |
 | Python quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
 | Python unit tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
 | Java quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
@@ -65,10 +68,11 @@ Activate Python jobs when the first real Gateway, Orders or Payments service
 exists and that service owns a project configuration with a pinned Ruff
 version. Ruff should provide lint/import checks and formatting checks through
 `ruff check` and `ruff format --check`. Type checking is **TO BE DECIDED** and
-should be selected after service packaging and typing conventions exist. Pytest
-and coverage belong in CI, with thresholds defined only after a real baseline
-exists. A matrix for `gateway`, `orders` and `payments` is useful only if their
-tooling is sufficiently uniform.
+should be selected after service packaging and typing conventions exist. Tests
+run with `jsr-testrunner` (the project's only test framework; pytest is
+prohibited) and coverage belongs in CI, with thresholds defined only after a
+real baseline exists. A matrix for `gateway`, `orders` and `payments` is useful
+only if their tooling is sufficiently uniform.
 
 The repository's `scripts/validate_contracts.py` is tooling, not a FastAPI
 service. It is intentionally not treated as the first service-quality target.
@@ -93,7 +97,8 @@ module and its runtime support make race testing applicable. The module's
 ## Contract And Distributed Tests
 
 Static contract validation is active today, and the repository's executable
-contract suite (`tests/contracts`, run in CI via `python -m testrunner tests -v`)
+contract suite (`tests/contracts`, run in CI via
+`testrunner tests -v --disable-plugin-autoload`)
 verifies JSON Schema Draft 2020-12 validity, positive and negative payload
 fixtures, OpenAPI document validity, bounded-context boundary rules, and
 documentation/reference integrity. This suite does not yet exercise an

@@ -63,4 +63,4 @@ jobs:
         run: npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
 
       - name: Run contract, schema, and boundary tests
-        run: python -m testrunner tests -v
+        run: testrunner tests -v --disable-plugin-autoload
