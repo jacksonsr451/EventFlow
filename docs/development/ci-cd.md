@@ -102,7 +102,11 @@ contract suite (`tests/contracts` and `tests/security`, run in CI via
 `testrunner tests -v --disable-plugin-autoload`)
 verifies JSON Schema Draft 2020-12 validity, positive and negative payload
 fixtures, OpenAPI document validity, bounded-context boundary rules, security
-documentation integrity, and documentation/reference integrity. This suite does
+documentation integrity, and documentation/reference integrity. For the Order
+Processing bounded context it additionally freezes the reviewed contract surface
+against `tests/contracts/order_processing_baseline.json` and checks the event
+taxonomy, envelope, error shape and domain boundary
+(`tests/contracts/test_order_processing_preservation.py`). This suite does
 not yet exercise an
 implementation: HTTP tests must run a real service against OpenAPI, and event
 producer/consumer tests must run against AsyncAPI and JSON Schema. Those

@@ -29,6 +29,7 @@ EventFlow/
 ├── docs/
 │   ├── adr/                 ← Architecture Decision Records (sequential, never deleted)
 │   ├── architecture/        ← Descriptive system architecture documents
+│   │   └── order-processing/← Order Saga contract inventory, separation, reliability and execution plan
 │   ├── concepts/            ← Educational concept explanations
 │   ├── development/         ← Developer how-to guides (this file lives here)
 │   ├── security/            ← Threat model, security policies and data governance
@@ -57,6 +58,7 @@ EventFlow/
 │
 ├── tests/                   ← Root-level cross-domain tests
 │   ├── contracts/           ← Contract boundary and schema validation tests
+│   │   └── order_processing_baseline.json  ← Frozen Order Processing contract snapshot
 │   └── security/            ← Security documentation and contract tests
 │
 ├── .pre-commit-config.yaml  ← Pre-commit hook configuration
@@ -153,6 +155,7 @@ Run manually: `pre-commit run --all-files`
 | #2 Workflow Specification | `docs/architecture/work-management-workflow.md`, `contracts/openapi/work-management.yaml`, `contracts/schemas/work_management.yaml` |
 | #3 Monorepo Layout (this issue) | `docs/adr/ADR-007-*.md`, `docs/architecture/client-integration.md`, `docs/development/monorepo-layout.md` |
 | #35 Threat model and data governance | `docs/security/`, `contracts/schemas/security_events.yaml`, `tests/security/` |
+| #49 Order Processing preservation | `docs/architecture/order-processing/`, `tests/contracts/order_processing_baseline.json`, `tests/contracts/test_order_processing_preservation.py` |
 | #9 Workspaces + RBAC | `services/work-management/` (planned) |
 | #10 Authentication | `services/auth/` or `services/work-management/auth/` (planned) |
 | #11 Versioned API + codegen | `packages/` configuration (planned) |
