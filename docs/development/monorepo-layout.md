@@ -36,9 +36,14 @@ EventFlow/
 │   └── roadmap/             ← Issue dependency mindmap and critical path
 │
 ├── services/                ← Backend microservices
-│   └── orders/              ← Python/FastAPI — Order Processing domain (planned location)
-│       ├── src/             ← Application source code
-│       └── tests/           ← Service-level tests
+│   ├── orders/              ← Python/FastAPI — Order Processing domain (planned location)
+│   │   ├── src/             ← Application source code
+│   │   └── tests/           ← Service-level tests
+│   └── work-management/     ← Python/FastAPI — Work Management domain (persistence foundation, ADR-008)
+│       ├── alembic.ini      ← Migration configuration
+│       ├── pyproject.toml   ← Self-contained Poetry project
+│       ├── src/eventflow_work_management/  ← config, db, models, repositories, seeds, migrations
+│       └── tests/           ← jsr-testrunner persistence tests (PostgreSQL-backed)
 │
 ├── packages/                ← Shared TypeScript packages (PLANNED — Issue #11, #33)
 │   ├── domain/              ← Generated entity types from JSON Schema
@@ -156,6 +161,7 @@ Run manually: `pre-commit run --all-files`
 | #3 Monorepo Layout (this issue) | `docs/adr/ADR-007-*.md`, `docs/architecture/client-integration.md`, `docs/development/monorepo-layout.md` |
 | #35 Threat model and data governance | `docs/security/`, `contracts/schemas/security_events.yaml`, `tests/security/` |
 | #49 Order Processing preservation | `docs/architecture/order-processing/`, `tests/contracts/order_processing_baseline.json`, `tests/contracts/test_order_processing_preservation.py` |
+| #12 Work Management persistence | `services/work-management/`, `docker-compose.yml`, `docs/adr/ADR-008-*.md`, `docs/architecture/work-management-persistence.md` |
 | #9 Workspaces + RBAC | `services/work-management/` (planned) |
 | #10 Authentication | `services/auth/` or `services/work-management/auth/` (planned) |
 | #11 Versioned API + codegen | `packages/` configuration (planned) |

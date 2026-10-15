@@ -25,6 +25,15 @@ pytest is deliberately not installed. It runs on pull requests and pushes to
 same PR or branch. GitHub Actions execution is not implied by local runs; remote
 status is determined by the GitHub workflow itself.
 
+A second job, `work-management-persistence`, starts a PostgreSQL 17 service
+container and exercises the Work Management persistence foundation (ADR-008). It
+installs pinned SQLAlchemy, Alembic, psycopg and `jsr-testrunner` versions,
+applies the Alembic migrations, verifies they downgrade to `base` and upgrade
+again, and runs the PostgreSQL-backed suite under
+`services/work-management/tests` with
+`testrunner services/work-management/tests -v --disable-plugin-autoload`. The
+job uses the same runner prohibition on pytest and its plugins.
+
 Pre-commit remains complementary. Its common hooks and fast contract check are
 not a replacement for the CI job or for the official OpenAPI/AsyncAPI checks.
 CI reuses the common hooks while explicitly skipping the local contract hook;
@@ -39,13 +48,14 @@ the authoritative contract validator runs once through
 | Static contracts | Fast local validator | Full validation | Full validation | Required gate | Required gate | Required gate | ACTIVE |
 | Contract/schema/boundary tests (jsr-testrunner) | Local run | `testrunner tests -v --disable-plugin-autoload` | Same CI workflow | Gate when present | Gate when present | Gate when present | ACTIVE |
 | Python quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
-| Python unit tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
+| Python unit tests | Not active | Work Management persistence unit tests | Same CI workflow | Gate when present | Gate when present | Gate when present | ACTIVE |
+| Python integration tests (PostgreSQL) | Not active | Work Management persistence migrations and PostgreSQL suite | Same CI workflow | Gate when present | Gate when present | Gate when present | ACTIVE |
 | Java quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
 | Java unit tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
 | Go quality | Not active | Not active | Not active | Gate when present | Gate when present | Gate when present | PLANNED |
 | Go unit tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
 | Executable contract tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
-| Integration tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
+| Integration tests | None | Work Management persistence only | Same CI workflow | Gate when present | Gate when present | Gate when present | PARTIAL |
 | Resilience tests | None | None | None | Gate when present | Gate when present | Gate when present | PLANNED |
 | Security scanning | Private-key hook | Private-key hook only | Private-key hook only | Required gate | Required gate | Required gate | PARTIAL |
 | Dependency scanning | None | Not active | Not active | Required gate | Required gate | Required gate | PLANNED |
@@ -65,15 +75,15 @@ required merge check.
 
 ### Python
 
-Activate Python jobs when the first real Gateway, Orders or Payments service
-exists and that service owns a project configuration with a pinned Ruff
-version. Ruff should provide lint/import checks and formatting checks through
-`ruff check` and `ruff format --check`. Type checking is **TO BE DECIDED** and
-should be selected after service packaging and typing conventions exist. Tests
-run with `jsr-testrunner` (the project's only test framework; pytest is
-prohibited) and coverage belongs in CI, with thresholds defined only after a
-real baseline exists. A matrix for `gateway`, `orders` and `payments` is useful
-only if their tooling is sufficiently uniform.
+The first Python service, Work Management, activated its persistence job with
+ADR-008: the `work-management-persistence` job runs Alembic migrations and a
+PostgreSQL-backed `jsr-testrunner` suite. Lint (`Ruff`) and type-checking jobs
+remain PLANNED until the service owns a pinned Ruff configuration and typing
+conventions. Tests run with `jsr-testrunner` (the project's only test framework;
+pytest is prohibited) and coverage belongs in CI, with thresholds defined only
+after a real baseline exists. Gateway, Orders and Payments jobs activate when
+those services exist and own their tooling. A matrix for `gateway`, `orders` and
+`payments` is useful only if their tooling is sufficiently uniform.
 
 The repository's `scripts/validate_contracts.py` is tooling, not a FastAPI
 service. It is intentionally not treated as the first service-quality target.
@@ -106,11 +116,14 @@ documentation integrity, and documentation/reference integrity. For the Order
 Processing bounded context it additionally freezes the reviewed contract surface
 against `tests/contracts/order_processing_baseline.json` and checks the event
 taxonomy, envelope, error shape and domain boundary
-(`tests/contracts/test_order_processing_preservation.py`). This suite does
-not yet exercise an
-implementation: HTTP tests must run a real service against OpenAPI, and event
-producer/consumer tests must run against AsyncAPI and JSON Schema. Those
-implementation-level executable tests remain PLANNED until services exist.
+(`tests/contracts/test_order_processing_preservation.py`). The Work Management
+persistence foundation is additionally covered by an executable, PostgreSQL-backed
+suite under `services/work-management/tests/`
+([work-management-persistence.md](../architecture/work-management-persistence.md)).
+Beyond persistence, this suite does not yet exercise an implementation: HTTP
+tests must run a real service against OpenAPI, and event producer/consumer tests
+must run against AsyncAPI and JSON Schema. Those implementation-level executable
+tests remain PLANNED until the corresponding services exist.
 
 Integration tests should use disposable PostgreSQL and Kafka/Redpanda
 dependencies when enough services exist to execute a real workflow. Future
@@ -201,7 +214,7 @@ that is already acting on an environment.
 
 ## Activation Rules
 
-- Python CI starts when a real Python service and its project tooling exist.
+- Python CI starts when a real Python service and its project tooling exist (started for Work Management persistence in ADR-008).
 - Java CI starts when Inventory has a real Maven or Gradle build.
 - Go CI starts when Notifications has `go.mod` and source code.
 - Executable contract tests start when a producer or consumer implementation exists.

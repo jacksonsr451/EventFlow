@@ -170,6 +170,52 @@ $defs:
         type: boolean
         const: true
 
+  Workspace:
+    type: object
+    description: Tenant boundary. Every Work Management row is scoped to exactly one workspace.
+    required: [workspace_id, name, slug, created_at, updated_at]
+    additionalProperties: false
+    properties:
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      name:
+        type: string
+        minLength: 3
+        maxLength: 120
+      slug:
+        type: string
+        pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+        maxLength: 80
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  Project:
+    type: object
+    description: A unit of work grouping inside a workspace.
+    required: [project_id, workspace_id, key, name, created_at, updated_at]
+    additionalProperties: false
+    properties:
+      project_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      key:
+        type: string
+        pattern: ^[A-Z][A-Z0-9]{1,9}$
+      name:
+        type: string
+        minLength: 3
+        maxLength: 120
+      description:
+        type: string
+        minLength: 1
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
   Consultation:
     type: object
     required: [consultation_id, workspace_id, project_id, author_id, origin, title, description, status, priority, created_at, updated_at]
@@ -384,6 +430,101 @@ $defs:
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  Board:
+    type: object
+    description: An ordered set of columns that groups board cards for a project.
+    required: [board_id, workspace_id, project_id, name, columns, created_at, updated_at]
+    additionalProperties: false
+    properties:
+      board_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      columns:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  AuditRecord:
+    type: object
+    description: Append-only record of a Work Management state change.
+    required: [audit_id, workspace_id, action, entity_type, entity_id, occurred_at, snapshot_hash]
+    additionalProperties: false
+    properties:
+      audit_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      actor_id:
+        $ref: '#/$defs/UUID'
+      action:
+        type: string
+        minLength: 3
+        maxLength: 120
+      entity_type:
+        type: string
+        minLength: 3
+        maxLength: 80
+      entity_id:
+        $ref: '#/$defs/UUID'
+      occurred_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      snapshot:
+        type: object
+      snapshot_hash:
+        type: string
+        pattern: ^[0-9a-f]{64}$
+      correlation_id:
+        $ref: '#/$defs/UUID'
+
+  RemoteIntegrationReference:
+    type: object
+    description: Maps a Work Management entity to an external GitHub/GitLab resource.
+    required: [reference_id, workspace_id, provider, installation_id, remote_resource_type, remote_resource_id, entity_type, entity_id, created_at]
+    additionalProperties: false
+    properties:
+      reference_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      provider:
+        type: string
+        enum: [github, gitlab]
+      installation_id:
+        type: string
+        minLength: 1
+        maxLength: 120
+      remote_resource_type:
+        type: string
+        enum: [issue, pull_request, merge_request]
+      remote_resource_id:
+        type: string
+        minLength: 1
+        maxLength: 120
+      entity_type:
+        type: string
+        minLength: 3
+        maxLength: 80
+      entity_id:
+        $ref: '#/$defs/UUID'
+      url:
+        type: string
+        minLength: 1
+        maxLength: 500
+      created_at:
         $ref: '#/$defs/RFC3339DateTime'
 
   ErrorResponse:

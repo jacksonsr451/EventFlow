@@ -11,11 +11,17 @@ flowchart LR
   Inventory --> I[(Stock, Reservation)]
   Payments --> P[(Payment, compensation)]
   Notifications --> N[(Notification, audit/idempotency)]
+  WorkManagement --> W[(Workspace, Consultation, Proposal, Approval, WorkItem, Board, Audit)]
   Catalog --> C[(Product, price, status)]
   O -. contracts/events .-> I
   O -. contracts/events .-> P
   O -. HTTP/read model .-> C
 ```
+
+Work Management owns its own PostgreSQL schema and never reads or writes Order
+Processing tables ([ADR-008](../adr/ADR-008-work-management-persistence.md),
+[work-management-persistence.md](work-management-persistence.md)). It is the
+first service with a persistence implementation.
 
 Services communicate through HTTP contracts when an immediate response is
 needed, asynchronous commands/events for workflows, and projections/read

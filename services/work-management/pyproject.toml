@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "eventflow-work-management"
+version = "0.1.0"
+description = "Work Management bounded-context service: persistence, repositories and migrations."
+authors = ["Jackson Severino da Rocha <jackson@example.com>"]
+license = "MIT"
+packages = [{ include = "eventflow_work_management", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+SQLAlchemy = "^2.0"
+alembic = "^1.13"
+psycopg = { version = "^3.2", extras = ["binary"] }
+
+[tool.poetry.group.dev.dependencies]
+jsr-testrunner = "^0.1.0"
+PyYAML = "^6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
