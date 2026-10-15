@@ -96,4 +96,4 @@ issues is out of scope for Issue #49.
 | OPD-07 | `feat/orders-domain` serializes order status as lowercase (`pending`); the contract enum is uppercase (`PENDING`) | [execution-plan.md](execution-plan.md) |
 | OPD-08 | `feat/orders-domain` declares `pytest`/`pytest-cov` and a `conftest.py`; the repository requires `jsr-testrunner` only | [execution-plan.md](execution-plan.md) |
 | OPD-09 | Event schema files define `$schema` but no `$id`, while ADR-007 versioning expects an `$id` | [compatibility.md](compatibility.md) |
-| OPD-10 | Work Management and Order Processing still use two `problem+json` shapes (Amendment A-01) | [ADR-007](../../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md) |
+| OPD-10 | Work Management and Order Processing used two `problem+json` shapes; resolved by A-01 in [#11](https://github.com/jacksonsr451/EventFlow/issues/11) | [ADR-007](../../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md) |

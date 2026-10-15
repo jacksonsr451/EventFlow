@@ -24,24 +24,24 @@ and new versions may coexist during migration
 
 ## Error Semantics
 
-Both domains use the `application/problem+json` media type, so the divergence
-below is a genuine **shape** incompatibility, not a media-type distinction.
+Both domains use the `application/problem+json` media type.
 
 | Domain | Error shape | Definition |
 |---|---|---|
 | Order Processing | RFC 9457-style problem `type`, `title`, `status`, `detail`, `instance` + `correlation_id`, `request_id`, optional `errors[]` and `code` | [`common.yaml#/$defs/Error`](../../../contracts/schemas/common.yaml), exposed as `http.yaml#/$defs/ErrorResponse` |
-| Work Management | Custom `error_code`, `message`, `details`, `timestamp` | `work_management.yaml#/$defs/ErrorResponse` |
+| Work Management | RFC 9457 problem `type`, `title`, `status`, `detail`, `instance` + `correlation_id`, `request_id`, optional `errors[]` and `code` | `work_management.yaml#/$defs/ErrorResponse` |
 
-Order Processing already follows the RFC 9457 target model. Amendment
+Order Processing already followed the RFC 9457 target model. Amendment
 [A-01](../../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md#amendment-a-01--align-work-management-errors-with-rfc-9457)
-proposes aligning **Work Management** to the Order Processing shape — not the
-reverse. For Order Processing the implication is:
+aligned **Work Management** to that shape — not the reverse — and was applied by
+[#11](https://github.com/jacksonsr451/EventFlow/issues/11) using a locally
+declared, structurally compatible definition (the Work Management contracts keep
+no reference to Order Processing schemas). For Order Processing the implication
+was:
 
-- **No Order Processing error contract change is required** by A-01.
-- A-01 must **reuse** the Order Processing `Error` definition (or extract a
-  shared schema) rather than redefine it, so Orders clients are unaffected.
-- If a shared `ErrorResponse` is extracted, the Orders contract must keep the
-  same observable fields and media type.
+- **No Order Processing error contract change was required** by A-01.
+- The Work Management definition reuses the same observable members, so Orders
+  clients are unaffected and no shared schema was extracted from `common.yaml`.
 
 Order error responses and codes are frozen in the compatibility baseline:
 `400`, `401`, `403`, `409`, `422`, `503` and the `code` enum
@@ -71,7 +71,7 @@ see the [regression strategy](regression-strategy.md) for the review process.
 
 | ID | Risk | Evidence | Impact | Smallest compatible response |
 |---|---|---|---|---|
-| CR-01 | Work Management error model diverges (two problem+json shapes) | ADR-007 3.4, A-01 | Clients need a per-domain error type and a mapping layer | Apply A-01 to Work Management only; keep Orders fields stable |
+| CR-01 | Work Management error model diverged (two problem+json shapes) | ADR-007 3.4, A-01 | Clients needed a per-domain error type and a mapping layer | Resolved: A-01 applied to Work Management by #11; Orders fields unchanged |
 | CR-02 | Event schema files have no `$id` | schema files, ADR-007 3.3 | Version carrier is incomplete; tooling cannot pin a schema URI | Add `$id` additively in a reviewed change (OPD-09) |
 | CR-03 | Many payloads are `additionalProperties: true` | `events.yaml` | Unknown fields are tolerated but not constrained | Documented as intentional; do not tighten without a new version |
 | CR-04 | Workflow example covers only the happy path | `contracts/examples/order-workflow.json` | Rejection, decline, unknown, cancellation and compensation are unexercised | Add coherent failure-path examples in a reviewed change |
@@ -88,9 +88,10 @@ follow-up.
 
 These are registered here; no new tracking issue is created by Issue #49.
 
-- Keep the RFC 9457 target and apply A-01 to Work Management, owned by
-  [#11](https://github.com/jacksonsr451/EventFlow/issues/11) with
-  [#49](https://github.com/jacksonsr451/EventFlow/issues/49).
+- RFC 9457 target: A-01 was applied to Work Management by
+  [#11](https://github.com/jacksonsr451/EventFlow/issues/11), with
+  [#49](https://github.com/jacksonsr451/EventFlow/issues/49) preserving the
+  Orders error contract.
 - Add `$id` to event schema files as an additive, reviewed change (OPD-09).
 - Add failure-path workflow examples in a reviewed change (CR-04).
 - Reconcile the `feat/orders-domain` enum and tooling when it is incorporated

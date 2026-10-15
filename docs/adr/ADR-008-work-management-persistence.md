@@ -136,9 +136,10 @@ request fingerprint and the stored response status/body. The domain change (for
 example an Approval) and its idempotency record are written in the **same**
 transaction. A retry with the same key and fingerprint returns the stored
 result; the same key with a different fingerprint is a conflict. This implements
-ADR-007 section 3.6 for the one endpoint that currently declares
-`Idempotency-Key` (`.../decide`) and provides the storage primitive for
-Amendment A-02.
+ADR-007 section 3.6 for the endpoints that declare `Idempotency-Key` and
+provides the storage primitive for Amendment A-02, which
+[Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11) applied at the
+contract level.
 
 ### 6. Transactions and repositories
 
@@ -169,8 +170,9 @@ end-to-end. This deferral is recorded so it is not mistaken for completeness.
 - Composite foreign keys make cross-tenant references unrepresentable.
 - Alembic migrations give reviewable, reversible schema history and avoid
   `create_all()` drift.
-- The idempotency table satisfies ADR-007 section 3.6 and is reused when
-  Amendment A-02 extends the header to more endpoints.
+- The idempotency table satisfies ADR-007 section 3.6 and is reused by the
+  operations that Amendment A-02 (applied by
+  [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11)) extended.
 
 ### Negative
 

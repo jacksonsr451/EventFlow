@@ -1,0 +1,16 @@
+{
+  "category": "bug",
+  "priority": "high",
+  "triage_notes": "Reproduced locally; input validation missing on the checkout handler.",
+  "bug_criteria": {
+    "expected_behavior": "Returns 400 problem+json with code VALIDATION_ERROR.",
+    "observed_behavior": "Unhandled error causes a 500 Internal Server Error.",
+    "reproduction_steps": [
+      "Send POST with an empty items array.",
+      "Inspect the HTTP status code."
+    ],
+    "environment": "Python 3.11 / FastAPI 0.115",
+    "severity": "high",
+    "is_regression": false
+  }
+}

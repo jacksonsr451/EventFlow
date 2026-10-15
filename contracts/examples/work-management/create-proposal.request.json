@@ -1,0 +1,14 @@
+{
+  "consultation_id": "c3d4e5f6-0000-0000-0000-000000000003",
+  "title": "Enforce non-empty cart validation in order creation",
+  "technical_description": "Add a domain validation rule requiring at least one item before order construction.",
+  "scope": "Order domain and unit tests",
+  "justification": "Prevents downstream saga failures and unhandled 500 errors.",
+  "acceptance_criteria": [
+    "The order constructor rejects an empty items collection.",
+    "Unit tests pass with no regressions."
+  ],
+  "category": "bug",
+  "priority": "high",
+  "estimated_hours": 3.0
+}

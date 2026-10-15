@@ -1,0 +1,10 @@
+{
+  "type": "https://errors.eventflow.invalid/conflict/stale-version",
+  "title": "Stale proposal version",
+  "status": 409,
+  "detail": "Proposal version 1 is superseded by version 2.",
+  "instance": "/v1/workspaces/d234f567-8901-2345-6789-01bcde234567/proposals/b2c3d4e5-0000-0000-0000-000000000006/decide",
+  "code": "STALE_VERSION",
+  "correlation_id": "a1b2c3d4-0000-0000-0000-000000000001",
+  "request_id": "a1b2c3d4-0000-0000-0000-000000000002"
+}

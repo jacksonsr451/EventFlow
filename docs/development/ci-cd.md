@@ -116,9 +116,14 @@ documentation integrity, and documentation/reference integrity. For the Order
 Processing bounded context it additionally freezes the reviewed contract surface
 against `tests/contracts/order_processing_baseline.json` and checks the event
 taxonomy, envelope, error shape and domain boundary
-(`tests/contracts/test_order_processing_preservation.py`). The Work Management
-persistence foundation is additionally covered by an executable, PostgreSQL-backed
-suite under `services/work-management/tests/`
+(`tests/contracts/test_order_processing_preservation.py`). The versioned Work
+Management public API is covered by
+`tests/contracts/test_work_management_api.py` (authentication, authorization
+roles, the RFC 9457 error shape, pagination, `ETag` concurrency, idempotency,
+DTOs and per-flow examples; see
+[work-management-api.md](../architecture/work-management-api.md)). The Work
+Management persistence foundation is additionally covered by an executable,
+PostgreSQL-backed suite under `services/work-management/tests/`
 ([work-management-persistence.md](../architecture/work-management-persistence.md)).
 Beyond persistence, this suite does not yet exercise an implementation: HTTP
 tests must run a real service against OpenAPI, and event producer/consumer tests

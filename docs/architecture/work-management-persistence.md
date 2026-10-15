@@ -85,8 +85,9 @@ reserves `(workspace_id, operation, idempotency_key)`, writes the Approval, the
 proposal status change, an audit record and the idempotency record, then commits
 once. Concurrent retries with the same key resolve to a single effect: the loser
 of the unique-insert race reads the stored result and replays it. This implements
-ADR-007 section 3.6 for `.../decide` and provides the storage primitive for
-Amendment A-02, which is not applied here.
+ADR-007 section 3.6 for `.../decide` and provides the storage primitive that
+Amendment A-02 relies on; A-02 itself is a contract change applied by
+[Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
 
 ## Tenant Isolation Scope
 

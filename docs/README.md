@@ -18,6 +18,7 @@ domains interact.
 - [Order Processing preservation](architecture/order-processing/README.md): contract inventory, bounded-context separation, compatibility, reliability and execution plan for the Order Saga.
 - [Work management workflow](architecture/work-management-workflow.md): Consultation, triage, proposal, approval, WorkItem and BoardCard.
 - [Work management persistence](architecture/work-management-persistence.md): PostgreSQL schema, migrations, repositories and database-enforced invariants.
+- [Work management API](architecture/work-management-api.md): versioning, DTOs, problem+json errors, pagination, ETag, idempotency and authorization.
 - [Client integration](architecture/client-integration.md): how Web, Desktop and VS Code consume the API and share contracts.
 
 ## Security

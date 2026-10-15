@@ -143,7 +143,7 @@ All changes below are additive and require review; none is performed by #49.
 | Add failure-path workflow examples (CR-04) | M1 | Yes (examples only) |
 | Add notification provider contract (CR-07) | M4 | Yes (new file) |
 | Decide the `ACTIVE → CONSUMED` event (OPD-03) | M2 | Yes (new event) |
-| Apply A-01 (RFC 9457) to Work Management only (CR-01) | #11 | Yes for Orders |
+| Applied A-01 (RFC 9457) to Work Management only (CR-01) | #11 (done) | Yes for Orders |
 
 ## Migration and Compatibility Risks
 
@@ -152,7 +152,7 @@ All changes below are additive and require review; none is performed by #49.
 | Merging `feat/orders-domain` wholesale regresses `main` | Extract domain only; do not merge the branch |
 | Lowercase status leaks to the wire | Reconcile enums; regression test freezes the contract enum |
 | A new required field breaks clients | Additive optional only; baseline review gate |
-| Two problem+json shapes confuse clients | Apply A-01 to Work Management; keep Orders fields stable |
+| Two problem+json shapes confuse clients | Resolved: A-01 applied to Work Management; Orders fields unchanged |
 | Stocks/payments logic drifts into Orders | Boundary tests + ownership rules in [domain-separation.md](domain-separation.md) |
 
 ## CI/CD Requirements

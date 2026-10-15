@@ -6,7 +6,9 @@ tests and service implementations. No service implementation is included here.
 
 ## Directories
 
-- `openapi/`: HTTP interfaces used by the current Order and Cart use cases.
+- `openapi/`: HTTP interfaces for the Order and Cart use cases
+  (`orders.yaml`) and the versioned Work Management API
+  (`work-management.yaml`).
 - `asyncapi/`: asynchronous workflow channel, messages and delivery metadata.
 - `schemas/`: reusable JSON Schema documents for shared values, HTTP models,
   event envelopes, event payloads and security events.
@@ -29,6 +31,14 @@ HTTP checkout uses `Idempotency-Key`. Repeating the same key and equivalent
 request represents the same operation; reusing it with a different request is
 an idempotency conflict. The storage and retention mechanism are implementation
 concerns.
+
+The Work Management public API (`openapi/work-management.yaml`) is versioned by
+its `/v1/` URL prefix. It declares named request/response DTOs, RFC 9457
+`application/problem+json` errors, cursor pagination with filtering and sorting,
+`ETag`/`If-Match` optimistic concurrency, `Idempotency-Key` on every retryable
+operation, and per-operation authorization roles (`x-required-roles`). Its
+compatibility policy is documented in
+`docs/architecture/work-management-api.md`.
 
 `schemas/security_events.yaml` defines the security event envelope and its
 taxonomy. It is a documentation-grade contract and intentionally defines no
