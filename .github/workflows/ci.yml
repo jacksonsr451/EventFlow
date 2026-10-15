@@ -55,5 +55,8 @@ jobs:
       - name: Validate OpenAPI
         run: openapi-spec-validator contracts/openapi/orders.yaml
 
+      - name: Validate Work Management OpenAPI
+        run: openapi-spec-validator contracts/openapi/work-management.yaml
+
       - name: Validate AsyncAPI
         run: npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml

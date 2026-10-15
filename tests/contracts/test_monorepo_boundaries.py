@@ -88,6 +88,20 @@ def test_orders_openapi_does_not_reference_work_management_schema():
     )
 
 
+def test_work_management_openapi_does_not_reference_order_domain_contracts():
+    """Work Management OpenAPI must not reference Order Processing contracts.
+
+    The Work Management domain must not import the Order OpenAPI, shared
+    schemas, or the Order AsyncAPI workflow.
+    """
+    wm_text = (OPENAPI / "work-management.yaml").read_text(encoding="utf-8")
+    for forbidden in ("orders.yaml", "common.yaml", "http.yaml", "workflow.yaml"):
+        assert forbidden not in wm_text, (
+            f"work-management.yaml must not reference {forbidden} "
+            "(bounded context isolation violation)"
+        )
+
+
 # ---------------------------------------------------------------------------
 # ADR-007 registration tests
 # ---------------------------------------------------------------------------

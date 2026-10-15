@@ -62,15 +62,15 @@ EventFlow/
 │   └── roadmap/                # Issue mindmap and critical path
 │
 ├── services/                   # Backend microservices (polyglot)
-│   ├── orders/                 # Python/FastAPI — Order Processing domain
+│   ├── orders/                 # Python/FastAPI — Order Processing domain (planned)
 │   ├── inventory/              # Java/Spring Boot — Inventory (planned)
 │   ├── notifications/          # Go — Notifications (planned)
 │   └── work-management/        # Python/FastAPI — Work Management domain (planned)
 │
 ├── packages/                   # Shared TypeScript packages (planned)
-│   ├── domain/                 # Generated or hand-authored entity types
+│   ├── domain/                 # Generated entity types (single source of truth)
 │   │   ├── work-management/    # Types derived from contracts/schemas/work_management.yaml
-│   │   └── orders/             # Types derived from contracts/openapi/orders.yaml
+│   │   └── orders/             # Types derived from the Order JSON Schemas in contracts/schemas/
 │   ├── api-client/             # HTTP client wrappers for each OpenAPI spec
 │   ├── auth/                   # Token management and session utilities
 │   └── ui/                     # Shared React component library (Tauri + Web)
@@ -205,14 +205,34 @@ The typed HTTP client in `packages/api-client/` is generated from
 |---|---|---|
 | JSON Schema | `$schema` + `$id` + `schema_version` field in event envelope | Minor: additive optional fields allowed. Major: new `$id` version segment. |
 | OpenAPI | `info.version` in the spec | URL-prefixed (`/v1/`). Breaking changes require a new version prefix. |
-| AsyncAPI | `info.version` in the spec | Event `schema_version` field in envelope. Consumers must tolerate unknown fields. |
+| AsyncAPI | `info.version` in the spec | Applies to the existing Order Processing workflow contract. Event `schema_version` in envelope. Consumers must tolerate unknown fields. |
 | `packages/domain` | `package.json` semver | Breaking TypeScript interface changes → major version. |
 | `packages/api-client` | `package.json` semver | Tied to OpenAPI version. |
 
+The Work Management domain currently exposes HTTP (OpenAPI) and JSON Schema
+contracts only. Its asynchronous contract (for example a future
+`contracts/asyncapi/work-events.yaml`) does not exist yet and is deferred to
+[Issue #46](https://github.com/jacksonsr451/EventFlow/issues/46).
+
 #### 3.4 Error Handling Contract
 
-All HTTP errors follow RFC 9457 (Problem Details for HTTP APIs) with the
-`ErrorResponse` schema defined in `contracts/schemas/work_management.yaml`.
+HTTP errors are transported as `application/problem+json`. Two distinct
+`ErrorResponse` schemas currently exist and are **not interchangeable**:
+
+- **Order Processing:** `contracts/openapi/orders.yaml` resolves
+  `ErrorResponse` to `contracts/schemas/http.yaml#/$defs/ErrorResponse`, which
+  references `common.yaml#/$defs/Error` and follows RFC 9457 (`type`, `title`,
+  `status`, `detail`, `instance`) plus `correlation_id` and `request_id`.
+- **Work Management:** `contracts/schemas/work_management.yaml#/$defs/ErrorResponse`
+  is a custom shape (`error_code`, `message`, `details`, `timestamp`).
+
+Clients must therefore use the per-domain generated error type; a single shared
+error handler is **not** currently possible. Aligning the Work Management error
+schema with RFC 9457 is a **pending architectural decision** for a future
+contract revision ([Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11) /
+[Issue #49](https://github.com/jacksonsr451/EventFlow/issues/49)). This ADR does
+not modify the Issue #2 contract.
+
 Clients must handle:
 - `400 Bad Request` — validation failure; display field-level errors.
 - `401 Unauthorized` — redirect to login / trigger token refresh.
@@ -229,7 +249,7 @@ is stored per platform:
 | Client | Token Storage |
 |---|---|
 | Webapp | `HttpOnly` session cookie or `sessionStorage` (never `localStorage`) |
-| Desktop | Tauri's secure keychain via `tauri-plugin-store` |
+| Desktop | OS keychain / secure store (for example `tauri-plugin-stronghold` or a keyring plugin), not a plain JSON store |
 | VS Code | VS Code `SecretStorage` API |
 
 RBAC roles (`submitter`, `triager`, `proposer`, `approver`, `assignee`,
@@ -237,20 +257,41 @@ RBAC roles (`submitter`, `triager`, `proposer`, `approver`, `assignee`,
 show or hide UI elements; they must never assume a role grants access without
 a backend response confirming it.
 
+A shared token must not grant cross-workspace access. The backend scopes every
+request to the caller's workspaces and returns `403`/`404` rather than leaking
+other tenants' data ([Issue #47](https://github.com/jacksonsr451/EventFlow/issues/47)).
+The Tauri application must configure a Content Security Policy and an explicit
+IPC allowlist so the WebView can reach only the backend API and first-party
+assets; the concrete policy is defined in
+[Issue #25](https://github.com/jacksonsr451/EventFlow/issues/25).
+
 #### 3.6 Idempotency
 
 Clients that submit approval decisions (`POST /v1/.../decide`) must generate
 and store an `Idempotency-Key` (UUID v4) before the request. On network
-failure, the same key is retried. The backend guarantees idempotency for 24
-hours. The Desktop and VS Code clients persist the key in local state across
-application restarts.
+failure, the same key is retried; the backend deduplicates identical retries
+with the same key, and the retention window is a backend implementation
+parameter ([Issue #7](https://github.com/jacksonsr451/EventFlow/issues/7)). The
+Desktop and VS Code clients persist the key in local state across application
+restarts.
+
+Within the current Work Management contract
+(`contracts/openapi/work-management.yaml`), `Idempotency-Key` is declared **only**
+on the approval decision endpoint. Consultation creation, triage, and proposal
+creation do **not** accept an idempotency key. Extending `Idempotency-Key` (or an
+equivalent deduplication mechanism) to those mutating endpoints is a required
+contract amendment before they can be replayed safely
+([Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11)). Clients must
+not assume create operations are idempotent until that amendment exists.
 
 #### 3.7 Offline and Synchronization
 
 The Desktop and VS Code clients maintain a local queue of pending operations.
-When the network is unavailable, write operations (create consultation, submit
-proposal) are enqueued. When connectivity is restored, operations are replayed
-in order using their stored `Idempotency-Key`. Read operations always fetch
+Approval decisions are replayed with their stored `Idempotency-Key`. Create
+operations (consultation, proposal) may also be queued, but because the current
+contract does not define an idempotency key for them (see 3.6), their replay is
+best-effort and is subject to the contract amendment above. When connectivity
+is restored, operations are replayed in order. Read operations always fetch
 from the backend; stale local data is never presented as authoritative.
 
 Conflict resolution follows a **last-writer-wins with user notification**
@@ -266,7 +307,10 @@ or a custom boundary plugin) enforces this at build time. The backend services
 enforce isolation at the API and persistence layers.
 
 Client code must not import directly from `services/`. All data comes through
-`packages/api-client`.
+`packages/api-client`. Within `packages/domain` and `packages/api-client`, the
+Order Processing and Work Management entry modules are separate and must not
+cross-import; cross-domain presentation composition, if ever required, happens
+at the UI layer only.
 
 ### 5. Integration with GitHub and GitLab
 

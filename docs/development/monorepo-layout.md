@@ -33,7 +33,7 @@ EventFlow/
 │   └── roadmap/             ← Issue dependency mindmap and critical path
 │
 ├── services/                ← Backend microservices
-│   └── orders/              ← Python/FastAPI — Order Processing domain (exists)
+│   └── orders/              ← Python/FastAPI — Order Processing domain (planned location)
 │       ├── src/             ← Application source code
 │       └── tests/           ← Service-level tests
 │
@@ -99,7 +99,8 @@ poetry run testrunner --verbose   # jsr-testrunner only; no pytest
 ## Working with Shared Packages (Planned)
 
 When `packages/` is implemented (Issue #33):
-- Use pnpm workspaces.
+- pnpm is the intended workspace manager; the exact choice between pnpm and npm
+  workspaces is finalized in Issue #33 (see ADR-007 section 2.1).
 - Each package has its own `package.json` with explicit peer dependencies.
 - TypeScript types in `packages/domain/` are generated; do not edit them manually.
 - Regenerate after any schema change: `pnpm run codegen` (command TBD in Issue #11).

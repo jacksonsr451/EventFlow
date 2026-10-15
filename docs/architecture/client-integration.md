@@ -145,6 +145,12 @@ Client (offline)                     Backend
 (1 s, 2 s, 4 s, …, max 60 s). 4xx responses are removed from the queue
 and surfaced to the user as errors.
 
+> **Idempotency scope:** only the approval decision endpoint currently declares
+> an `Idempotency-Key` in the contract. Replaying queued create operations
+> (consultation, proposal) safely requires backend deduplication or the contract
+> amendment described in [ADR-007](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md)
+> section 3.6.
+
 ## Editor Context and Consent Model (VS Code)
 
 The editor context captures the developer's current code position for use in
@@ -171,8 +177,8 @@ Practical rules:
 
 1. `packages/domain/work-management` types must not be used in any Order
    Processing UI flow, and vice versa.
-2. `packages/api-client/work-management` and
-   `packages/api-client/orders` are separate modules with no cross-imports.
+2. The generated Work Management and Order Processing clients are separate
+   entry modules of `packages/api-client` with no cross-imports.
 3. If a future UI screen must display both order and work-management data
    (e.g., a unified dashboard), it composes data at the presentation layer
    only — never by merging domain types.
