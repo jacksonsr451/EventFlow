@@ -1,0 +1,55 @@
+"""Declarative base, naming conventions and shared column helpers."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import datetime
+
+from sqlalchemy import DateTime, MetaData, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# Deterministic constraint/index names. Composite unique and check constraints
+# are named explicitly in each model to avoid collisions with this convention.
+NAMING_CONVENTION = {
+    "ix": "ix_%(table_name)s_%(column_0_name)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
+
+class Base(DeclarativeBase):
+    """Declarative base for every Work Management table."""
+
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+class CreatedAtMixin:
+    """Adds an immutable ``created_at`` timestamp."""
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TimestampMixin(CreatedAtMixin):
+    """Adds ``created_at`` and a database-maintained ``updated_at``."""
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+def check_in(column: str, values: Sequence[str]) -> str:
+    """Render a ``column IN (...)`` predicate for a CHECK constraint."""
+    rendered = ", ".join(f"'{value}'" for value in values)
+    return f"{column} IN ({rendered})"
+
+
+def check_regex(column: str, pattern: str) -> str:
+    """Render a POSIX regex predicate for a CHECK constraint."""
+    return f"{column} ~ '{pattern}'"

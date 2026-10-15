@@ -64,3 +64,57 @@ jobs:
 
       - name: Run contract, schema, and boundary tests
         run: testrunner tests -v --disable-plugin-autoload
+
+  work-management-persistence:
+    name: Work Management persistence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: eventflow
+          POSTGRES_PASSWORD: eventflow
+          POSTGRES_DB: eventflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eventflow -d eventflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      EVENTFLOW_DATABASE_URL: postgresql+psycopg://eventflow:eventflow@localhost:5432/eventflow
+      EVENTFLOW_TEST_DATABASE_URL: postgresql+psycopg://eventflow:eventflow@localhost:5432/eventflow
+      PYTHONPATH: services/work-management/src
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned persistence tooling
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "SQLAlchemy==2.0.54"
+          "alembic==1.20.0"
+          "psycopg==3.3.6"
+          "psycopg-binary==3.3.6"
+          "PyYAML==6.0.3"
+          "jsr-testrunner==0.1.0"
+
+      - name: Apply Work Management migrations
+        run: alembic -c services/work-management/alembic.ini upgrade head
+
+      - name: Verify migrations are reversible
+        run: >-
+          alembic -c services/work-management/alembic.ini downgrade base &&
+          alembic -c services/work-management/alembic.ini upgrade head
+
+      - name: Run Work Management persistence tests
+        run: testrunner services/work-management/tests -v --disable-plugin-autoload

@@ -1,10 +1,12 @@
 # Getting Started
 
-The repository is currently in Phase 0. The service directories and local
-infrastructure described by the architecture are not implemented yet. The
-first machine-readable contract baseline exists under `contracts/`.
-`docker-compose.yml`, `Makefile` and the service directories therefore do not
-provide a runnable distributed system today.
+The repository is currently in Phase 0. Most service directories and local
+infrastructure described by the architecture are not implemented yet. The first
+machine-readable contract baseline exists under `contracts/`, and the Work
+Management service has its PostgreSQL persistence foundation
+([ADR-008](../adr/ADR-008-work-management-persistence.md)). `docker-compose.yml`
+today provides only the local PostgreSQL instance, and `Makefile` is still
+empty, so the repository does not provide a runnable distributed system.
 
 The intended sequence is architecture, contracts, domain tests, service
 implementation and infrastructure. Do not treat `make up` or `make test` as
@@ -31,8 +33,27 @@ npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
 The AsyncAPI command additionally requires Node.js and npm; they are not
 needed for the pre-commit hooks themselves.
 
-Service tests, container builds and Continuous Deployment will be added only
-after corresponding implementations and deployable environments exist.
+## Work Management Persistence
+
+The Work Management persistence foundation runs against PostgreSQL. Copy
+`.env.example` to `.env`, set local values, start the database, and apply the
+migrations:
+
+```text
+docker compose up -d postgres
+python -m pip install "SQLAlchemy==2.0.54" "alembic==1.20.0" "psycopg[binary]==3.3.6" "PyYAML==6.0.3" "jsr-testrunner==0.1.0"
+alembic -c services/work-management/alembic.ini upgrade head
+testrunner services/work-management/tests -v --disable-plugin-autoload
+```
+
+The integration tests create and drop their own throwaway databases and read the
+admin URL from `EVENTFLOW_TEST_DATABASE_URL`; they skip themselves when it is not
+set. See
+[work-management-persistence.md](../architecture/work-management-persistence.md).
+
+Service tests for other services, container builds and Continuous Deployment
+will be added only after corresponding implementations and deployable
+environments exist.
 
 ## Pre-commit
 

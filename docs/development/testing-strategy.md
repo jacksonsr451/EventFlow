@@ -2,8 +2,10 @@
 
 Testing will combine unit, integration, contract, end-to-end and resilience
 tests. Repository-level contract tests already exist under `tests/contracts/`
-and security specification tests under `tests/security/`; both run in CI. Unit,
-integration, end-to-end and resilience tests do not exist yet.
+and security specification tests under `tests/security/`; both run in CI. The
+Work Management service also has PostgreSQL-backed persistence unit and
+integration tests under `services/work-management/tests/` (ADR-008). End-to-end
+and resilience tests do not exist yet.
 
 ## Required Invariants
 
@@ -39,13 +41,38 @@ are detailed per transition in
 [order-processing/reliability.md](../architecture/order-processing/reliability.md);
 runtime coverage begins with Issues #50–#54.
 
+## Work Management Persistence (Implemented)
+
+The Work Management service persists its bounded context in PostgreSQL
+([ADR-008](../adr/ADR-008-work-management-persistence.md),
+[work-management-persistence.md](../architecture/work-management-persistence.md)).
+Its suite runs with `jsr-testrunner` and proves behavior against a real
+PostgreSQL instance:
+
+- migrations apply from empty to `head`, are idempotent and downgrade to `base`;
+- every contract enum, check constraint, unique constraint and composite
+  workspace foreign key rejects invalid or cross-tenant rows;
+- an Approval is bound to one Proposal version and a WorkItem can only be
+  created from an approved Proposal/version (database trigger);
+- audit records are append-only (database trigger);
+- an approval retry with the same `Idempotency-Key` replays without new effects,
+  a different request under the same key conflicts, and concurrent same-key
+  decisions produce exactly one effect;
+- concurrent proposal creation never duplicates a `(consultation_id, version)`
+  pair;
+- remote integration references are unique per external resource;
+- the development seed is deterministic and idempotent.
+
+Integration tests skip themselves when no PostgreSQL URL is configured, so the
+suite is inert in environments without a database.
+
 ## Quality Tooling Strategy
 
 | Area | Pre-commit | CI | Status |
 |---|---|---|---|
 | Repository | whitespace, EOF, YAML/JSON syntax, conflicts, large files, case conflicts and private-key detection | Same repository hooks plus contract/documentation validation | Active |
 | Contracts | `scripts/validate_contracts.py` with scoped execution | OpenAPI, AsyncAPI, JSON Schema, refs and examples; `tests/contracts` and `tests/security` via `testrunner tests -v --disable-plugin-autoload` | Active |
-| Python | None until service code and project tooling exist; repository tooling is not treated as FastAPI code | Ruff, type checking and tests when services exist | Future |
+| Python | None; `scripts/validate_contracts.py` is repository tooling, not service code | Work Management persistence tests via `testrunner services/work-management/tests -v --disable-plugin-autoload` against PostgreSQL; Ruff and type checking still PLANNED | Partial |
 | Java | The service build's fast formatter/checks when Inventory exists | Maven/Gradle compile, analysis and tests | Future |
 | Go | `gofmt` and possibly fast `go vet` when a module exists | `gofmt -l`, `go vet` and tests | Future |
 | Docker | Parser/lint checks when Dockerfiles exist | Image build and scanning | Future |

@@ -17,6 +17,7 @@ domains interact.
 - [Order workflow](architecture/order-workflow.md): Cart, PriceQuote, Order, Reservation, Saga and reconciliation.
 - [Order Processing preservation](architecture/order-processing/README.md): contract inventory, bounded-context separation, compatibility, reliability and execution plan for the Order Saga.
 - [Work management workflow](architecture/work-management-workflow.md): Consultation, triage, proposal, approval, WorkItem and BoardCard.
+- [Work management persistence](architecture/work-management-persistence.md): PostgreSQL schema, migrations, repositories and database-enforced invariants.
 - [Client integration](architecture/client-integration.md): how Web, Desktop and VS Code consume the API and share contracts.
 
 ## Security
@@ -49,6 +50,7 @@ alternatives and consequences.
 - [ADR-005: Polyglot Service Architecture](adr/ADR-005-polyglot-service-architecture.md)
 - [ADR-006: Product Scope, Bounded Contexts, and Monorepo Architecture](adr/ADR-006-product-scope-and-bounded-contexts.md)
 - [ADR-007: Multi-Client Monorepo Layout and Shared Contracts](adr/ADR-007-multi-client-monorepo-layout-and-contracts.md)
+- [ADR-008: Work Management Persistence Stack and Database Schema](adr/ADR-008-work-management-persistence.md)
 
 ## Concepts
 
