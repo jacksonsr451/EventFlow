@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "eventflow-work-management"
+version = "0.1.0"
+description = "Work‑Management domain tests (consultation‑proposal‑task‑card workflow)"
+authors = ["Jackson Severino da Rocha <jackson@example.com>"]
+license = "MIT"
+packages = [{ include = "tests" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+PyYAML = "^6.0"
+
+[tool.poetry.group.dev.dependencies]
+jsr-testrunner = "^0.1.0"
+jsonschema = "^4.20.0"
+openapi-spec-validator = "^0.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

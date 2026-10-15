@@ -15,6 +15,7 @@ domains interact.
 - [Communication](architecture/communication.md): HTTP, commands, events, envelope and versioning.
 - [Data ownership](architecture/data-ownership.md): exclusive persistence ownership and access rules.
 - [Order workflow](architecture/order-workflow.md): Cart, PriceQuote, Order, Reservation, Saga and reconciliation.
+- [Work management workflow](architecture/work-management-workflow.md): Consultation, triage, proposal, approval, WorkItem and BoardCard.
 
 ## Architecture Decision Records
 
