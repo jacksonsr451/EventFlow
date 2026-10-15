@@ -16,6 +16,7 @@ domains interact.
 - [Data ownership](architecture/data-ownership.md): exclusive persistence ownership and access rules.
 - [Order workflow](architecture/order-workflow.md): Cart, PriceQuote, Order, Reservation, Saga and reconciliation.
 - [Work management workflow](architecture/work-management-workflow.md): Consultation, triage, proposal, approval, WorkItem and BoardCard.
+- [Client integration](architecture/client-integration.md): how Web, Desktop and VS Code consume the API and share contracts.
 
 ## Architecture Decision Records
 
@@ -29,6 +30,7 @@ alternatives and consequences.
 - [ADR-004: Order Workflow Orchestration](adr/ADR-004-order-orchestration.md)
 - [ADR-005: Polyglot Service Architecture](adr/ADR-005-polyglot-service-architecture.md)
 - [ADR-006: Product Scope, Bounded Contexts, and Monorepo Architecture](adr/ADR-006-product-scope-and-bounded-contexts.md)
+- [ADR-007: Multi-Client Monorepo Layout and Shared Contracts](adr/ADR-007-multi-client-monorepo-layout-and-contracts.md)
 
 ## Concepts
 
@@ -49,7 +51,8 @@ and how future implementations should be validated.
 
 - [Getting started](development/getting-started.md): current repository status and future workflow.
 - [Conventions](development/conventions.md): terminology and architectural constraints.
-- [Testing strategy](development/testing-strategy.md): planned invariant, contract and resilience coverage.
+- [Monorepo layout](development/monorepo-layout.md): directories, contracts and bounded-context rules.
+- [Testing strategy](development/testing-strategy.md): implemented contract coverage plus planned invariant and resilience coverage.
 - [CI/CD strategy](development/ci-cd.md): active validation and future delivery stages.
 
 ## Documentation Boundaries
@@ -58,8 +61,8 @@ and how future implementations should be validated.
 - `docs/adr/` answers: “Why was this architectural choice made?”
 - `docs/concepts/` answers: “How does this mechanism work?”
 - `docs/development/` answers: “How should contributors work and validate it?”
-- `contracts/` contains machine-readable interfaces; service implementations
-  and contract-driven tests are not present yet.
+- `contracts/` contains machine-readable interfaces; contract validation tests
+  exist under `tests/contracts/`, but service implementations are not present yet.
 
 Avoid documenting planned features as implemented. Update the relevant section
 when an architectural decision or public contract changes.

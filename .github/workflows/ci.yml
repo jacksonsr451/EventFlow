@@ -42,6 +42,7 @@ jobs:
           "jsonschema-specifications==2025.9.1"
           "referencing==0.37.0"
           "openapi-spec-validator==0.9.0"
+          "jsr-testrunner==0.1.0"
           "pre-commit==4.6.2"
 
       - name: Run repository quality hooks
@@ -55,5 +56,11 @@ jobs:
       - name: Validate OpenAPI
         run: openapi-spec-validator contracts/openapi/orders.yaml
 
+      - name: Validate Work Management OpenAPI
+        run: openapi-spec-validator contracts/openapi/work-management.yaml
+
       - name: Validate AsyncAPI
         run: npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
+
+      - name: Run contract, schema, and boundary tests
+        run: testrunner tests -v --disable-plugin-autoload

@@ -15,6 +15,9 @@ jsr-testrunner = "^0.1.0"
 jsonschema = "^4.20.0"
 openapi-spec-validator = "^0.7.1"
 
+[tool.testrunner]
+addopts = ["--disable-plugin-autoload"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -15,6 +15,7 @@ approved; it does not mean the choice has already been implemented.
 | [ADR-004](ADR-004-order-orchestration.md) | Order Workflow Orchestration | Accepted |
 | [ADR-005](ADR-005-polyglot-service-architecture.md) | Polyglot Service Architecture | Accepted |
 | [ADR-006](ADR-006-product-scope-and-bounded-contexts.md) | Product Scope, Bounded Contexts, and Monorepo Architecture | Accepted |
+| [ADR-007](ADR-007-multi-client-monorepo-layout-and-contracts.md) | Multi-Client Monorepo Layout and Shared Contracts | Accepted |
 
 Future candidates such as detailed Inventory concurrency, event versioning,
 OpenTelemetry instrumentation and detailed client adapters are not additional ADRs in
