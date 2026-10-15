@@ -1,0 +1,378 @@
+# ADR-007: Multi-Client Monorepo Layout and Shared Contracts
+
+## Status
+
+Accepted
+
+## Context
+
+ADR-006 established two bounded contexts (Order Processing and Work Management)
+in a single repository, and mandated an API-first integration model for three
+client platforms: a React web application, a Tauri desktop application, and a
+VS Code extension. As implementation begins, the repository requires explicit
+decisions about:
+
+1. Where client code lives in the monorepo and how directories are organized.
+2. How TypeScript models and business-logic primitives are shared across clients
+   without duplicating backend domain rules.
+3. How contracts (OpenAPI, AsyncAPI, JSON Schema) evolve without breaking client
+   compatibility.
+4. How each client handles authentication, offline behaviour, editor context
+   capture, and synchronization.
+5. What tooling enforces boundaries between bounded contexts and between clients
+   and shared packages.
+
+The three clients have overlapping needs (same API, same auth, same entity
+models) but fundamentally different runtime environments:
+
+- **Web (Webapp)** — Browser. React SPA. Full network access. Stateless from
+  the client's perspective.
+- **Desktop (Tauri)** — Native OS process with a Rust backend and a WebView
+  front end. Can maintain local state, background threads, and file-system
+  access.
+- **VS Code Extension** — Node.js extension host process plus an optional
+  WebView panel. Deeply integrated with the editor: captures file, line, Git,
+  and repository context. Constrained by the VS Code extension API.
+
+None of these clients contains business logic. All authoritative state
+transitions happen on the backend. Clients consume contracts.
+
+## Decision
+
+### 1. Directory Structure
+
+The monorepo adopts the following top-level layout. Directories that do not
+yet contain implementation code are documented here as **planned** to
+communicate intention without creating placeholder artifacts.
+
+```
+EventFlow/
+│
+├── contracts/                  # Language-independent machine-readable contracts
+│   ├── openapi/                # HTTP API specifications (OpenAPI 3.1)
+│   ├── asyncapi/               # Async message specifications (AsyncAPI 3.0)
+│   ├── schemas/                # Reusable JSON Schema documents (Draft 2020-12)
+│   └── examples/               # Non-production workflow examples
+│
+├── docs/
+│   ├── adr/                    # Architecture Decision Records
+│   ├── architecture/           # Descriptive architecture documents
+│   ├── concepts/               # Explanatory concept guides
+│   ├── development/            # Developer how-to guides
+│   └── roadmap/                # Issue mindmap and critical path
+│
+├── services/                   # Backend microservices (polyglot)
+│   ├── orders/                 # Python/FastAPI — Order Processing domain
+│   ├── inventory/              # Java/Spring Boot — Inventory (planned)
+│   ├── notifications/          # Go — Notifications (planned)
+│   └── work-management/        # Python/FastAPI — Work Management domain (planned)
+│
+├── packages/                   # Shared TypeScript packages (planned)
+│   ├── domain/                 # Generated or hand-authored entity types
+│   │   ├── work-management/    # Types derived from contracts/schemas/work_management.yaml
+│   │   └── orders/             # Types derived from contracts/openapi/orders.yaml
+│   ├── api-client/             # HTTP client wrappers for each OpenAPI spec
+│   ├── auth/                   # Token management and session utilities
+│   └── ui/                     # Shared React component library (Tauri + Web)
+│
+├── clients/                    # Client applications (planned)
+│   ├── webapp/                 # React SPA (Vite + React + TypeScript)
+│   ├── desktop/                # Tauri application (Rust backend + React WebView)
+│   └── vscode/                 # VS Code extension (Node.js + optional WebView)
+│
+└── scripts/                    # Validation, generation, and tooling scripts
+```
+
+> **Layout authority:** This section refines the directory layout proposed in
+> [ADR-006](ADR-006-product-scope-and-bounded-contexts.md) section 3. The names
+> defined here (`clients/`, `services/work-management/`) are authoritative:
+> ADR-006's `apps/` and `services/work-core/` names are superseded. The
+> bounded-context isolation rules from ADR-006 are unchanged.
+
+**Rationale for `packages/` separation:**
+- `packages/domain` contains TypeScript interfaces generated from JSON Schema
+  and OpenAPI definitions. It is the single source of truth for entity shapes
+  in TypeScript. No client may define its own version of `Consultation`,
+  `Proposal`, or `WorkItem`.
+- `packages/api-client` provides typed HTTP clients generated from OpenAPI
+  specs. Clients import these functions rather than hand-coding `fetch` calls.
+- `packages/auth` encapsulates token storage and refresh logic so that all
+  three clients share the same authentication behaviour.
+- `packages/ui` contains React components usable by both Webapp and the Tauri
+  WebView. VS Code uses a subset or its own simplified components when the
+  VS Code Webview API imposes constraints.
+
+### 2. Technology Evaluation and Decisions
+
+#### 2.1 TypeScript Across All Clients
+
+**Decision:** TypeScript is the shared language for all three clients and for
+all shared packages.
+
+**Rationale:**
+- The VS Code extension API is TypeScript-first; there is no viable alternative.
+- Tauri supports any WebView technology; TypeScript with React is the natural
+  choice to share UI components with the Webapp.
+- A single language across clients eliminates serialization boundaries between
+  packages and clients, and allows genuine code sharing.
+
+**Trade-offs:**
+- Rust code inside the Tauri desktop sidecar remains separate and cannot share
+  TypeScript packages directly. The Rust layer only handles native OS concerns
+  (file system, IPC, tray); it does not contain business logic.
+- TypeScript compilation must be coordinated across packages. A workspace
+  manager (pnpm workspaces or npm workspaces) is required.
+
+#### 2.2 React for Web and Desktop
+
+**Decision:** React (with Vite) is the rendering framework for Webapp and for
+the Tauri WebView.
+
+**Rationale:**
+- Components in `packages/ui` can be reused without modification in both
+  environments.
+- React's declarative model integrates cleanly with server-driven state
+  (consultation lists, proposal approval results).
+- The VS Code extension may use React in its optional WebView panel but cannot
+  share the same component tree with the app because VS Code imposes a Content
+  Security Policy. A thin adapter layer isolates the extension's WebView from
+  `packages/ui`.
+
+**Alternative considered:** Vue or Svelte. Rejected because neither has the
+same VS Code WebView community support, and component sharing with Tauri would
+require adapters in any case.
+
+#### 2.3 Tauri for Desktop
+
+**Decision:** Tauri 2.x is the desktop framework.
+
+**Rationale:**
+- Tauri provides a native OS window with a WebView that runs the React
+  application. The Rust core handles file-system access, system tray, local
+  state persistence, and the offline synchronization queue.
+- Tauri produces significantly smaller bundles than Electron and avoids
+  shipping a full Chromium instance.
+- The Rust core does not contain EventFlow business logic. It is a thin
+  platform adapter that invokes the backend API or queues requests for later.
+
+**Trade-offs:**
+- Requires Rust toolchain in the development environment.
+- WebView rendering differs across operating systems (WebKit on macOS/Linux,
+  WebView2 on Windows). UI tests must cover multiple platforms.
+
+**Alternative considered:** Electron. Rejected because of bundle size and the
+absence of any advantage specific to EventFlow's requirements.
+
+#### 2.4 VS Code Extension Architecture
+
+**Decision:** The VS Code extension uses the standard `ExtensionHost` process
+(Node.js) and an optional WebView panel for interactive forms (consultation
+submission, board card view).
+
+**Key constraints:**
+- The extension must request explicit consent before capturing editor context
+  (file path, line range, Git commit, repository identity). Consent is recorded
+  per workspace and stored in VS Code's `workspaceState`.
+- The extension accesses only `vscode.workspace`, `vscode.window`, and the
+  EventFlow HTTP API. It does not access the file system directly for user
+  content.
+- The WebView panel is sandboxed by VS Code's CSP. It cannot import from
+  `packages/ui` directly; a bundled subset is compiled into the extension.
+
+### 3. Shared Contract Policy
+
+#### 3.1 TypeScript Types from JSON Schema
+
+TypeScript interfaces for all domain entities (`Consultation`, `Proposal`,
+`Approval`, `WorkItem`, `BoardCard`) are **generated** from
+`contracts/schemas/work_management.yaml` (JSON Schema Draft 2020-12) using
+`json-schema-to-typescript` or an equivalent tool. No client may hand-write
+these interfaces.
+
+The generated types live in `packages/domain/work-management/`. When the
+schema changes, the types are regenerated and the package version is bumped.
+
+#### 3.2 HTTP Client from OpenAPI
+
+The typed HTTP client in `packages/api-client/` is generated from
+`contracts/openapi/work-management.yaml` using `openapi-typescript` or
+`openapi-generator-cli`. Clients call typed functions such as
+`createConsultation(body)` rather than raw `fetch`.
+
+#### 3.3 Versioning Strategy
+
+| Layer | Version Carrier | Compatibility Rule |
+|---|---|---|
+| JSON Schema | `$schema` + `$id` + `schema_version` field in event envelope | Minor: additive optional fields allowed. Major: new `$id` version segment. |
+| OpenAPI | `info.version` in the spec | URL-prefixed (`/v1/`). Breaking changes require a new version prefix. |
+| AsyncAPI | `info.version` in the spec | Event `schema_version` field in envelope. Consumers must tolerate unknown fields. |
+| `packages/domain` | `package.json` semver | Breaking TypeScript interface changes → major version. |
+| `packages/api-client` | `package.json` semver | Tied to OpenAPI version. |
+
+#### 3.4 Error Handling Contract
+
+All HTTP errors follow RFC 9457 (Problem Details for HTTP APIs) with the
+`ErrorResponse` schema defined in `contracts/schemas/work_management.yaml`.
+Clients must handle:
+- `400 Bad Request` — validation failure; display field-level errors.
+- `401 Unauthorized` — redirect to login / trigger token refresh.
+- `403 Forbidden` — display a role-insufficient message; do not retry.
+- `409 Conflict` — optimistic locking failure; reload and re-apply user intent.
+- `5xx` — display a transient error; offer retry with exponential backoff.
+
+#### 3.5 Authentication and RBAC
+
+All clients authenticate using a shared token mechanism (details in
+[Issue #10](https://github.com/jacksonsr451/EventFlow/issues/10)). The token
+is stored per platform:
+
+| Client | Token Storage |
+|---|---|
+| Webapp | `HttpOnly` session cookie or `sessionStorage` (never `localStorage`) |
+| Desktop | Tauri's secure keychain via `tauri-plugin-store` |
+| VS Code | VS Code `SecretStorage` API |
+
+RBAC roles (`submitter`, `triager`, `proposer`, `approver`, `assignee`,
+`viewer`) are enforced by the backend. Clients use role information only to
+show or hide UI elements; they must never assume a role grants access without
+a backend response confirming it.
+
+#### 3.6 Idempotency
+
+Clients that submit approval decisions (`POST /v1/.../decide`) must generate
+and store an `Idempotency-Key` (UUID v4) before the request. On network
+failure, the same key is retried. The backend guarantees idempotency for 24
+hours. The Desktop and VS Code clients persist the key in local state across
+application restarts.
+
+#### 3.7 Offline and Synchronization
+
+The Desktop and VS Code clients maintain a local queue of pending operations.
+When the network is unavailable, write operations (create consultation, submit
+proposal) are enqueued. When connectivity is restored, operations are replayed
+in order using their stored `Idempotency-Key`. Read operations always fetch
+from the backend; stale local data is never presented as authoritative.
+
+Conflict resolution follows a **last-writer-wins with user notification**
+policy. Optimistic locking (`proposal_version` field) is used for approval
+decisions. If a `409` is returned on retry, the client reloads the entity and
+asks the user to re-confirm.
+
+### 4. Bounded Context Isolation
+
+The `packages/domain/work-management` and `packages/domain/orders` packages
+must not import from each other. A lint rule (ESLint `no-restricted-imports`
+or a custom boundary plugin) enforces this at build time. The backend services
+enforce isolation at the API and persistence layers.
+
+Client code must not import directly from `services/`. All data comes through
+`packages/api-client`.
+
+### 5. Integration with GitHub and GitLab
+
+Work Management cards and tasks may reference GitHub issues, pull requests,
+and GitLab merge requests as **external references** (stored as URIs in the
+`external_references` field of `Consultation`). The backend validates URI
+format but does not call GitHub or GitLab APIs synchronously during the
+consultation workflow.
+
+Future issues ([#27](https://github.com/jacksonsr451/EventFlow/issues/27),
+[#29](https://github.com/jacksonsr451/EventFlow/issues/29),
+[#44](https://github.com/jacksonsr451/EventFlow/issues/44)) will define the
+webhook-driven integration where GitHub events trigger consultation creation.
+That integration uses backend adapters, not client-side API calls, to avoid
+exposing GitHub credentials to client code.
+
+### 6. Testing Strategy by Client
+
+| Layer | Framework | Scope |
+|---|---|---|
+| `packages/domain` | `vitest` | Type-level tests; JSON Schema round-trip |
+| `packages/api-client` | `vitest` + `msw` (mock service worker) | HTTP client correctness against mocked OpenAPI responses |
+| `packages/ui` | `vitest` + React Testing Library | Component rendering and accessibility |
+| Webapp | `vitest` + Playwright | Unit + E2E against a local backend |
+| Desktop | `vitest` + Playwright with Tauri driver | Unit + E2E |
+| VS Code extension | `@vscode/test-electron` | Extension host integration tests |
+| Backend contracts | `jsr-testrunner` (Python) | JSON Schema and OpenAPI validation (already implemented) |
+
+Contract compatibility tests verify that the generated TypeScript types are
+structurally compatible with the JSON Schema source after each schema update.
+
+## Consequences
+
+### Positive
+
+- Single source of truth for entity shapes: JSON Schema → TypeScript types via
+  code generation. No manual synchronization.
+- All three clients share auth logic, error handling, and entity types via
+  `packages/`. Reduces divergence.
+- Clear directory boundary between `clients/`, `packages/`, `services/`, and
+  `contracts/` makes it easy to scope CI triggers and code ownership.
+- Offline support is architecturally motivated (Desktop + VS Code) without
+  over-engineering the Webapp.
+- Tauri and VS Code extension constraints are explicitly acknowledged before
+  implementation begins, preventing surprise compatibility issues.
+
+### Negative
+
+- pnpm workspaces (or equivalent) adds a configuration layer before any client
+  code is written.
+- Code generation for TypeScript types introduces a build step that must be
+  kept in sync. A stale generation produces type drift.
+- WebView CSP restrictions in VS Code require a bundled subset of `packages/ui`
+  rather than a direct import, creating duplication risk.
+- Tauri requires Rust toolchain, expanding the local development requirements.
+- Cross-platform WebView rendering differences require multi-platform test
+  environments for the Desktop client.
+
+## Alternatives Considered
+
+### Multi-Repo Client Split
+
+Each client in its own repository. Rejected because:
+- Contract changes would require coordinated PR across multiple repositories.
+- Shared packages would need to be published to a registry (npm) even for
+  internal changes, slowing iteration.
+- The unified 55-issue roadmap spans all clients; splitting repos fragments
+  traceability.
+
+### Nx or Turborepo Monorepo Tooling
+
+Using a full monorepo build system (Nx, Turborepo) for task orchestration.
+Deferred: the current scale does not justify the additional configuration
+complexity. The decision to adopt a build system will be made when the number
+of TypeScript packages grows to the point where manual build ordering becomes
+untenable. If adopted, it must not alter the directory structure defined here.
+
+### Single TypeScript Application with Tauri
+
+A single React application deployed to both Web and Desktop, with
+platform-specific modules gated by environment detection. Rejected because:
+- The VS Code extension cannot share a React application root with the Webapp.
+- A single app obscures the platform adaptation boundaries that the project
+  intends to demonstrate architecturally.
+
+### GraphQL Instead of REST
+
+A GraphQL API layer to reduce client-specific query endpoints. Rejected for
+this phase because:
+- The backend domains are already specified as REST/OpenAPI.
+- GraphQL subscription complexity (for realtime Kanban updates) is a separate
+  concern deferred to later issues.
+- Introducing GraphQL here would require regenerating all existing contracts.
+
+## Notes
+
+- The implementation of `packages/` and `clients/` begins in
+  [Issue #13](https://github.com/jacksonsr451/EventFlow/issues/13) (Webapp),
+  [Issue #23](https://github.com/jacksonsr451/EventFlow/issues/23) (VS Code),
+  and [Issue #25](https://github.com/jacksonsr451/EventFlow/issues/25)
+  (Desktop).
+- TypeScript code generation tooling is selected in
+  [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
+- Workspace tooling (pnpm or npm workspaces) is configured in
+  [Issue #33](https://github.com/jacksonsr451/EventFlow/issues/33).
+- See [client-integration.md](../architecture/client-integration.md) for
+  sequence diagrams and integration patterns.
+- See [monorepo-layout.md](../development/monorepo-layout.md) for the
+  developer guide to working with the directory structure.

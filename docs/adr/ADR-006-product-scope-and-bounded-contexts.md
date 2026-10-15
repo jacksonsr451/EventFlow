@@ -166,6 +166,12 @@ EventFlow/
 └── scripts/              # Shared repository quality and contract validation tooling
 ```
 
+> **Note:** [ADR-007](ADR-007-multi-client-monorepo-layout-and-contracts.md)
+> refines this layout for the client and package layer (Issue #3). Where the two
+> disagree, ADR-007 is authoritative: `apps/` becomes `clients/`, and
+> `services/work-core/` becomes `services/work-management/`. The bounded-context
+> separation defined here is unchanged.
+
 ### 4. Client Integration and API-First Strategy
 
 The three clients (Webapp, VS Code Extension, Desktop Application) interface with
@@ -289,6 +295,10 @@ Implementation will follow the prioritized critical path established in
 
 - See [overview](../architecture/overview.md) for top-level system context.
 - See [task-mindmap](../roadmap/task-mindmap.md) for issue dependencies.
-- The next architectural steps are [ADR-007 / Issue #2](https://github.com/jacksonsr451/EventFlow/issues/2)
-  (Workflow Specification) and [ADR-008 / Issue #3](https://github.com/jacksonsr451/EventFlow/issues/3)
-  (Multi-Client Monorepo Layout and Contracts).
+- The Workflow Specification for [Issue #2](https://github.com/jacksonsr451/EventFlow/issues/2)
+  is documented in [work-management-workflow.md](../architecture/work-management-workflow.md).
+- [ADR-007](ADR-007-multi-client-monorepo-layout-and-contracts.md) defines the
+  multi-client monorepo layout and shared contracts for
+  [Issue #3](https://github.com/jacksonsr451/EventFlow/issues/3). It supersedes
+  the directory naming in section 3 above while preserving every bounded-context
+  invariant.
