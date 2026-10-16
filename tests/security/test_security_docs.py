@@ -13,7 +13,6 @@ These tests verify that the security specification is internally coherent:
 import pathlib
 import re
 
-import testrunner
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -61,7 +60,6 @@ TRACE_THREAT_ROW = re.compile(r"^\|\s*(TM-[A-Z]{2}-\d{2})\s*\|", re.MULTILINE)
 TRACE_CONTROL_ROW = re.compile(r"^\|\s*([A-Z]{2}-\d{2})\s*\|", re.MULTILINE)
 
 
-
 def read(name):
     return (SECURITY_DOCS / name).read_text(encoding="utf-8")
 
@@ -94,7 +92,6 @@ def table_rows(name, pattern):
         if pattern.match(line):
             rows.append([cell.strip() for cell in line.strip().strip("|").split("|")])
     return rows
-
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +288,9 @@ def test_traceability_references_existing_test_files():
             cell = cell.strip()
             if "/" in cell and not (REPO_ROOT / cell).exists():
                 missing.append(cell)
-    assert not missing, f"traceability cites non-existent test files: {sorted(set(missing))}"
+    assert not missing, (
+        f"traceability cites non-existent test files: {sorted(set(missing))}"
+    )
 
 
 def test_traceability_controls_are_registered():

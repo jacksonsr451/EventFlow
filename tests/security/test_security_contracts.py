@@ -238,7 +238,6 @@ def test_free_text_fields_declare_a_max_length(security_schema):
     assert not unbounded, f"free-text fields without maxLength: {unbounded}"
 
 
-
 def test_schema_defines_no_secret_properties(security_schema):
     """The security event schema must not define secret-bearing properties."""
     leaked = _property_names(security_schema) & SECRET_PROPERTY_NAMES

@@ -9,6 +9,7 @@ packages = [{ include = "tests" }]
 [tool.poetry.dependencies]
 python = "^3.11"
 PyYAML = "^6.0"
+cryptography = ">=44,<51"
 
 [tool.poetry.group.dev.dependencies]
 jsr-testrunner = "^0.1.0"

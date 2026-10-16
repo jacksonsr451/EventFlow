@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "path": "..",
+      "name": "raiz"
+    },
+    {
+      "path": "../services/orders",
+      "name": "orders"
+    },
+    {
+      "path": "../services/work-management",
+      "name": "work-management"
+    },
+    // {
+    //   "path": "../workspace",
+    //   "name": "workspace"
+    // }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/workspace": false,
+      "**/services": true
+    }
+  }
+}
