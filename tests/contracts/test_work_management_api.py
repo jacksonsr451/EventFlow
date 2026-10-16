@@ -68,12 +68,15 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/evidence",
     "POST /v1/workspaces/{workspace_id}/proposals",
     "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit",
+    "PATCH /v1/workspaces/{workspace_id}/proposals/{proposal_id}",
+    "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/duplicate",
     "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",
     "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}",
 }
 
 LIST_OPERATIONS = {
     "listConsultations": "ConsultationPage",
+    "listProposals": "ProposalPage",
     "listWorkItems": "WorkItemPage",
     "listBoardCards": "BoardCardPage",
 }
@@ -472,7 +475,14 @@ def test_list_operations_paginate(openapi):
 
 def test_page_envelopes_are_defined(schema):
     """The page envelope definitions must be present and valid."""
-    for definition in ("PageInfo", "ConsultationPage", "WorkItemPage", "BoardCardPage"):
+    for definition in (
+        "PageInfo",
+        "ConsultationPage",
+        "ProposalPage",
+        "ProposalRevisionPage",
+        "WorkItemPage",
+        "BoardCardPage",
+    ):
         assert definition in schema["$defs"], f"{definition} is not defined"
         Draft202012Validator.check_schema(schema["$defs"][definition])
 

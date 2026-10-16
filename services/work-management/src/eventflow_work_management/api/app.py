@@ -27,6 +27,7 @@ from eventflow_work_management.api.errors import (
     problem_error_handler,
     problem_response,
 )
+from eventflow_work_management.api.proposal_routes import router as proposal_router
 from eventflow_work_management.api.workspace_routes import router as workspace_router
 from eventflow_work_management.config import database_url
 from eventflow_work_management.db.engine import create_engine_from_url, session_factory
@@ -195,6 +196,7 @@ def create_app(
     app.include_router(authentication_router)
     app.include_router(workspace_router)
     app.include_router(consultation_router)
+    app.include_router(proposal_router)
     app.include_router(attachment_router)
 
     return app

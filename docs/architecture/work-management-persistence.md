@@ -26,7 +26,9 @@ and does not depend on Order Processing code or tables.
 | `workspaces` | Tenant boundary | unique `slug` (format checked) |
 | `projects` | Grouping inside a workspace | unique `(workspace_id, key)`, unique `(workspace_id, id)` |
 | `consultations` | Submitted requests | enums; `(workspace_id, project_id)` FK to `projects`; unique `(workspace_id, project_id, id)` |
-| `proposals` | Versioned plans | unique `(consultation_id, version)`; project-bound consultation FK; array checks |
+| `proposals` | Independent plans (1→N per consultation) | project-bound consultation FK; array/JSON checks; self FKs for `duplicated_from`/`superseded_by` |
+| `proposal_revisions` | Immutable per-proposal snapshots | unique `(proposal_id, version)`; append-only triggers; workspace-bound proposal FK |
+| `proposal_evidence` | Proposal→consultation evidence links | composite PK `(proposal_id, evidence_id)`; workspace-bound FKs |
 | `approvals` | One decision per proposal version | unique `(proposal_id, proposal_version)`; `sha256` hash |
 | `work_items` | Execution work | unique `origin_proposal_id`; origin trigger; project-bound proposal FK; composite FKs to project and approval |
 | `boards` / `board_cards` | Kanban placement | card `project_id` bound to board and WorkItem by composite FKs; unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)` |
@@ -60,8 +62,12 @@ Application code validates first; the database is the last line of defense.
   functionally dependent on the board and is kept consistent by the constraints.
 - **WorkItem cardinality.** `work_items` has `UNIQUE (origin_proposal_id)`: at
   most one WorkItem can originate from a given Proposal, per workflow step 7.
-- **Proposal versioning.** `proposals` has `UNIQUE (consultation_id, version)`;
-  `approvals` has `UNIQUE (proposal_id, proposal_version)`.
+- **Proposal versioning.** Each Proposal owns its revision counter: two Proposals
+  derived from the same Consultation are independent and may both be at version
+  1. `proposal_revisions` enforces `UNIQUE (proposal_id, version)` and its
+  `BEFORE UPDATE`/`BEFORE DELETE`/`BEFORE TRUNCATE` triggers
+  (`eventflow_proposal_revisions_block_mutation`) make the revision history
+  append-only. `approvals` has `UNIQUE (proposal_id, proposal_version)`.
 - **WorkItem provenance.** A `BEFORE INSERT/UPDATE` trigger requires the
   referenced approval to exist in the same workspace, to match the proposal and
   version, and to be `approved`. A WorkItem cannot come from a Consultation or
@@ -131,8 +137,8 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 | Idempotency | `uq_idempotency_records_scope_key` | `ApprovalRepository.decide` + `IdempotencyRepository` | `test_same_key_replays_without_new_effects`, `test_same_key_different_request_conflicts`, `test_concurrent_same_key_has_exactly_one_effect` |
 | Approval uniqueness | `uq_approvals_proposal_version` | `ApprovalRepository.decide` conflict handling | `test_new_key_for_decided_version_is_rejected` |
 | Remote reference uniqueness and integrity | `uq_remote_integration_references_resource`, `trg_remote_references_entity_guard` | `RemoteReferenceRepository.link` | `test_duplicate_remote_resource_is_rejected`, `test_reference_to_unknown_entity_is_rejected` |
-| Proposal version uniqueness | `uq_proposals_consultation_version` | `ProposalRepository._next_version` | `test_duplicate_proposal_version_is_rejected`, `test_concurrent_proposals_never_duplicate_versions` |
-| Migration reproducibility | Alembic `0001_initial` | `support.run_migrations` | `test_migrations_integration.py` |
+| Proposal independence and revision uniqueness | `uq_proposal_revisions_proposal_version`, `trg_proposal_revisions_no_update/_no_delete/_no_truncate` | `ProposalRepository.add`/`update_content`/`append_revision` | `test_independent_proposals_share_consultation`, `test_duplicate_proposal_revision_is_rejected`, `test_concurrent_proposals_create_independent_rows` |
+| Migration reproducibility | Alembic `0001_initial`…`0007_proposal_task_proposals` | `support.run_migrations` | `test_migrations_integration.py` |
 
 ## Residual Risks and Deferred Controls
 

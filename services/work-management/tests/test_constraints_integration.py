@@ -5,7 +5,13 @@ from __future__ import annotations
 from uuid import uuid4
 
 import testrunner
-from eventflow_work_management.models import Consultation, Proposal, WorkItem, Workspace
+from eventflow_work_management.models import (
+    Consultation,
+    Proposal,
+    ProposalRevision,
+    WorkItem,
+    Workspace,
+)
 from eventflow_work_management.repositories import (
     ApprovalRepository,
     BoardCardRepository,
@@ -91,7 +97,7 @@ def test_cross_workspace_reference_is_rejected():
         session.rollback()
 
 
-def test_duplicate_proposal_version_is_rejected():
+def test_independent_proposals_share_consultation():
     admin_url = require_database_url()
     with migrated_engine(admin_url) as engine, session_scope(engine) as session:
         workspace = create_workspace(session)
@@ -99,14 +105,14 @@ def test_duplicate_proposal_version_is_rejected():
         consultation = create_consultation(session, workspace, project)
         repository = ProposalRepository(session)
 
-        def create():
-            return repository.create(
+        def create(title):
+            return repository.add(
                 workspace_id=workspace.id,
                 project_id=project.id,
                 consultation_id=consultation.id,
                 proposer_id=uuid4(),
-                title="Versioned proposal",
-                technical_description="Versioned proposal description.",
+                title=title,
+                technical_description="Independent proposal description.",
                 scope="Scope.",
                 justification="Justification.",
                 acceptance_criteria=["criteria"],
@@ -114,23 +120,51 @@ def test_duplicate_proposal_version_is_rejected():
                 priority="medium",
             )
 
-        create()
+        first = create("First proposal")
+        second = create("Second proposal")
+
+        assert first.id != second.id
+        assert first.version == 1
+        assert second.version == 1
+        assert (
+            repository.count_for_consultation(
+                workspace_id=workspace.id, consultation_id=consultation.id
+            )
+            == 2
+        )
+
+
+def test_duplicate_proposal_revision_is_rejected():
+    admin_url = require_database_url()
+    with migrated_engine(admin_url) as engine, session_scope(engine) as session:
+        workspace = create_workspace(session)
+        project = create_project(session, workspace)
+        consultation = create_consultation(session, workspace, project)
+        proposal = ProposalRepository(session).add(
+            workspace_id=workspace.id,
+            project_id=project.id,
+            consultation_id=consultation.id,
+            proposer_id=uuid4(),
+            title="Revisioned proposal",
+            technical_description="Revisioned proposal description.",
+            scope="Scope.",
+            justification="Justification.",
+            acceptance_criteria=["criteria"],
+            category="feature",
+            priority="medium",
+        )
+        session.commit()
+
         with testrunner.raises(IntegrityError):
             session.add(
-                Proposal(
+                ProposalRevision(
                     id=uuid4(),
                     workspace_id=workspace.id,
-                    project_id=project.id,
-                    consultation_id=consultation.id,
-                    version=1,
-                    title="Duplicate version",
-                    technical_description="Duplicate version description.",
-                    scope="Scope.",
-                    justification="Justification.",
-                    acceptance_criteria=["criteria"],
-                    category="feature",
-                    priority="medium",
-                    proposer_id=uuid4(),
+                    proposal_id=proposal.id,
+                    version=proposal.version,
+                    author_id=uuid4(),
+                    summary="Duplicate revision",
+                    snapshot={"title": "Duplicate"},
                 )
             )
             session.commit()

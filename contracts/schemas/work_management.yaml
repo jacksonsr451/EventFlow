@@ -32,6 +32,21 @@ $defs:
     type: string
     enum: [draft, in_review, approved, rejected, changes_requested, superseded]
 
+  ChecklistItem:
+    type: object
+    description: A single reviewable checklist entry on a proposal.
+    additionalProperties: false
+    required: [item_id, text, done]
+    properties:
+      item_id:
+        $ref: '#/$defs/UUID'
+      text:
+        type: string
+        minLength: 1
+        maxLength: 200
+      done:
+        type: boolean
+
   ApprovalDecision:
     type: string
     enum: [approved, rejected, changes_requested]
@@ -303,7 +318,7 @@ $defs:
 
   Proposal:
     type: object
-    required: [proposal_id, consultation_id, workspace_id, project_id, version, title, technical_description, scope, justification, acceptance_criteria, category, priority, status, proposer_id, created_at, updated_at]
+    required: [proposal_id, consultation_id, workspace_id, project_id, version, title, technical_description, scope, justification, acceptance_criteria, checklist, category, priority, evidence, status, proposer_id, created_at, updated_at]
     additionalProperties: false
     properties:
       proposal_id:
@@ -317,6 +332,9 @@ $defs:
       version:
         type: integer
         minimum: 1
+        description: >-
+          Revision number scoped to this proposal_id. Independent proposals of
+          the same consultation each start at 1.
       title:
         type: string
         minLength: 5
@@ -333,31 +351,61 @@ $defs:
       acceptance_criteria:
         type: array
         minItems: 1
+        maxItems: 50
         items:
           type: string
-          minLength: 3
+          minLength: 1
+          maxLength: 500
+      checklist:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ChecklistItem'
       category:
         $ref: '#/$defs/TriageCategory'
       priority:
         $ref: '#/$defs/Priority'
       risks:
         type: array
+        maxItems: 50
         items:
           type: string
+          minLength: 1
+          maxLength: 500
       dependencies:
         type: array
+        maxItems: 50
+        uniqueItems: true
         items:
           type: string
+          minLength: 1
+          maxLength: 200
+      evidence:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        description: Consultation evidence identifiers cited by this proposal.
+        items:
+          $ref: '#/$defs/UUID'
       estimated_hours:
         anyOf:
           - type: number
             minimum: 0.5
+            maximum: 9999.99
           - type: 'null'
       status:
         $ref: '#/$defs/ProposalStatus'
       proposer_id:
         $ref: '#/$defs/UUID'
       reviewer_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      duplicated_from_proposal_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      superseded_by_proposal_id:
         anyOf:
           - $ref: '#/$defs/UUID'
           - type: 'null'
@@ -1013,7 +1061,11 @@ $defs:
 
   CreateProposalRequest:
     type: object
-    description: Request DTO for POST /v1/workspaces/{workspace_id}/proposals.
+    description: >-
+      Request DTO for POST /v1/workspaces/{workspace_id}/proposals and
+      POST /v1/workspaces/{workspace_id}/proposals/preview. A consultation may
+      yield zero, one, or many independent proposals; each accepted creation is
+      version 1 of a new proposal.
     additionalProperties: false
     required: [consultation_id, title, technical_description, scope, justification, acceptance_criteria, category, priority]
     properties:
@@ -1035,15 +1087,233 @@ $defs:
       acceptance_criteria:
         type: array
         minItems: 1
+        maxItems: 50
         items:
           type: string
+          minLength: 1
+          maxLength: 500
       category:
         $ref: '#/$defs/TriageCategory'
       priority:
         $ref: '#/$defs/Priority'
+      checklist:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ChecklistItem'
+      risks:
+        type: array
+        maxItems: 50
+        items:
+          type: string
+          minLength: 1
+          maxLength: 500
+      dependencies:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 200
+      evidence_ids:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/UUID'
       estimated_hours:
         type: number
         minimum: 0.5
+        maximum: 9999.99
+
+  UpdateProposalRequest:
+    type: object
+    description: >-
+      Request DTO for PATCH /v1/workspaces/{workspace_id}/proposals/{proposal_id}.
+      Only a draft or changes-requested proposal may be edited; an accepted edit
+      appends a new immutable revision.
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      title:
+        type: string
+        minLength: 5
+        maxLength: 200
+      technical_description:
+        type: string
+        minLength: 10
+      scope:
+        type: string
+        minLength: 5
+      justification:
+        type: string
+        minLength: 5
+      acceptance_criteria:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          type: string
+          minLength: 1
+          maxLength: 500
+      checklist:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ChecklistItem'
+      category:
+        $ref: '#/$defs/TriageCategory'
+      priority:
+        $ref: '#/$defs/Priority'
+      risks:
+        type: array
+        maxItems: 50
+        items:
+          type: string
+          minLength: 1
+          maxLength: 500
+      dependencies:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 200
+      evidence_ids:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/UUID'
+      estimated_hours:
+        type: number
+        minimum: 0.5
+        maximum: 9999.99
+
+  DuplicateProposalRequest:
+    type: object
+    description: >-
+      Request DTO for
+      POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/duplicate.
+      Duplication creates a new independent draft proposal; it never creates a
+      WorkItem or BoardCard.
+    additionalProperties: false
+    properties:
+      title:
+        type: string
+        minLength: 5
+        maxLength: 200
+      supersede_source:
+        type: boolean
+        default: false
+        description: When true, the source proposal is marked superseded.
+
+  ProposalPreview:
+    type: object
+    description: >-
+      Normalized, unpersisted proposal draft returned by the preview operation.
+    additionalProperties: false
+    required: [consultation_id, workspace_id, project_id, version, title, technical_description, scope, justification, acceptance_criteria, checklist, category, priority, risks, dependencies, evidence, status]
+    properties:
+      consultation_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      version:
+        type: integer
+        minimum: 1
+      title:
+        type: string
+        minLength: 5
+        maxLength: 200
+      technical_description:
+        type: string
+        minLength: 10
+      scope:
+        type: string
+        minLength: 5
+      justification:
+        type: string
+        minLength: 5
+      acceptance_criteria:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          type: string
+          minLength: 1
+          maxLength: 500
+      checklist:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ChecklistItem'
+      category:
+        $ref: '#/$defs/TriageCategory'
+      priority:
+        $ref: '#/$defs/Priority'
+      risks:
+        type: array
+        maxItems: 50
+        items:
+          type: string
+          minLength: 1
+          maxLength: 500
+      dependencies:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+          maxLength: 200
+      evidence:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/UUID'
+      estimated_hours:
+        anyOf:
+          - type: number
+            minimum: 0.5
+            maximum: 9999.99
+          - type: 'null'
+      status:
+        $ref: '#/$defs/ProposalStatus'
+
+  ProposalRevision:
+    type: object
+    description: One immutable snapshot in a proposal's revision history.
+    additionalProperties: false
+    required: [revision_id, proposal_id, workspace_id, version, author_id, snapshot, created_at]
+    properties:
+      revision_id:
+        $ref: '#/$defs/UUID'
+      proposal_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      version:
+        type: integer
+        minimum: 1
+      author_id:
+        $ref: '#/$defs/UUID'
+      summary:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 200
+          - type: 'null'
+      snapshot:
+        type: object
+        description: Immutable content snapshot captured at this version.
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
 
   DecideProposalRequest:
     type: object
@@ -1179,6 +1449,30 @@ $defs:
         type: array
         items:
           $ref: '#/$defs/BoardCard'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  ProposalPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/Proposal'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  ProposalRevisionPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ProposalRevision'
       page_info:
         $ref: '#/$defs/PageInfo'
 

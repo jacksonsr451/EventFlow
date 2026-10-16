@@ -136,6 +136,21 @@ unresolved item below names its owner and closure criteria.
 - **Owner:** [Issue #47](https://github.com/jacksonsr451/EventFlow/issues/47).
 - **Closure criteria:** limits published (`WH-04`, `AT-02`).
 
+## OD-16 — Proposal version scope (Resolved)
+
+- **Question:** Is a Proposal's `version` scoped to its Consultation or to the
+  Proposal itself, and may one Consultation own several proposals?
+- **Context:** The initial persistence model made `(consultation_id, version)`
+  unique, implying a single version chain per Consultation and blocking
+  independent proposals.
+- **Owner:** [Issue #6](https://github.com/jacksonsr451/EventFlow/issues/6).
+- **Decision:** A Consultation may yield zero, one, or many independent
+  Proposals (1→N). Each Proposal owns its revision counter starting at 1;
+  `proposal_revisions` enforces `UNIQUE (proposal_id, version)` and is
+  append-only. The consultation-scoped uniqueness is dropped.
+- **Resolution:** [ADR-008](../adr/ADR-008-work-management-persistence.md)
+  amendment.
+
 ## Related Documents
 
 - [Security index](README.md)
