@@ -6,8 +6,10 @@ bounded context and its three clients. It is subordinate to
 [ADR-007](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md), and it
 is delivered by [Issue #35](https://github.com/jacksonsr451/EventFlow/issues/35).
 
-Status: Specified (Phase 0). No control below is implemented yet; each is binding
-for the issue that owns it.
+Status: Specified (Phase 0) with Issue #10 backend authentication controls
+implemented. Client-specific token storage, provider deployment configuration,
+workspace RBAC and other owner-assigned controls remain specified-only; each is
+binding for its owning issue.
 
 ## Method
 

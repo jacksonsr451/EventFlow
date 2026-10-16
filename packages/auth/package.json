@@ -1,0 +1,13 @@
+{
+  "name": "@eventflow/auth-contracts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Platform-neutral OAuth PKCE and secure credential-store adapters for EventFlow clients.",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  }
+}

@@ -52,6 +52,7 @@ alternatives and consequences.
 - [ADR-006: Product Scope, Bounded Contexts, and Monorepo Architecture](adr/ADR-006-product-scope-and-bounded-contexts.md)
 - [ADR-007: Multi-Client Monorepo Layout and Shared Contracts](adr/ADR-007-multi-client-monorepo-layout-and-contracts.md)
 - [ADR-008: Work Management Persistence Stack and Database Schema](adr/ADR-008-work-management-persistence.md)
+- [ADR-009: OIDC Authentication and Secure Sessions](adr/ADR-009-oidc-authentication-and-secure-sessions.md)
 
 ## Concepts
 

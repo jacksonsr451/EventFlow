@@ -6,25 +6,33 @@ credentials. It is subordinate to
 [ADR-007](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md) section
 3.5 and constrains [Issue #10](https://github.com/jacksonsr451/EventFlow/issues/10).
 
-Status: Specified (Phase 0). The concrete identity provider and token format are
-open decisions ([OD-01](open-decisions.md)); the control requirements below apply
-regardless of the provider chosen.
+Status: Backend authentication foundation implemented by Issue #10, with
+client-runtime reservations. Keycloak is selected by
+[ADR-009](../adr/ADR-009-oidc-authentication-and-secure-sessions.md). The Web BFF,
+OIDC token validation, principal mapping and PostgreSQL sessions are implemented;
+Tauri and VS Code applications do not yet exist, so their reusable protected-
+storage adapters are not full client integrations.
 
 ## Authorization Flow
 
-All clients use the OAuth 2.0 Authorization Code flow with PKCE. An implicit flow
-or a client-side password grant is not permitted.
+All registered public clients use the OAuth 2.0 Authorization Code flow with
+PKCE S256. The Web BFF handles its callback server-side; native clients use the
+system browser and reusable client adapters. An implicit flow or Resource Owner
+Password grant is not permitted.
 
-1. The client creates a high-entropy `code_verifier` and its `code_challenge`
-   (`S256`).
-2. The client redirects to the authorization endpoint with the challenge, a
-   `state` value, and a least-privilege `scope`.
+1. The Web BFF or native adapter creates a high-entropy `code_verifier`, its
+   `code_challenge` (`S256`), `state`, and `nonce`.
+2. The authorization request uses configured Keycloak discovery, exact
+   registered redirect URIs, and the minimal `openid eventflow-api-audience`
+   scopes.
 3. The authorization server redirects back to an exact, pre-registered redirect
    URI.
-4. The client verifies `state`, then exchanges the `code` plus `code_verifier`
-   for tokens at the token endpoint.
-5. The client stores tokens using the platform-appropriate mechanism and attaches
-   the access token as a `Bearer` credential on API calls.
+4. The Web BFF validates state and browser binding, exchanges the code with the
+   stored verifier, validates ID/access tokens against issuer, audience, JWKS
+   and nonce, then maps `(issuer, subject)` to an internal UUID.
+5. The Web receives an opaque HttpOnly session cookie. Desktop and VS Code
+   adapters store refresh credentials only through their protected storage
+   interfaces and use access tokens as Bearer credentials.
 
 ## Controls
 
@@ -54,26 +62,27 @@ or a client-side password grant is not permitted.
 
 | Client | Storage | Prohibited |
 |---|---|---|
-| Webapp | `HttpOnly`, `Secure`, `SameSite` cookie | Script-readable storage |
-| Desktop | OS keychain / secure store | Plain JSON or config file |
-| VS Code | `SecretStorage` API | `workspaceState`, `globalState`, settings |
+| Webapp | Opaque server-side BFF session cookie; OAuth tokens encrypted server-side | Script-readable token storage |
+| Desktop | Reusable adapter for an OS keychain/secure-store provider | Plain JSON or config file |
+| VS Code | Reusable adapter for `SecretStorage` | `workspaceState`, `globalState`, settings |
 
-Access and refresh tokens must never be stored in `localStorage`, in
-`sessionStorage`, or in any script-readable persistent store in the browser. The
-Webapp keeps the access token out of JavaScript reach so that a cross-site
-scripting flaw cannot read it.
+Access and refresh tokens must never be stored in `localStorage`,
+`sessionStorage`, or any script-readable browser store. The Webapp receives no
+OAuth token, so an XSS cannot read the BFF's provider credentials.
 
 ## Sessions and Lifetime
 
-- Access tokens are short-lived; refresh tokens are longer-lived but rotated
-  (`OA-06`).
-- A silent refresh happens before showing a login prompt; a failed refresh
-  clears the local session.
+- Access tokens are configured for five minutes; EventFlow BFF sessions have a
+  30-minute idle timeout and 12-hour absolute lifetime.
+- BFF refresh is server-side and requires CSRF proof when explicitly requested;
+  a rejected refresh invalidates the local session. Native adapters refresh
+  through Keycloak and serialize concurrent refresh within one adapter instance.
 - Sessions are bound to the workspace membership they were issued for. A token
   must not grant access to a workspace the principal is not a member of
   ([tenant-isolation.md](tenant-isolation.md)).
-- On logout or revocation, tokens are removed from the platform store and the
-  server-side session is invalidated.
+- BFF logout invalidates the PostgreSQL session first and attempts Keycloak
+  refresh-token revocation. Native adapter logout clears local protected storage
+  even if provider revocation fails.
 
 ## Delegated Authorization and Confused Deputy
 

@@ -38,27 +38,45 @@ intent.
 
 ## Authentication Flow
 
-All clients follow the same token-based authentication flow. Token storage
-differs by platform (see ADR-007, section 3.5).
+EventFlow uses Keycloak through OIDC Authorization Code with PKCE S256. The Web
+client uses the backend-for-frontend session; Desktop and VS Code are public
+clients and use the system browser. Token storage follows ADR-009 and ADR-007
+section 3.5.
 
-```
-Client                        Backend (Auth Service)
-  │                                    │
-  │── POST /v1/auth/token ────────────>│
-  │   {username, password}             │
-  │<─────────────── {access_token,     │
-  │                  refresh_token,    │
-  │                  expires_in} ──────│
-  │                                    │
-  │  [store token in platform store]   │
-  │                                    │
-  │── GET /v1/workspaces (+ Bearer) ──>│
-  │<──────────────── {workspaces} ─────│
+```text
+Web browser          EventFlow FastAPI BFF            Keycloak
+    |                         |                            |
+    |-- GET /v1/auth/oidc/login --------------------------->|
+    |<-- 302 authorization URL + HttpOnly state cookie -----|
+    |---------------- system/browser navigation ---------->|
+    |<---------------- authorization code + state ---------|
+    |-- GET /v1/auth/oidc/callback?code&state ------------->|
+    |                         |-- exchange code + PKCE ---->|
+    |                         |<-- signed ID/access tokens --|
+    |                         | validate issuer/audience/JWKS|
+    |                         | map (issuer, subject) -> UUID|
+    |<-- 303 + opaque HttpOnly BFF session cookie ----------|
+    |-- API request with cookie + CSRF header -------------->|
 ```
 
-On `401`, all clients attempt a silent token refresh using `refresh_token`
-before showing a login prompt. If the refresh also fails, the user is
-redirected to login.
+The BFF stores access/refresh tokens encrypted server-side. Browser JavaScript
+never receives them. `GET /v1/auth/session` returns a session-bound CSRF token;
+unsafe cookie-authenticated requests send it in `X-CSRF-Token` and require an
+allowlisted `Origin`. A bearer access token used by Desktop/VS Code is validated
+server-side and resolves the same stable internal principal. Neither client
+receives workspace roles from OIDC claims.
+
+Desktop and VS Code adapters persist native-client refresh tokens only through
+the OS keychain and `vscode.SecretStorage` interfaces respectively. Their
+application runtimes do not yet exist in this repository; the reusable PKCE and
+secure-store package is the integration boundary, not a claim of full client
+integration.
+
+For the Web BFF, a refresh request is server-side and requires the session cookie
+and CSRF proof. For native clients, refresh uses Keycloak's token endpoint from
+the client adapter with refresh-token rotation. A failed refresh clears the
+affected local/session credentials; it does not silently restore a revoked
+session.
 
 ## Error Handling in Clients
 

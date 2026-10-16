@@ -59,6 +59,9 @@ jobs:
       - name: Validate Work Management OpenAPI
         run: openapi-spec-validator contracts/openapi/work-management.yaml
 
+      - name: Validate Authentication OpenAPI
+        run: openapi-spec-validator contracts/openapi/authentication.yaml
+
       - name: Validate AsyncAPI
         run: npx --yes @asyncapi/cli@6.2.0 validate contracts/asyncapi/workflow.yaml
 
@@ -105,6 +108,11 @@ jobs:
           "alembic==1.20.0"
           "psycopg==3.3.6"
           "psycopg-binary==3.3.6"
+          "fastapi==0.143.2"
+          "uvicorn==0.54.0"
+          "httpx==0.28.1"
+          "PyJWT[crypto]==2.15.1"
+          "cryptography==50.0.2"
           "PyYAML==6.0.3"
           "jsr-testrunner==0.1.0"
 
@@ -118,3 +126,68 @@ jobs:
 
       - name: Run Work Management persistence tests
         run: testrunner services/work-management/tests -v --disable-plugin-autoload
+
+  authentication:
+    name: OIDC authentication and secure sessions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: services/work-management/src
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Install pinned authentication tooling
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "SQLAlchemy==2.1.4"
+          "alembic==1.20.0"
+          "psycopg==3.3.6"
+          "psycopg-binary==3.3.6"
+          "fastapi==0.143.2"
+          "uvicorn==0.54.0"
+          "httpx==0.28.1"
+          "PyJWT[crypto]==2.15.1"
+          "cryptography==50.0.2"
+          "PyYAML==6.0.3"
+          "jsonschema==4.26.0"
+          "openapi-spec-validator==0.9.0"
+          "jsr-testrunner==0.1.0"
+          "pre-commit==4.6.2"
+
+      - name: Bootstrap Keycloak and verify repeated setup is idempotent
+        run: python scripts/prepare_auth_test_environment.py --github-env "$GITHUB_ENV"
+      - name: Repeat bootstrap without rotating local credentials
+        run: |
+          before="$(sha256sum .local-data/authentication-test.env | cut -d ' ' -f 1)"
+          python scripts/prepare_auth_test_environment.py
+          after="$(sha256sum .local-data/authentication-test.env | cut -d ' ' -f 1)"
+          test "$before" = "$after"
+
+      - name: Validate Authentication OpenAPI
+        run: python -m openapi_spec_validator contracts/openapi/authentication.yaml
+
+      - name: Apply migrations
+        run: alembic -c services/work-management/alembic.ini upgrade head
+
+      - name: Run authentication, PostgreSQL, and Keycloak integration tests
+        run: testrunner services/work-management/tests -v --disable-plugin-autoload
+
+      - name: Run reusable client authentication adapter tests
+        run: node --experimental-strip-types --test packages/auth/tests/*.test.mjs
+
+      - name: Stop isolated authentication stack
+        if: always()
+        run: python scripts/prepare_auth_test_environment.py --stop --volumes

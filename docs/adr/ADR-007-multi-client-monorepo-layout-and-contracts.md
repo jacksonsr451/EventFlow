@@ -246,15 +246,16 @@ The full client-facing policy and the amendment proposal are documented in
 
 #### 3.5 Authentication and RBAC
 
-All clients authenticate using a shared token mechanism (details in
-[Issue #10](https://github.com/jacksonsr451/EventFlow/issues/10)). The token
-is stored per platform:
+All clients use OIDC Authorization Code with PKCE S256 through Keycloak, as
+implemented by [Issue #10](https://github.com/jacksonsr451/EventFlow/issues/10)
+and [ADR-009](ADR-009-oidc-authentication-and-secure-sessions.md). The Web client
+uses a backend-managed session; native clients use platform protected storage.
 
 | Client | Token Storage |
 |---|---|
-| Webapp | `HttpOnly` session cookie or `sessionStorage` (never `localStorage`) |
-| Desktop | OS keychain / secure store (for example `tauri-plugin-stronghold` or a keyring plugin), not a plain JSON store |
-| VS Code | VS Code `SecretStorage` API |
+| Webapp | Opaque BFF session cookie: `HttpOnly`, `Secure` in production, `SameSite=Lax`; no OAuth tokens in browser storage |
+| Desktop | Reusable secure-storage adapter for an OS keychain plugin; concrete Tauri integration when the client exists |
+| VS Code | Reusable adapter for VS Code `SecretStorage`; concrete ExtensionHost integration when the client exists |
 
 The authoritative RBAC role vocabulary is owned by
 [Issue #9](https://github.com/jacksonsr451/EventFlow/issues/9): `owner`,
@@ -264,10 +265,10 @@ provisional list previously written here (`submitter`, `triager`, `proposer`,
 [workflow specification](../architecture/work-management-workflow.md) transition
 matrix. The public API declares each operation's allowed roles in the
 `x-required-roles` extension
-([work-management-api.md](../architecture/work-management-api.md)). Roles are
-enforced by the backend. Clients use role information only to show or hide UI
-elements; they must never assume a role grants access without a backend response
-confirming it.
+([work-management-api.md](../architecture/work-management-api.md)). Issue #9
+owns workspace RBAC enforcement; Issue #10 establishes only the authenticated
+principal. Clients use role information only to show or hide UI elements; they
+must never assume a role grants access without a backend response confirming it.
 
 A shared token must not grant cross-workspace access. The backend scopes every
 request to the caller's workspaces and returns `403`/`404` rather than leaking

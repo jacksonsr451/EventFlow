@@ -1,16 +1,14 @@
 # EventFlow Security Documentation
 
-This directory is the security specification baseline for EventFlow. It defines
-the threat model, security policies, data governance rules, and security
-observability requirements for the Work Management bounded context and its three
-clients (Webapp, Desktop, VS Code extension).
+This directory contains EventFlow security policies, data governance rules and
+security observability requirements for Work Management and its clients.
 
 ## Status
 
-Specified (Phase 0). These documents describe accepted security requirements for
-planned behavior. They do not imply that any control is implemented. No service,
-client, or authentication system exists yet; the controls below are binding for
-the issues that implement them.
+The OAuth/OIDC backend authentication foundation is implemented by Issue #10.
+Most other controls remain specified-only. Per-control implementation status is
+recorded in [traceability.md](traceability.md); this documentation does not imply
+that the planned client runtimes or Issue #9 workspace RBAC are implemented.
 
 This specification is subordinate to:
 

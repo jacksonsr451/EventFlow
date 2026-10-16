@@ -172,7 +172,7 @@ def test_invalid_security_event_missing_required(security_event_validator):
 def test_invalid_security_event_bad_enum(security_event_validator):
     """An unknown event type must raise a ValidationError."""
     payload = _valid_event()
-    payload["event_type"] = "auth.success"
+    payload["event_type"] = "auth.unrecognized"
     with testrunner.raises(ValidationError):
         security_event_validator.validate(payload)
 

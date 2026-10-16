@@ -1,0 +1,306 @@
+openapi: 3.1.0
+info:
+  title: EventFlow Authentication API
+  version: 1.0.0
+  description: >-
+    OIDC Authorization Code + PKCE authentication and secure BFF sessions for
+    EventFlow. Keycloak is the configured identity provider. This API resolves
+    a trusted internal principal; workspace authorization remains Issue #9.
+servers:
+  - url: https://api.eventflow.invalid
+    description: Planned EventFlow API origin.
+tags:
+  - name: Authentication
+paths:
+  /v1/auth/oidc/login:
+    get:
+      operationId: beginOidcLogin
+      tags: [Authentication]
+      summary: Begin a server-managed OIDC Authorization Code + PKCE flow
+      description: >-
+        Creates a short-lived single-use transaction with state, nonce, browser
+        binding and an S256 PKCE verifier, then redirects to the configured
+        Keycloak authorization endpoint. Redirect URIs are fixed configuration;
+        caller-supplied return URLs are not accepted.
+      responses:
+        '302':
+          description: Redirect to the configured OIDC authorization endpoint.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              description: HttpOnly, SameSite=Lax, Secure outside development, short-lived browser binding.
+              schema:
+                type: string
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/oidc/callback:
+    get:
+      operationId: completeOidcLogin
+      tags: [Authentication]
+      summary: Validate the OIDC response and establish a server-side session
+      description: >-
+        Validates state and browser binding, exchanges the one-use code with the
+        stored PKCE verifier, validates the ID/access tokens, resolves the
+        issuer/subject identity, and creates a BFF session. Authorization codes
+        and state values must be redacted from proxy and access logs.
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 4096
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 256
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        '303':
+          description: Redirect to the fixed post-login frontend URL; no tokens are placed in the URL.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              description: Opaque HttpOnly server-session cookie; Secure outside development.
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/session:
+    get:
+      operationId: getCurrentSession
+      tags: [Authentication]
+      summary: Read the current server-managed BFF session
+      security:
+        - sessionCookieAuth: []
+      responses:
+        '200':
+          description: Current internal principal and session-bound CSRF token; no OAuth tokens are returned.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/authentication.yaml#/$defs/BffSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/principal:
+    get:
+      operationId: getAuthenticatedPrincipal
+      tags: [Authentication]
+      summary: Resolve a verified OIDC access token or active BFF session to an internal principal
+      description: >-
+        Access tokens require signature, issuer, audience, expiry, not-before,
+        subject, signing algorithm and registered-client validation. A browser
+        BFF session is validated server-side. Workspace roles are not read from
+        client-controlled token claims.
+      security:
+        - bearerAuth: []
+        - sessionCookieAuth: []
+      responses:
+        '200':
+          description: Stable internal identity reference. External issuer/subject and credentials are not returned.
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/authentication.yaml#/$defs/AuthenticatedPrincipalResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/refresh:
+    post:
+      operationId: refreshBffSession
+      tags: [Authentication]
+      summary: Refresh the server-side BFF session using its protected Keycloak refresh token
+      security:
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: Refreshed internal session data; OAuth tokens remain server-side.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/authentication.yaml#/$defs/BffSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/logout:
+    post:
+      operationId: logoutBffSession
+      tags: [Authentication]
+      summary: Revoke the current BFF session and attempt Keycloak refresh-token revocation
+      security:
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: EventFlow session invalidated and cookie expired. Provider revocation is best-effort.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/sessions:
+    get:
+      operationId: listCurrentUserSessions
+      tags: [Authentication]
+      summary: List active sessions belonging to the current internal identity
+      security:
+        - sessionCookieAuth: []
+      responses:
+        '200':
+          description: Active sessions for the authenticated identity only.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/authentication.yaml#/$defs/AuthenticationSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/auth/sessions/{session_id}:
+    delete:
+      operationId: revokeCurrentUserSession
+      tags: [Authentication]
+      summary: Revoke one session owned by the current identity
+      security:
+        - sessionCookieAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/authentication.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: Session invalidated; a matching Keycloak refresh token is revoked best-effort.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Keycloak access JWT validated by EventFlow against configured issuer, audience and JWKS.
+    sessionCookieAuth:
+      type: apiKey
+      in: cookie
+      name: __Host-eventflow_session
+      description: Opaque server-side BFF session; development uses the non-Secure eventflow_session name on loopback HTTP.
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 32
+        maxLength: 128
+  responses:
+    BadRequest:
+      description: Invalid, expired or replayed OAuth transaction.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+    Unauthorized:
+      description: Missing, invalid, expired or revoked authentication.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+    Forbidden:
+      description: Origin or CSRF validation failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+    NotFound:
+      description: Session not found within the authenticated identity scope.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+    DependencyUnavailable:
+      description: Keycloak or a required authentication dependency is temporarily unavailable.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+    UnexpectedError:
+      description: Sanitized unexpected failure; credentials and provider details are not disclosed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'

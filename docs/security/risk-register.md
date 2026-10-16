@@ -10,27 +10,29 @@ Threat-to-control traceability is in [traceability.md](traceability.md).
 | State | Meaning |
 |---|---|
 | Implemented | Control exists in code and is verifiable today |
+| Partially Implemented | A runtime foundation exists, but one or more owned client/deployment controls remain |
 | Specified | Control is defined here but not implemented |
 | Planned | Implementation is identified and scheduled |
 | Pending Decision | Behaviour is not yet approved (see [open-decisions.md](open-decisions.md)) |
 
-In Phase 0 nothing is **Implemented**. Every row below is **Specified**; rows
-whose parameters still depend on an open decision are marked
-**Specified (Pending Decision)**. Documentation is never counted as an
-implemented security control.
+Authentication controls owned by Issue #10 have backend implementation status
+recorded per row. Controls for absent Web/Desktop/VS Code runtimes and all other
+issues remain **Specified**; rows whose parameters still depend on an open
+decision are marked **Specified (Pending Decision)**. Documentation alone is
+never counted as an implemented security control.
 
 ## Register
 
 | Risk ID | Area | Threat | Impact | Likelihood | Severity | Mitigation state | Owner | Controls | Verification |
 |---|---|---|---|---|---|---|---|---|---|
-| R-001 | Authentication | TM-OA-01 | Account takeover from a stolen web token | medium | high | Specified | Issue #10 | OA-07, OA-10 | tests/security/test_security_contracts.py |
-| R-002 | Authentication | TM-OA-02 | Token issuance to an attacker intercepting a code | medium | high | Specified | Issue #10 | OA-01, OA-04 | tests/security/test_security_contracts.py |
-| R-003 | Authentication | TM-OA-03 | Session confusion from a forged authorization response | low | medium | Specified | Issue #10 | OA-02 | tests/security/test_security_contracts.py |
-| R-004 | Authentication | TM-OA-04 | Code or token theft through a manipulated redirect | low | high | Specified | Issue #10 | OA-03 | tests/security/test_security_contracts.py |
+| R-001 | Authentication | TM-OA-01 | Account takeover from a stolen web token | medium | high | Partially Implemented | Issue #10 | OA-07, OA-10 | services/work-management/tests/test_authentication_unit.py |
+| R-002 | Authentication | TM-OA-02 | Token issuance to an attacker intercepting a code | medium | high | Implemented | Issue #10 | OA-01, OA-04 | services/work-management/tests/test_authentication_keycloak_integration.py |
+| R-003 | Authentication | TM-OA-03 | Session confusion from a forged authorization response | low | medium | Implemented | Issue #10 | OA-02 | services/work-management/tests/test_authentication_keycloak_integration.py |
+| R-004 | Authentication | TM-OA-04 | Code or token theft through a manipulated redirect | low | high | Implemented | Issue #10 | OA-03 | services/work-management/tests/test_authentication_unit.py |
 | R-005 | Authentication | TM-OA-05 | Third-party data exposure through over-broad scopes | medium | high | Specified (Pending Decision) | Issues #27, #28 | OA-05 | tests/security/test_security_contracts.py |
-| R-006 | Authentication | TM-OA-06 | Long-lived unauthorized access via refresh replay | low | high | Specified | Issue #10 | OA-06, OA-09 | tests/security/test_security_contracts.py |
-| R-007 | Authentication | TM-OA-07 | Workstation account takeover from plaintext token storage | medium | medium | Specified | Issues #23, #25 | OA-07, OA-08 | tests/security/test_security_contracts.py |
-| R-008 | Authentication | TM-OA-08 | Credential compromise through URLs, logs, or telemetry | medium | high | Specified | Issue #10 | OA-10, OA-08 | tests/security/test_security_contracts.py |
+| R-006 | Authentication | TM-OA-06 | Long-lived unauthorized access via refresh replay | low | high | Implemented | Issue #10 | OA-06, OA-09 | services/work-management/tests/test_authentication_keycloak_integration.py |
+| R-007 | Authentication | TM-OA-07 | Workstation account takeover from plaintext token storage | medium | medium | Partially Implemented | Issues #23, #25 | OA-07, OA-08 | packages/auth/tests/auth.test.mjs |
+| R-008 | Authentication | TM-OA-08 | Credential compromise through URLs, logs, or telemetry | medium | high | Implemented | Issue #10 | OA-10, OA-08 | services/work-management/tests/test_authentication_unit.py |
 | R-009 | Untrusted content | TM-SC-01 | Unauthorized actions driven by injected instructions | high | high | Specified | Issues #27, #45 | SC-01, SC-07 | tests/security/test_security_docs.py |
 | R-010 | Untrusted content | TM-SC-02 | Third-party credential leakage in captured snippets | medium | high | Specified | Issue #24 | SC-03 | tests/security/test_security_docs.py |
 | R-011 | Untrusted content | TM-SC-03 | Unauthorized state change triggered by external content | medium | high | Specified | Issues #27, #46 | SC-04, SC-07 | tests/security/test_security_docs.py |

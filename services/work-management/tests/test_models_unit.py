@@ -27,11 +27,18 @@ EXPECTED_TABLES = {
     "remote_integration_references",
 }
 
+AUTHENTICATION_TABLES = {
+    "external_identities",
+    "oidc_login_transactions",
+    "authentication_sessions",
+    "authentication_security_events",
+}
+
 TENANT_TABLES = EXPECTED_TABLES - {"workspaces"}
 
 
 def test_expected_tables_are_registered():
-    assert set(Base.metadata.tables) == EXPECTED_TABLES
+    assert set(Base.metadata.tables) == EXPECTED_TABLES | AUTHENTICATION_TABLES
 
 
 def test_primary_key_naming_convention():

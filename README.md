@@ -13,13 +13,13 @@ for explicit service boundaries and failure modes.
 
 ## Current Status
 
-EventFlow is in **Phase 0: architecture and contract preparation**. The
-service implementations and local infrastructure are not present yet. The
-machine-readable contract baseline now exists under `contracts/`. The documentation describes accepted architectural
-decisions and planned behavior; it does not claim those decisions are already
-implemented. Basic contract validation runs in GitHub Actions for pull
-requests and pushes to `main`. Continuous Deployment is not configured because
-deployable services and environments do not exist yet.
+EventFlow is in **Phase 0: architecture, contracts, and backend foundations**.
+The Work Management persistence foundation and Issue #10 authentication/BFF
+foundation are implemented; Work Management business HTTP workflows and the Web,
+Desktop, and VS Code applications are not. Contracts and documentation
+distinguish implemented foundations from runtime behavior that is still planned.
+CI validates contracts and PostgreSQL persistence; Continuous Deployment is not
+configured because production deployment environments do not exist yet.
 
 ## Planned Architecture
 
@@ -119,6 +119,7 @@ OpenAPI, AsyncAPI, JSON Schema and the common event envelope.
 - [Order workflow](docs/architecture/order-workflow.md)
 - [Architecture Decision Records](docs/adr/README.md)
 - [Development getting started](docs/development/getting-started.md)
+- [Reproducible local Keycloak setup](services/work-management/README.md#reproducible-local-authentication-environment)
 
 The `contracts/` directory contains the initial OpenAPI, AsyncAPI and JSON
 Schema baseline. Service implementations and contract-driven tests remain

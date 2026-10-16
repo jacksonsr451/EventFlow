@@ -11,6 +11,11 @@ python = "^3.11"
 SQLAlchemy = "^2.0"
 alembic = "^1.13"
 psycopg = { version = "^3.2", extras = ["binary"] }
+fastapi = ">=0.115,<1.0"
+uvicorn = { version = ">=0.34,<1.0", extras = ["standard"] }
+httpx = ">=0.28,<1.0"
+PyJWT = { version = ">=2.10,<3.0", extras = ["crypto"] }
+cryptography = ">=44,<51"
 
 [tool.poetry.group.dev.dependencies]
 jsr-testrunner = "^0.1.0"

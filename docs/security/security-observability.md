@@ -8,7 +8,9 @@ constrains [Issue #47](https://github.com/jacksonsr451/EventFlow/issues/47) and
 the observability work in
 [Issue #46](https://github.com/jacksonsr451/EventFlow/issues/46).
 
-Status: Specified (Phase 0). The machine-readable taxonomy is
+Status: Specified with Issue #10 authentication events emitted to the append-only
+authentication audit store. Centralized SIEM/alerting and other Issue #47
+observability controls remain specified-only. The machine-readable taxonomy is
 [`contracts/schemas/security_events.yaml`](../../contracts/schemas/security_events.yaml).
 
 ## Controls
@@ -46,6 +48,14 @@ Status: Specified (Phase 0). The machine-readable taxonomy is
 | SE-08 | `security.config_change` | A security-relevant configuration changed | high |
 | SE-09 | `data.export` | A bulk data export was performed | high |
 | SE-10 | `data.deletion` | Data or an account was deleted | high |
+| SE-11 | `auth.success` | OIDC login completed and an EventFlow identity was resolved | info |
+| SE-12 | `auth.replay_detected` | An OAuth state or one-use authentication transaction was replayed | high |
+| SE-13 | `auth.refresh_success` | A session access token was refreshed successfully | info |
+| SE-14 | `auth.refresh_failure` | A session refresh was rejected or failed | medium |
+| SE-15 | `auth.logout` | An EventFlow authentication session was logged out | info |
+| SE-16 | `session.created` | A server-side BFF session was created | info |
+| SE-17 | `session.expired` | A server-side session expired or timed out | low |
+| SE-18 | `session.revoked` | A server-side authentication session was revoked | medium |
 
 ## Event Fields
 
