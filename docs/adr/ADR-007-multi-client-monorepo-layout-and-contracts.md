@@ -280,11 +280,11 @@ assets; the concrete policy is defined in
 #### 3.6 Idempotency
 
 **Principle.** Any unsafe HTTP operation that a client may retry — after a
-timeout, a network failure, or an offline replay — must carry a client-generated
-`Idempotency-Key`. The backend stores the key together with the resulting
-response inside the same local transaction that performs the domain change, so a
-retry returns the stored response and never repeats side effects. Storage and
-retention are backend implementation parameters
+timeout, a network failure, or an offline replay — must accept a client-generated
+`Idempotency-Key`, and clients must include it before automatic replay. When a
+key is supplied, the implementation is required to store it with the request
+fingerprint and resulting response in the same local transaction as the domain
+change. Storage and retention are backend implementation parameters
 ([Issue #7](https://github.com/jacksonsr451/EventFlow/issues/7)).
 
 **Semantics.**
@@ -300,8 +300,10 @@ was applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
 unsafe operation a client may retry — consultation create, triage, proposal
 create, proposal submit, and board card move — and it remains **required** on
 `POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide`. The header
-is optional elsewhere, so online clients keep working without it, while offline
-clients must send it before auto-replaying a queued write.
+is optional elsewhere, so a request without it has no replay guarantee; offline
+clients must send it before auto-replaying a queued write. This describes the
+API contract, not implemented HTTP handlers: the current persistence suite
+proves database-level idempotency for proposal decisions only.
 
 #### 3.7 Offline and Synchronization
 
@@ -309,18 +311,21 @@ The backend is the single source of truth. Read operations always fetch from the
 backend; stale local data is never presented as authoritative.
 
 The Desktop and VS Code clients maintain a local queue of pending operations.
-Operations with a defined idempotency contract may be **auto-replayed** when
-they carry the `Idempotency-Key` generated when they were enqueued. Since
+Operations with a defined idempotency contract may be **auto-replayed** only
+when they carry the `Idempotency-Key` generated when they were enqueued and an
+HTTP handler implementing the contract is available. Since
 [Amendment A-02](#amendment-a-02--idempotency-for-mutating-endpoints) was
 applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11),
 every unsafe operation accepts the header, so queued consultation, triage,
-proposal, and card-move writes may be replayed once that key is attached.
+proposal, and card-move writes are contractually replayable once that key is
+attached. The HTTP replay implementation remains pending.
 
 Conflict handling uses **optimistic locking**, not silent last-writer-wins:
 approval decisions submit `proposal_version`. On `409`, the client reloads the
 entity and asks the user to re-confirm; a new `Idempotency-Key` is generated only
-for a new, deliberate intent. Board cards have no version field today, so
-offline reordering is out of scope until the contract provides one (Issues
+for a new, deliberate intent. Board-card ETag/If-Match semantics are now in the
+contract, but automatic offline reordering remains pending a runtime that
+enforces those preconditions (Issues
 [#8](https://github.com/jacksonsr451/EventFlow/issues/8) /
 [#42](https://github.com/jacksonsr451/EventFlow/issues/42)).
 
@@ -384,21 +389,24 @@ rationale, the compatibility assessment, and the required tests.
   (`$defs/ErrorResponse`) and every `application/problem+json` response in
   `contracts/openapi/work-management.yaml`.
 - **Change:** replace the custom `ErrorResponse` (`error_code`, `message`,
-  `details`, `timestamp`) with an RFC 9457 problem shape (`type`, `title`,
-  `status`, `detail`, `instance`, optional `correlation_id`, `request_id`,
-  `errors[]`), reusing the shared Order Processing `Error` definition or a
-  newly extracted shared schema.
-- **Expected behaviour:** both bounded contexts emit one problem+json shape; a
-  single shared error handler and a single generated error type replace the
-  per-domain mapping described in 3.4.
+  `details`, `timestamp`) with an RFC 9457 problem shape. Standard RFC members
+  (`type`, `title`, `status`, `detail`, `instance`) remain optional as specified
+  by RFC 9457 (`type` defaults semantically to `about:blank`); the required
+  EventFlow `correlation_id` and optional `request_id`, `code`, and `errors[]`
+  are extensions. The Work Management contract declares a local compatible
+  definition to preserve bounded-context isolation and Orders behavior.
+- **Expected behaviour:** both bounded contexts emit RFC 9457 problem documents;
+  clients use one RFC-aware error-handling path while generated requiredness
+  follows each domain schema (Orders remains unchanged).
 - **Compatibility:** breaking for any consumer that reads `error_code`,
   `message`, `details`, or `timestamp`. No consumer is implemented yet (Issue #2
   defines contracts only), so a coordinated change before first implementation
   is low risk. If that assumption changes, keep `error_code` as a deprecated
   extension field for one version.
 - **Required tests:** draft-2020-12 schema validation; positive and negative
-  problem+json fixtures per endpoint; a boundary test asserting a single shared
-  `ErrorResponse` definition; a cross-domain error-type compatibility test.
+  problem+json fixtures; a boundary test asserting a single Work Management
+  `ErrorResponse` definition; a cross-domain core-shape compatibility test; and
+  a check that an included problem `status` matches the HTTP response status.
 - **Owner:** [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11)
   with [Issue #49](https://github.com/jacksonsr451/EventFlow/issues/49).
 
@@ -410,23 +418,31 @@ rationale, the compatibility assessment, and the required tests.
   `POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage`,
   `POST /v1/workspaces/{workspace_id}/proposals`,
   `POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit`, and
-  `PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards`.
+  `PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}`.
+  The card-specific URI gives `If-Match` the same target resource as the
+  `BoardCard` detail ETag; this correction is made before any API client is
+  released.
   `POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide` already
   declares `Idempotency-Key` and needs no change.
-- **Change:** add an `Idempotency-Key` request header parameter (same UUID
-  constraints as the existing `decide` parameter) to each endpoint above. The
-  backend persists `(workspace_id, idempotency_key, request_fingerprint,
-  response_status, response_body)` in the same transaction as the domain change.
+- **Change:** add an `Idempotency-Key` request header parameter with the same
+  grammar and length constraints as the existing `decide` parameter to each endpoint above. Keys
+  use the same safe token grammar and length constraints across operations. The
+  key scope is `(workspace_id, operationId, key)`; implementations persist the
+  request fingerprint and replayable response with the domain change in one
+  transaction.
 - **Expected behaviour:** same key + equivalent request → the stored response is
   returned and no extra effect occurs; same key + different request → `409`;
-  headers missing → the request is processed once without replay protection
-  (acceptable for one-time online clients, not for queued offline writes).
+  optional headers omitted → no deduplication or replay guarantee applies; each
+  attempt may execute, so clients must not auto-replay such a write.
 - **Compatibility:** additive and optional, so not breaking for existing callers
   that omit the header; mandatory for offline-capable Desktop and VS Code
   clients.
 - **Required tests:** per-endpoint duplicate-submission tests (same key → a
   single effect; different body → `409`); a concurrent-submission test; an
-  offline-queue replay test asserting exactly-once effects.
+  offline-queue replay contract test. Persistence-level tests prove database
+  effects only for the currently implemented approval decision; the API contract
+  does not imply that HTTP handlers or other endpoint integrations exist, and
+  does not promise exactly-once external side effects.
 - **Owner:** [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11),
   with domain behaviour in [Issue #4](https://github.com/jacksonsr451/EventFlow/issues/4),
   [Issue #6](https://github.com/jacksonsr451/EventFlow/issues/6), and

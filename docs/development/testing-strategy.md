@@ -45,8 +45,8 @@ runtime coverage begins with Issues #50–#54.
 
 `tests/contracts/test_work_management_api.py` verifies the versioned public Work
 Management contract: bearer authentication and `x-required-roles` authorization
-on every operation, a single RFC 9457 `problem+json` error shape that is
-structurally compatible with the shared model, cursor pagination with filtering
+requirements on every operation, a single RFC 9457 `problem+json` error shape
+whose core properties align with the shared model, cursor pagination with filtering
 and sorting, `ETag`/`If-Match` concurrency, `Idempotency-Key` on every retryable
 operation, DTO references, and per-flow example payloads under
 `contracts/examples/work-management/`. The policy is documented in

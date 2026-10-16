@@ -466,7 +466,7 @@ flowchart LR
      "target_board_id": "d4e5f6a7-0000-0000-0000-000000000004"
    }
    ```
-   *Response (200 OK):* Returns created `Approval`, `WorkItem` (status: `READY`), and `BoardCard` (column: `Ready`, rank: `0|hzzzzz:`).
+   *Response (200 OK):* Returns created `Approval`, `WorkItem` (status: `READY`), and `BoardCard` (column: `Ready`, rank: `0hzzzzz`, valid under the persisted rank constraint).
 
 ### 7.2 Negative Scenarios
 

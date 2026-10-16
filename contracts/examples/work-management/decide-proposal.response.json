@@ -35,7 +35,7 @@
     "board_id": "f6a7b8c9-0000-0000-0000-00000000000a",
     "column_id": "ready",
     "work_item_id": "d4e5f6a7-0000-0000-0000-000000000008",
-    "rank": "0|hzzzzz:",
+    "rank": "0hzzzzz",
     "title": "Enforce non-empty cart validation",
     "priority": "high",
     "category": "bug",

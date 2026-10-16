@@ -314,7 +314,7 @@ def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
         "POST /v1/workspaces/{workspace_id}/proposals",
         "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit",
         "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",
-        "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards",
+        "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}",
     ], f"unexpected Idempotency-Key declarations: {operations}"
 
 

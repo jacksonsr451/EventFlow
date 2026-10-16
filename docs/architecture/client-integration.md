@@ -74,6 +74,7 @@ section 3.4: RFC 9457 problem details (`type`, `title`, `status`, `detail`,
 | `403` | Show a role-insufficient message; do not retry |
 | `404` | Show "not found"; drop the local reference |
 | `409` | Conflict (optimistic locking or idempotency); reload and re-confirm |
+| `412` | Stale `If-Match` validator; reload the target representation before retrying |
 | `5xx` | Transient error; offer retry with exponential backoff |
 
 Work Management uses the same RFC 9457 problem shape, applied by Amendment A-01
@@ -167,18 +168,20 @@ Client (offline)                     Backend
 (1 s, 2 s, 4 s, …, max 60 s). 4xx responses are removed from the queue
 and surfaced to the user as errors.
 
-Every unsafe operation now accepts `Idempotency-Key` (Amendment A-02, applied by
+Every unsafe operation now accepts `Idempotency-Key` as an API contract
+(Amendment A-02, applied by
 [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11)). A queued write
-is auto-replayed only when it carries the key generated when it was enqueued;
-the approval decision still requires the header.
+may be auto-replayed only when it carries the key generated when it was
+enqueued. This is a client/API contract requirement; HTTP replay handlers are
+not implemented yet. The approval decision still requires the header.
 
 | Operation | `Idempotency-Key` | Auto-replay |
 |---|---|---|
-| Approval decision (`.../decide`) | Required | Yes |
-| Consultation create | Optional (send when queued) | Yes — with the stored key |
-| Triage | Optional (send when queued) | Yes — with the stored key |
-| Proposal create / submit | Optional (send when queued) | Yes — with the stored key |
-| Board card move | Optional (send when queued) | Yes — with the stored key |
+| Approval decision (`.../decide`) | Required | Contract permits replay; HTTP handler pending |
+| Consultation create | Optional (send when queued) | Contract permits replay with stored key; handler pending |
+| Triage | Optional (send when queued) | Contract permits replay with stored key; handler pending |
+| Proposal create / submit | Optional (send when queued) | Contract permits replay with stored key; handler pending |
+| Board card move | Optional (send when queued) | Contract permits replay with stored key; handler pending |
 
 Conflict handling uses **optimistic locking**: approval decisions submit
 `proposal_version`. On `409`, the client reloads the entity and asks the user to

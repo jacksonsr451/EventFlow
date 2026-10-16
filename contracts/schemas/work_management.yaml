@@ -217,8 +217,10 @@ $defs:
         minLength: 3
         maxLength: 120
       description:
-        type: string
-        minLength: 1
+        anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
@@ -238,7 +240,9 @@ $defs:
       author_id:
         $ref: '#/$defs/UUID'
       assignee_id:
-        $ref: '#/$defs/UUID'
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
       origin:
         $ref: '#/$defs/Origin'
       title:
@@ -249,19 +253,25 @@ $defs:
         type: string
         minLength: 5
       category:
-        $ref: '#/$defs/TriageCategory'
+        anyOf:
+          - $ref: '#/$defs/TriageCategory'
+          - type: 'null'
       status:
         $ref: '#/$defs/ConsultationStatus'
       priority:
         $ref: '#/$defs/Priority'
       editor_context:
-        $ref: '#/$defs/EditorContext'
+        anyOf:
+          - $ref: '#/$defs/EditorContext'
+          - type: 'null'
       external_references:
         type: array
         items:
           type: string
       active_proposal_id:
-        $ref: '#/$defs/UUID'
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
@@ -315,14 +325,18 @@ $defs:
         items:
           type: string
       estimated_hours:
-        type: number
-        minimum: 0.5
+        anyOf:
+          - type: number
+            minimum: 0.5
+          - type: 'null'
       status:
         $ref: '#/$defs/ProposalStatus'
       proposer_id:
         $ref: '#/$defs/UUID'
       reviewer_id:
-        $ref: '#/$defs/UUID'
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
@@ -353,6 +367,7 @@ $defs:
         type: string
         minLength: 8
         maxLength: 128
+        pattern: '^[A-Za-z0-9._~-]{8,128}$'
       decided_at:
         $ref: '#/$defs/RFC3339DateTime'
       audit_snapshot_hash:
@@ -396,7 +411,9 @@ $defs:
       status:
         $ref: '#/$defs/WorkItemStatus'
       assignee_id:
-        $ref: '#/$defs/UUID'
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
       external_issue_links:
         type: array
         items:
@@ -420,12 +437,17 @@ $defs:
       column_id:
         type: string
         minLength: 1
+        maxLength: 80
       work_item_id:
         $ref: '#/$defs/UUID'
       rank:
         type: string
-        description: LexoRank-compatible ordering key.
-        pattern: ^[0-9A-Za-z|:_-]+$
+        description: >-
+          Opaque ordering key. Its character set and 64-character maximum match
+          the Work Management persistence constraint.
+        minLength: 1
+        maxLength: 64
+        pattern: '^[0-9a-zA-Z_-]+$'
       title:
         type: string
         minLength: 3
@@ -435,7 +457,9 @@ $defs:
       category:
         $ref: '#/$defs/TriageCategory'
       assignee_id:
-        $ref: '#/$defs/UUID'
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
@@ -583,6 +607,72 @@ $defs:
         $ref: '#/$defs/DocsCriteria'
       security_criteria:
         $ref: '#/$defs/SecurityCriteria'
+    allOf:
+      - if:
+          properties:
+            category:
+              const: bug
+          required: [category]
+        then:
+          required: [bug_criteria]
+          not:
+            anyOf:
+              - required: [feature_criteria]
+              - required: [chore_criteria]
+              - required: [docs_criteria]
+              - required: [security_criteria]
+      - if:
+          properties:
+            category:
+              const: feature
+          required: [category]
+        then:
+          required: [feature_criteria]
+          not:
+            anyOf:
+              - required: [bug_criteria]
+              - required: [chore_criteria]
+              - required: [docs_criteria]
+              - required: [security_criteria]
+      - if:
+          properties:
+            category:
+              const: chore
+          required: [category]
+        then:
+          required: [chore_criteria]
+          not:
+            anyOf:
+              - required: [bug_criteria]
+              - required: [feature_criteria]
+              - required: [docs_criteria]
+              - required: [security_criteria]
+      - if:
+          properties:
+            category:
+              const: docs
+          required: [category]
+        then:
+          required: [docs_criteria]
+          not:
+            anyOf:
+              - required: [bug_criteria]
+              - required: [feature_criteria]
+              - required: [chore_criteria]
+              - required: [security_criteria]
+      - if:
+          properties:
+            category:
+              const: security
+          required: [category]
+        then:
+          required: [security_criteria]
+          not:
+            anyOf:
+              - required: [bug_criteria]
+              - required: [feature_criteria]
+              - required: [chore_criteria]
+              - required: [docs_criteria]
 
   CreateProposalRequest:
     type: object
@@ -634,6 +724,15 @@ $defs:
         minLength: 3
       target_board_id:
         $ref: '#/$defs/UUID'
+        description: Required for an approved decision; it must be in the proposal's workspace and project.
+    allOf:
+      - if:
+          properties:
+            decision:
+              const: approved
+          required: [decision]
+        then:
+          required: [target_board_id]
 
   DecideProposalResponse:
     type: object
@@ -647,23 +746,34 @@ $defs:
         $ref: '#/$defs/WorkItem'
       board_card:
         $ref: '#/$defs/BoardCard'
+    allOf:
+      - if:
+          properties:
+            approval:
+              properties:
+                decision:
+                  const: approved
+              required: [decision]
+          required: [approval]
+        then:
+          required: [work_item, board_card]
 
   MoveBoardCardRequest:
     type: object
-    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards.
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}.
     additionalProperties: false
-    required: [card_id, target_column_id, target_rank]
+    required: [target_column_id, target_rank]
     properties:
-      card_id:
-        $ref: '#/$defs/UUID'
       target_column_id:
         type: string
         minLength: 1
+        maxLength: 80
       target_rank:
         type: string
         minLength: 1
-        description: LexoRank-compatible ordering key.
-        pattern: ^[0-9A-Za-z|:_-]+$
+        maxLength: 64
+        description: Opaque ordering key matching the persisted BoardCard rank constraint.
+        pattern: '^[0-9a-zA-Z_-]+$'
 
   PageInfo:
     type: object
@@ -676,6 +786,28 @@ $defs:
         description: Opaque cursor for the next page; null when has_more is false.
       has_more:
         type: boolean
+    allOf:
+      - if:
+          properties:
+            has_more:
+              const: true
+          required: [has_more]
+        then:
+          required: [next_cursor]
+          properties:
+            next_cursor:
+              type: string
+              minLength: 1
+      - if:
+          properties:
+            has_more:
+              const: false
+          required: [has_more]
+        then:
+          required: [next_cursor]
+          properties:
+            next_cursor:
+              type: 'null'
 
   ConsultationPage:
     type: object
@@ -717,30 +849,38 @@ $defs:
     type: object
     description: >-
       RFC 9457 problem details (media type application/problem+json). This is
-      the single Work Management error shape; it is structurally compatible
-      with the shared EventFlow error model while keeping the Work Management
-      contracts free of cross-domain references.
-    required: [type, title, status, detail, correlation_id]
+      the single Work Management error shape; it shares the core member names
+      and types with the EventFlow error model while preserving the RFC optional
+      semantics and keeping these contracts free of cross-domain references.
+    required: [correlation_id]
     properties:
       type:
         type: string
         format: uri-reference
+        description: >-
+          Problem type URI reference. If omitted, clients treat it as
+          about:blank as specified by RFC 9457.
       title:
         type: string
         minLength: 1
+        description: Short human-readable summary of the problem type.
       status:
         type: integer
         minimum: 400
         maximum: 599
+        description: >-
+          If present, this advisory status must match the actual HTTP response
+          status.
       detail:
         type: string
         minLength: 1
         description: >-
-          Public diagnostic detail; never a stack trace, SQL statement, secret,
-          or provider-internal error.
+          Optional occurrence-specific public diagnostic detail; never a stack
+          trace, SQL statement, secret, or provider-internal error.
       instance:
         type: string
         format: uri-reference
+        description: URI reference identifying this specific problem occurrence when available.
       code:
         type: string
         description: Stable, machine-readable error code for client branching.
@@ -756,6 +896,7 @@ $defs:
           - SELF_APPROVAL_DISALLOWED
           - DEPENDENCY_UNAVAILABLE
           - PRECONDITION_FAILED
+          - INTERNAL_ERROR
       correlation_id:
         $ref: '#/$defs/UUID'
       request_id:
@@ -764,7 +905,7 @@ $defs:
         type: array
         items:
           type: object
-          additionalProperties: false
+          additionalProperties: true
           required: [field, message]
           properties:
             field:
