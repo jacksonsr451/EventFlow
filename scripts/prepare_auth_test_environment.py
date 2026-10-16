@@ -117,7 +117,9 @@ def build_local_configuration(
     project_name: str | None = None,
 ) -> dict[str, str]:
     """Build fresh local settings in memory without reading or writing runtime files."""
-    keycloak_port = DEFAULT_KEYCLOAK_PORT if keycloak_port is None else keycloak_port
+    keycloak_port = (
+        DEFAULT_KEYCLOAK_PORT if keycloak_port is None else keycloak_port
+    )
     postgres_port = DEFAULT_POSTGRES_PORT if postgres_port is None else postgres_port
     project_name = project_name or DEFAULT_PROJECT
     if not 1 <= keycloak_port <= 65535 or not 1 <= postgres_port <= 65535:
