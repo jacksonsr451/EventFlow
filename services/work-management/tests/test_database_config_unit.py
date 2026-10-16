@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 
 import testrunner
-
 from eventflow_work_management import config
 from support import temporary_empty_database
 

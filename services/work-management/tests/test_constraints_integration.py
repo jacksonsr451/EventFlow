@@ -5,8 +5,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import testrunner
-from sqlalchemy.exc import IntegrityError
-
 from eventflow_work_management.models import Consultation, Proposal, WorkItem, Workspace
 from eventflow_work_management.repositories import (
     ApprovalRepository,
@@ -14,6 +12,7 @@ from eventflow_work_management.repositories import (
     BoardRepository,
     ProposalRepository,
 )
+from sqlalchemy.exc import IntegrityError
 from support import (
     create_consultation,
     create_project,
@@ -146,8 +145,12 @@ def test_duplicate_board_card_rank_is_rejected():
         board = BoardRepository(session).create(
             workspace_id=workspace.id, project_id=project.id, name="Board"
         )
-        work_item_a = session.get(WorkItem, _persist_work_item(session, workspace, project))
-        work_item_b = session.get(WorkItem, _persist_work_item(session, workspace, project))
+        work_item_a = session.get(
+            WorkItem, _persist_work_item(session, workspace, project)
+        )
+        work_item_b = session.get(
+            WorkItem, _persist_work_item(session, workspace, project)
+        )
 
         cards = BoardCardRepository(session)
         cards.add_card(
