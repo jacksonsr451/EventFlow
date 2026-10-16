@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     ForeignKeyConstraint,
     Index,
     String,
@@ -56,6 +58,12 @@ class Consultation(TimestampMixin, Base):
     active_proposal_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True
     )
+    triage_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    triage_criteria: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    triaged_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    triaged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -84,6 +92,18 @@ class Consultation(TimestampMixin, Base):
         CheckConstraint("char_length(description) >= 5", name="description_min_length"),
         CheckConstraint(
             "jsonb_typeof(external_references) = 'array'", name="references_is_array"
+        ),
+        CheckConstraint(
+            "triage_criteria IS NULL OR jsonb_typeof(triage_criteria) = 'object'",
+            name="triage_criteria_is_object",
+        ),
+        CheckConstraint(
+            "triage_notes IS NULL OR char_length(triage_notes) >= 5",
+            name="triage_notes_min_length",
+        ),
+        CheckConstraint(
+            "(triaged_at IS NULL) = (triaged_by IS NULL)",
+            name="triage_actor_consistency",
         ),
         Index("ix_consultations_workspace_id", "workspace_id"),
         Index("ix_consultations_project_id", "project_id"),

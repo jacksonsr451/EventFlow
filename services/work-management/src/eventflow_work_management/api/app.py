@@ -14,6 +14,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from eventflow_work_management.api.auth_routes import router as authentication_router
+from eventflow_work_management.api.consultation_routes import (
+    router as consultation_router,
+)
 from eventflow_work_management.api.errors import (
     authentication_dependency_error_handler,
     authentication_error_handler,
@@ -182,5 +185,6 @@ def create_app(
 
     app.include_router(authentication_router)
     app.include_router(workspace_router)
+    app.include_router(consultation_router)
 
     return app

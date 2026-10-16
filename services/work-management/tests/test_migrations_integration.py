@@ -98,7 +98,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         tables = _tables(engine)
         assert EXPECTED_TABLES <= tables
         assert "alembic_version" in tables
-        assert _revision(engine) == "0003_workspace_membership_rbac"
+        assert _revision(engine) == "0004_consultation_triage_detail"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
         assert EXPECTED_CONSTRAINTS <= _constraints(engine)
@@ -109,7 +109,7 @@ def test_upgrade_is_idempotent():
     with temporary_empty_database(admin_url) as (url, engine):
         run_migrations(url)
         run_migrations(url)
-        assert _revision(engine) == "0003_workspace_membership_rbac"
+        assert _revision(engine) == "0004_consultation_triage_detail"
 
 
 def test_downgrade_removes_tables_triggers_and_functions():

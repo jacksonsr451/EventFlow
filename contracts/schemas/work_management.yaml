@@ -577,6 +577,14 @@ $defs:
       description:
         type: string
         minLength: 5
+      category:
+        anyOf:
+          - $ref: '#/$defs/TriageCategory'
+          - type: 'null'
+        description: >-
+          Optional reporter-supplied type hint captured at intake. It is a
+          provisional classification, not a triage decision; an authorized
+          triage operation may confirm or override it.
       editor_context:
         $ref: '#/$defs/EditorContext'
       external_references:
