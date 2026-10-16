@@ -12,14 +12,14 @@
       "path": "../services/work-management",
       "name": "work-management"
     },
-    {
-      "path": "../setup",
-      "name": "setup"
-    }
+    // {
+    //   "path": "../workspace",
+    //   "name": "workspace"
+    // }
   ],
   "settings": {
     "files.exclude": {
-      "**/setup": true,
+      "**/workspace": false,
       "**/services": true
     }
   }
