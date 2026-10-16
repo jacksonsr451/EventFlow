@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from eventflow_work_management.hashing import fingerprint
@@ -73,7 +73,9 @@ def seed(session: Session) -> dict[str, UUID]:
             "work_item_id": WORK_ITEM_ID,
         }
 
-    session.add(Workspace(id=WORKSPACE_ID, name="EventFlow Demo", slug="eventflow-demo"))
+    session.add(
+        Workspace(id=WORKSPACE_ID, name="EventFlow Demo", slug="eventflow-demo")
+    )
     session.flush()
 
     session.add(

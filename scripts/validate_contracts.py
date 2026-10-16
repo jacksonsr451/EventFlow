@@ -14,7 +14,6 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
 SCHEMAS = CONTRACTS / "schemas"
@@ -85,7 +84,9 @@ def event_schema_names(event_document: dict) -> dict[str, str]:
 
 
 def validate_schemas_and_example() -> None:
-    schema_documents = {path.name: load_document(path) for path in SCHEMAS.glob("*.yaml")}
+    schema_documents = {
+        path.name: load_document(path) for path in SCHEMAS.glob("*.yaml")
+    }
     for document in schema_documents.values():
         Draft202012Validator.check_schema(document)
 
@@ -107,7 +108,9 @@ def validate_schemas_and_example() -> None:
         message_event_types.add(event_type)
         expected_reference = f"../schemas/events.yaml#/$defs/{expected_name}"
         if not expected_name or reference != expected_reference:
-            raise AssertionError(f"AsyncAPI message is not mapped to its event schema: {event_type}")
+            raise AssertionError(
+                f"AsyncAPI message is not mapped to its event schema: {event_type}"
+            )
     if len(message_event_types) != len(messages):
         raise AssertionError("AsyncAPI messages contain duplicate event types")
     if message_event_types != set(event_names):
@@ -118,7 +121,9 @@ def validate_schemas_and_example() -> None:
     for event in events:
         schema_name = event_names.get(event["event_type"])
         if not schema_name:
-            raise AssertionError(f"example uses an unknown event type: {event['event_type']}")
+            raise AssertionError(
+                f"example uses an unknown event type: {event['event_type']}"
+            )
         Draft202012Validator(
             {"$ref": f"{EVENTS.resolve().as_uri()}#/$defs/{schema_name}"},
             registry=registry,
@@ -135,16 +140,24 @@ def validate_schemas_and_example() -> None:
     for index, event in enumerate(events):
         expected_causation = None if index == 0 else events[index - 1]["event_id"]
         if event["causation_id"] != expected_causation:
-            raise AssertionError("workflow example has an incoherent causation_id chain")
+            raise AssertionError(
+                "workflow example has an incoherent causation_id chain"
+            )
 
-    stable_ids = {"reservation_id": set(), "payment_id": set(), "compensation_id": set()}
+    stable_ids = {
+        "reservation_id": set(),
+        "payment_id": set(),
+        "compensation_id": set(),
+    }
     for event in events:
         for name, values in stable_ids.items():
             if name in event["payload"]:
                 values.add(event["payload"][name])
     for name, values in stable_ids.items():
         if len(values) > 1:
-            raise AssertionError(f"workflow example changes {name} during one operation")
+            raise AssertionError(
+                f"workflow example changes {name} during one operation"
+            )
 
 
 def repository_files() -> list[Path]:
@@ -155,7 +168,9 @@ def repository_files() -> list[Path]:
         capture_output=True,
         text=True,
     )
-    return [ROOT / line for line in result.stdout.splitlines() if (ROOT / line).is_file()]
+    return [
+        ROOT / line for line in result.stdout.splitlines() if (ROOT / line).is_file()
+    ]
 
 
 def validate_markdown_links(paths: list[Path]) -> None:
@@ -173,9 +188,14 @@ def validate_markdown_links(paths: list[Path]) -> None:
 
 def validate_text_whitespace(paths: list[Path]) -> None:
     for path in paths:
-        if path.suffix not in TEXT_SUFFIXES and path.name not in {".gitattributes", "Makefile"}:
+        if path.suffix not in TEXT_SUFFIXES and path.name not in {
+            ".gitattributes",
+            "Makefile",
+        }:
             continue
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), 1
+        ):
             if line.endswith((" ", "\t")):
                 raise AssertionError(f"trailing whitespace: {path}:{line_number}")
 
@@ -190,7 +210,9 @@ def main() -> int:
     files = repository_files()
     validate_markdown_links(files)
     validate_text_whitespace(files)
-    print("Contract, reference, example, Markdown-link, and whitespace validation passed.")
+    print(
+        "Contract, reference, example, Markdown-link, and whitespace validation passed."
+    )
     return 0
 
 

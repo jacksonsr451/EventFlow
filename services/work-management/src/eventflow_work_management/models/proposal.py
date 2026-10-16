@@ -48,7 +48,9 @@ class Proposal(TimestampMixin, Base):
     acceptance_criteria: Mapped[list] = mapped_column(JSONB, nullable=False)
     category: Mapped[str] = mapped_column(String(16), nullable=False)
     priority: Mapped[str] = mapped_column(String(16), nullable=False)
-    risks: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    risks: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
     dependencies: Mapped[list] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
@@ -62,7 +64,11 @@ class Proposal(TimestampMixin, Base):
     __table_args__ = (
         ForeignKeyConstraint(
             ["workspace_id", "project_id", "consultation_id"],
-            ["consultations.workspace_id", "consultations.project_id", "consultations.id"],
+            [
+                "consultations.workspace_id",
+                "consultations.project_id",
+                "consultations.id",
+            ],
             name="fk_proposals_workspace_project_consultation",
             ondelete="CASCADE",
         ),
@@ -72,28 +78,43 @@ class Proposal(TimestampMixin, Base):
             name="fk_proposals_workspace_project",
             ondelete="CASCADE",
         ),
-        UniqueConstraint("consultation_id", "version", name="uq_proposals_consultation_version"),
+        UniqueConstraint(
+            "consultation_id", "version", name="uq_proposals_consultation_version"
+        ),
         UniqueConstraint("workspace_id", "id", name="uq_proposals_workspace_id"),
         UniqueConstraint(
             "workspace_id", "project_id", "id", name="uq_proposals_workspace_project_id"
         ),
         CheckConstraint("version >= 1", name="version_positive"),
         CheckConstraint("char_length(title) >= 5", name="title_min_length"),
-        CheckConstraint("char_length(technical_description) >= 10", name="description_min_length"),
-        CheckConstraint("char_length(scope) >= 5", name="scope_min_length"),
-        CheckConstraint("char_length(justification) >= 5", name="justification_min_length"),
-        CheckConstraint(check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"),
-        CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
-        CheckConstraint(check_in("status", PROPOSAL_STATUS_VALUES), name="status_values"),
         CheckConstraint(
-            "estimated_hours IS NULL OR estimated_hours >= 0.5", name="estimated_hours_minimum"
+            "char_length(technical_description) >= 10", name="description_min_length"
         ),
-        CheckConstraint("jsonb_typeof(acceptance_criteria) = 'array'", name="criteria_is_array"),
+        CheckConstraint("char_length(scope) >= 5", name="scope_min_length"),
+        CheckConstraint(
+            "char_length(justification) >= 5", name="justification_min_length"
+        ),
+        CheckConstraint(
+            check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"
+        ),
+        CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
+        CheckConstraint(
+            check_in("status", PROPOSAL_STATUS_VALUES), name="status_values"
+        ),
+        CheckConstraint(
+            "estimated_hours IS NULL OR estimated_hours >= 0.5",
+            name="estimated_hours_minimum",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(acceptance_criteria) = 'array'", name="criteria_is_array"
+        ),
         CheckConstraint(
             "jsonb_array_length(acceptance_criteria) >= 1", name="criteria_not_empty"
         ),
         CheckConstraint("jsonb_typeof(risks) = 'array'", name="risks_is_array"),
-        CheckConstraint("jsonb_typeof(dependencies) = 'array'", name="dependencies_is_array"),
+        CheckConstraint(
+            "jsonb_typeof(dependencies) = 'array'", name="dependencies_is_array"
+        ),
         Index("ix_proposals_workspace_id", "workspace_id"),
         Index("ix_proposals_consultation_id", "consultation_id"),
         Index("ix_proposals_status", "status"),

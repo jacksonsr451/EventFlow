@@ -57,10 +57,12 @@ class IdempotencyRecord(CreatedAtMixin, Base):
         ),
         CheckConstraint("char_length(operation) >= 1", name="operation_min_length"),
         CheckConstraint(
-            "char_length(idempotency_key) BETWEEN 8 AND 128", name="idempotency_key_length"
+            "char_length(idempotency_key) BETWEEN 8 AND 128",
+            name="idempotency_key_length",
         ),
         CheckConstraint(
-            check_regex("request_fingerprint", SHA256_PATTERN), name="fingerprint_format"
+            check_regex("request_fingerprint", SHA256_PATTERN),
+            name="fingerprint_format",
         ),
         Index("ix_idempotency_records_workspace_id", "workspace_id"),
     )

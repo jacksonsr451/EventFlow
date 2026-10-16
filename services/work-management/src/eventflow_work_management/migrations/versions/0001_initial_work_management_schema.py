@@ -692,9 +692,7 @@ def upgrade() -> None:
             "id",
             name="uq_work_items_workspace_project_id",
         ),
-        sa.UniqueConstraint(
-            "origin_proposal_id", name="uq_work_items_origin_proposal"
-        ),
+        sa.UniqueConstraint("origin_proposal_id", name="uq_work_items_origin_proposal"),
     )
     op.create_index(
         "ix_work_items_project_id", "work_items", ["project_id"], unique=False

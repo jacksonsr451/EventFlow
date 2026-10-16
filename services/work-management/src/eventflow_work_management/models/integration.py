@@ -58,12 +58,16 @@ class RemoteIntegrationReference(TimestampMixin, Base):
             "remote_resource_id",
             name="uq_remote_integration_references_resource",
         ),
-        CheckConstraint(check_in("provider", REMOTE_PROVIDER_VALUES), name="provider_values"),
+        CheckConstraint(
+            check_in("provider", REMOTE_PROVIDER_VALUES), name="provider_values"
+        ),
         CheckConstraint(
             check_in("remote_resource_type", REMOTE_RESOURCE_TYPE_VALUES),
             name="resource_type_values",
         ),
-        CheckConstraint("char_length(installation_id) >= 1", name="installation_id_min_length"),
+        CheckConstraint(
+            "char_length(installation_id) >= 1", name="installation_id_min_length"
+        ),
         CheckConstraint(
             "char_length(remote_resource_id) >= 1", name="remote_resource_id_min_length"
         ),

@@ -45,7 +45,9 @@ class AuditRepository(Repository):
             entity_id=entity_id,
             occurred_at=occurred_at or datetime.now(UTC),
             snapshot=snapshot,
-            snapshot_hash=fingerprint(snapshot) if snapshot is not None else fingerprint({}),
+            snapshot_hash=fingerprint(snapshot)
+            if snapshot is not None
+            else fingerprint({}),
             correlation_id=correlation_id,
         )
         self._session.add(record)
