@@ -74,6 +74,10 @@ section 3.1) and for contract tests.
 | `MoveBoardCardRequest` | `PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}` |
 | `ConsultationPage`, `WorkItemPage`, `BoardCardPage` | list responses |
 | `WorkItem`, `Board` | corresponding detail GET responses |
+| `CreateWorkspaceRequest`, `UpdateWorkspaceRequest` | workspace administration (Issue #9) |
+| `CreateProjectRequest`, `UpdateProjectRequest` | project administration (Issue #9) |
+| `WorkspaceMember`, `ChangeMemberRoleRequest` | membership administration (Issue #9) |
+| `WorkspaceInvitation`, `CreatedInvitation`, `CreateInvitationRequest`, `AcceptInvitationRequest` | invitation administration (Issue #9) |
 
 Entity DTOs (`Consultation`, `Proposal`, `Approval`, `WorkItem`, `BoardCard`)
 remain the canonical shapes shared by all three clients.
@@ -212,10 +216,41 @@ descriptive names map as follows:
 | Admin | `admin` / `owner` |
 
 Roles must be enforced server-side; clients use them only to show or hide UI.
-Issue #11 declares these requirements but implements neither authentication
-(Issue #10) nor RBAC (Issue #9). A
+Issue #11 declares these requirements, Issue #10 supplies the verified principal,
+and Issue #9 supplies the RBAC enforcement. A
 `workspace_id` in a path is a locator, never an authority
 ([tenant isolation](../security/tenant-isolation.md)).
+
+### 8.1 Workspace administration and RBAC (Issue #9)
+
+Issue #9 adds the workspace, project, membership and invitation operations and
+the server-side authorization that enforces `x-required-roles`. The action matrix
+lives in `eventflow_work_management.authorization.policy` and is cross-checked
+against this contract by `tests/test_rbac_policy_unit.py`, so the declared roles
+and the enforced policy cannot drift.
+
+Three operations are **authentication-scoped** rather than workspace-role-scoped:
+
+| Operation | Why no workspace role applies |
+|---|---|
+| `createWorkspace` | The caller is not yet a member of any workspace. |
+| `listWorkspaces` | The response set is selected by membership, not by a runtime role. |
+| `acceptInvitation` | Authorization is identity-bound to the invited identity. |
+
+They declare `x-required-roles: [viewer]` — the baseline authenticated tier, so
+the least-privilege lower bound — plus an explicit
+`x-authorization-scope: authenticated` marker. Enforcement additionally requires
+the verified principal (and, for acceptance, the exact token digest and matching
+`invited_user_id`). The authoritative roles are the six values `owner`, `admin`,
+`triager`, `approver`, `contributor`, and `viewer`; `viewer` is read-only,
+`owner` has every action, and only an owner may grant or revoke the owner seat.
+
+Tenant isolation is enforced by resolving membership before any action: a missing
+workspace, a missing active membership, or a foreign resource all return `404`,
+while a visible workspace with an insufficient role returns `403` (TI-02/TI-03).
+Membership invariants that span rows (at least one active owner) are serialized
+with a workspace row lock (`SELECT ... FOR UPDATE`). Invitations store only a
+SHA-256 digest of the one-time token and are bound to one identity and workspace.
 
 Authorization defaults to deny. A workspace role is evaluated only after
 workspace membership is established; it does not grant access to another

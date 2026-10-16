@@ -23,6 +23,10 @@ tags:
   - name: Approvals
   - name: WorkItems
   - name: Boards
+  - name: Workspaces
+  - name: Projects
+  - name: Members
+  - name: Invitations
 paths:
   /v1/workspaces/{workspace_id}/consultations:
     post:
@@ -727,6 +731,728 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces:
+    post:
+      operationId: createWorkspace
+      tags: [Workspaces]
+      summary: Create a workspace and become its owner
+      description: >-
+        Any authenticated principal may create a workspace; the creator is
+        recorded as the founding owner. No existing workspace role is required,
+        so the baseline viewer token denotes the authenticated tier. A concurrent
+        duplicate slug returns 409.
+      security:
+        - bearerAuth: []
+      x-required-roles: [viewer]
+      x-authorization-scope: authenticated
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateWorkspaceRequest'
+      responses:
+        '201':
+          description: Workspace created with a founding owner membership.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created workspace resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Workspace'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listWorkspaces
+      tags: [Workspaces]
+      summary: List the workspaces the caller is an active member of
+      description: >-
+        Returns only workspaces where the authenticated principal holds an active
+        membership. Membership state, not a request parameter, selects the tenant
+        set.
+      security:
+        - bearerAuth: []
+      x-required-roles: [viewer]
+      x-authorization-scope: authenticated
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The caller's visible workspaces.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/work_management.yaml#/$defs/Workspace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}:
+    get:
+      operationId: getWorkspace
+      tags: [Workspaces]
+      summary: Retrieve one workspace the caller can access
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested workspace.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Workspace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    patch:
+      operationId: updateWorkspace
+      tags: [Workspaces]
+      summary: Update workspace metadata
+      description: >-
+        Requires the workspace:update permission (admin or owner). An optional
+        If-Match strong validator must match the current workspace ETag.
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateWorkspaceRequest'
+      responses:
+        '200':
+          description: Workspace updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Workspace'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects:
+    post:
+      operationId: createProject
+      tags: [Projects]
+      summary: Create a project inside a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created project resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listProjects
+      tags: [Projects]
+      summary: List projects in a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Projects in the workspace.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/work_management.yaml#/$defs/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}:
+    get:
+      operationId: getProject
+      tags: [Projects]
+      summary: Retrieve one project within a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested project.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    patch:
+      operationId: updateProject
+      tags: [Projects]
+      summary: Update project metadata
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/members:
+    get:
+      operationId: listWorkspaceMembers
+      tags: [Members]
+      summary: List workspace memberships
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Memberships in the workspace.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/work_management.yaml#/$defs/WorkspaceMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/members/{membership_id}:
+    patch:
+      operationId: changeMemberRole
+      tags: [Members]
+      summary: Change a member's workspace role
+      description: >-
+        An admin may assign any role except owner and may not modify an owner
+        membership; only an owner may create another owner. Demoting the last
+        owner returns 409.
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/ChangeMemberRoleRequest'
+      responses:
+        '200':
+          description: Membership role updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/WorkspaceMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    delete:
+      operationId: revokeMember
+      tags: [Members]
+      summary: Revoke a workspace membership
+      description: >-
+        Revokes an active membership. Revoking the last owner returns 409 and
+        membership state is retained for the audit trail.
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Membership revoked.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/members/{membership_id}/transfer-ownership:
+    post:
+      operationId: transferOwnership
+      tags: [Members]
+      summary: Transfer workspace ownership to another member
+      description: >-
+        Only an owner may transfer ownership. The target becomes owner and the
+        acting owner is stepped down to admin, so the workspace always retains at
+        least one owner.
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Ownership transferred.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [new_owner, previous_owner]
+                properties:
+                  new_owner:
+                    $ref: '../schemas/work_management.yaml#/$defs/WorkspaceMember'
+                  previous_owner:
+                    $ref: '../schemas/work_management.yaml#/$defs/WorkspaceMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/invitations:
+    post:
+      operationId: createInvitation
+      tags: [Invitations]
+      summary: Invite an identity to join a workspace
+      description: >-
+        An admin or owner invites one verified identity with an assignable role.
+        A duplicate active member or pending invitation returns 409. The one-time
+        token is returned only in this response.
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateInvitationRequest'
+      responses:
+        '201':
+          description: Invitation created; the token is disclosed once.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created invitation resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/CreatedInvitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listInvitations
+      tags: [Invitations]
+      summary: List workspace invitations
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Invitations in the workspace.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/work_management.yaml#/$defs/WorkspaceInvitation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/invitations/{invitation_id}/revoke:
+    post:
+      operationId: revokeInvitation
+      tags: [Invitations]
+      summary: Revoke a pending invitation
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/InvitationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Invitation revoked.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/WorkspaceInvitation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/invitations/{invitation_id}/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [Invitations]
+      summary: Accept an invitation to join a workspace
+      description: >-
+        Identity-bound authorization: the authenticated principal must be the
+        invited identity and present the exact one-time token. No existing
+        workspace role is required, so the baseline viewer token denotes the
+        authenticated tier. A wrong identity, workspace, or token, and a token
+        that is already consumed or withdrawn, return 404; a still-pending but
+        expired invitation returns 409.
+      security:
+        - bearerAuth: []
+      x-required-roles: [viewer]
+      x-authorization-scope: authenticated
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/InvitationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/AcceptInvitationRequest'
+      responses:
+        '201':
+          description: Invitation accepted and membership created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/WorkspaceMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -807,6 +1533,24 @@ components:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
     ConsultationId:
       name: consultation_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    MembershipId:
+      name: membership_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    InvitationId:
+      name: invitation_id
       in: path
       required: true
       schema:

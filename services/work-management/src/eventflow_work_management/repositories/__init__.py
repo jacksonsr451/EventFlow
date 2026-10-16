@@ -24,6 +24,12 @@ from eventflow_work_management.repositories.errors import (
 from eventflow_work_management.repositories.idempotency_repository import (
     IdempotencyRepository,
 )
+from eventflow_work_management.repositories.invitation_repository import (
+    InvitationRepository,
+)
+from eventflow_work_management.repositories.membership_repository import (
+    MembershipRepository,
+)
 from eventflow_work_management.repositories.proposal_repository import ProposalRepository
 from eventflow_work_management.repositories.remote_reference_repository import (
     RemoteReferenceRepository,
@@ -45,6 +51,8 @@ __all__ = [
     "EntityNotFound",
     "IdempotencyConflict",
     "IdempotencyRepository",
+    "InvitationRepository",
+    "MembershipRepository",
     "ProjectRepository",
     "ProposalRepository",
     "RemoteReferenceRepository",

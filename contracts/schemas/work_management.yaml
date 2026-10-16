@@ -845,6 +845,199 @@ $defs:
       page_info:
         $ref: '#/$defs/PageInfo'
 
+  MembershipState:
+    type: string
+    description: >-
+      Lifecycle of a workspace membership binding. A revoked row is retained for
+      the audit trail and does not block re-invitation.
+    enum: [active, revoked]
+
+  InvitationState:
+    type: string
+    description: Lifecycle of an identity-bound workspace invitation.
+    enum: [pending, accepted, revoked, expired]
+
+  WorkspaceMember:
+    type: object
+    description: >-
+      The tenant-scoped authorization binding for one verified identity. Issued by
+      Issue #9 membership administration.
+    required: [membership_id, workspace_id, user_id, role, state, created_at, updated_at]
+    additionalProperties: false
+    properties:
+      membership_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      user_id:
+        $ref: '#/$defs/UUID'
+      role:
+        $ref: '#/$defs/Role'
+      state:
+        $ref: '#/$defs/MembershipState'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  WorkspaceInvitation:
+    type: object
+    description: >-
+      A pending, identity-bound offer to join a workspace. The bearer token is
+      never persisted; only its digest is stored.
+    required: [invitation_id, workspace_id, invited_user_id, role, state, expires_at, created_at]
+    additionalProperties: false
+    properties:
+      invitation_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      invited_user_id:
+        $ref: '#/$defs/UUID'
+      invited_email:
+        anyOf:
+          - type: string
+            minLength: 3
+            maxLength: 320
+          - type: 'null'
+      role:
+        $ref: '#/$defs/Role'
+      state:
+        $ref: '#/$defs/InvitationState'
+      expires_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      accepted_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      revoked_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+
+  CreatedInvitation:
+    type: object
+    description: >-
+      Response for a created invitation: the persisted invitation plus the
+      one-time bearer token the administrator must deliver out of band. The token
+      is not retrievable again.
+    required: [invitation, token]
+    additionalProperties: false
+    properties:
+      invitation:
+        $ref: '#/$defs/WorkspaceInvitation'
+      token:
+        type: string
+        minLength: 16
+        maxLength: 512
+        description: One-time invitation token; stored only as a SHA-256 digest.
+
+  CreateWorkspaceRequest:
+    type: object
+    description: Request DTO for POST /v1/workspaces.
+    additionalProperties: false
+    required: [name, slug]
+    properties:
+      name:
+        type: string
+        minLength: 3
+        maxLength: 120
+      slug:
+        type: string
+        pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+        maxLength: 80
+
+  UpdateWorkspaceRequest:
+    type: object
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}.
+    additionalProperties: false
+    required: [name]
+    properties:
+      name:
+        type: string
+        minLength: 3
+        maxLength: 120
+
+  CreateProjectRequest:
+    type: object
+    description: Request DTO for POST /v1/workspaces/{workspace_id}/projects.
+    additionalProperties: false
+    required: [key, name]
+    properties:
+      key:
+        type: string
+        pattern: ^[A-Z][A-Z0-9]{1,9}$
+      name:
+        type: string
+        minLength: 3
+        maxLength: 120
+      description:
+        anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+
+  UpdateProjectRequest:
+    type: object
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/projects/{project_id}.
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      name:
+        type: string
+        minLength: 3
+        maxLength: 120
+      description:
+        anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+
+  ChangeMemberRoleRequest:
+    type: object
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/members/{membership_id}.
+    additionalProperties: false
+    required: [role]
+    properties:
+      role:
+        $ref: '#/$defs/Role'
+
+  CreateInvitationRequest:
+    type: object
+    description: Request DTO for POST /v1/workspaces/{workspace_id}/invitations.
+    additionalProperties: false
+    required: [invited_user_id, role]
+    properties:
+      invited_user_id:
+        $ref: '#/$defs/UUID'
+      role:
+        $ref: '#/$defs/Role'
+      invited_email:
+        anyOf:
+          - type: string
+            minLength: 3
+            maxLength: 320
+          - type: 'null'
+      expires_in_seconds:
+        type: integer
+        minimum: 300
+        maximum: 2592000
+        default: 1209600
+        description: Invitation lifetime; defaults to fourteen days.
+
+  AcceptInvitationRequest:
+    type: object
+    description: Request DTO for POST /v1/workspaces/{workspace_id}/invitations/{invitation_id}/accept.
+    additionalProperties: false
+    required: [token]
+    properties:
+      token:
+        type: string
+        minLength: 16
+        maxLength: 512
+
   ErrorResponse:
     type: object
     description: >-

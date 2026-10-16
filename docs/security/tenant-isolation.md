@@ -8,7 +8,10 @@ between the different identities involved in a request. It is subordinate to
 [ADR-007](../adr/ADR-007-multi-client-monorepo-layout-and-contracts.md), and it
 constrains [Issue #47](https://github.com/jacksonsr451/EventFlow/issues/47).
 
-Status: Specified (Phase 0). No enforcement code exists yet.
+Status: Partially implemented. Issue #9 enforces the workspace membership and RBAC
+invariants (TI-02, TI-03, TI-06, TI-07 and the synchronous parts of TI-01/TI-04)
+in `services/work-management`. The asynchronous invariants (TI-08, TI-09, TI-10)
+remain specified and are owned by their respective issues.
 
 ## Identity Separation
 
@@ -116,8 +119,8 @@ today.
 | TI-03 | Cross-tenant read returns `404`, never `403` | Issue #47 tests | Issue #47 |
 | TI-04 | Every query, projection, and export includes the tenant predicate | Issue #47 / #31 tests | Issue #12 |
 | TI-05 | Cache keys that hold tenant data include the workspace id | Issue #12 tests | Issue #12 |
-| TI-06 | Only an owner/admin can change roles; roles do not cross workspaces | Issue #9 tests | Issue #9 |
-| TI-07 | Absence of a grant denies access | Issue #9 tests | Issue #9 |
+| TI-06 | Only an owner/admin can change roles; roles do not cross workspaces | `services/work-management/tests/test_workspace_management_integration.py` | Issue #9 |
+| TI-07 | Absence of a grant denies access | `services/work-management/tests/test_rbac_policy_unit.py`, `test_workspace_management_integration.py` | Issue #9 |
 | TI-08 | A cross-tenant attempt emits `tenant.cross_access_attempt` | Issue #47 tests | Issue #47 |
 | TI-09 | A job without tenant context fails closed; a payload tenant is ignored | Issue #46 tests | Issue #46 |
 | TI-10 | A service principal cannot act on a workspace outside its binding | Issue #27 / #47 tests | Issue #27 |

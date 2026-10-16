@@ -18,6 +18,10 @@ from eventflow_work_management.models.board import Board, BoardCard
 from eventflow_work_management.models.consultation import Consultation
 from eventflow_work_management.models.idempotency import IdempotencyRecord
 from eventflow_work_management.models.integration import RemoteIntegrationReference
+from eventflow_work_management.models.membership import (
+    WorkspaceInvitation,
+    WorkspaceMembership,
+)
 from eventflow_work_management.models.proposal import Proposal
 from eventflow_work_management.models.work_item import WorkItem
 from eventflow_work_management.models.workspace import Project, Workspace
@@ -38,4 +42,6 @@ __all__ = [
     "RemoteIntegrationReference",
     "WorkItem",
     "Workspace",
+    "WorkspaceInvitation",
+    "WorkspaceMembership",
 ]
