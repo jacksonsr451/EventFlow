@@ -26,7 +26,7 @@ $defs:
 
   ConsultationStatus:
     type: string
-    enum: [open, triaging, proposed, duplicate, rejected, closed, reopened]
+    enum: [draft, open, triaging, proposed, duplicate, rejected, closed, reopened]
 
   ProposalStatus:
     type: string
@@ -587,6 +587,36 @@ $defs:
           triage operation may confirm or override it.
       editor_context:
         $ref: '#/$defs/EditorContext'
+      external_references:
+        type: array
+        items:
+          type: string
+
+  UpdateConsultationDraftRequest:
+    type: object
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}.
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      project_id:
+        $ref: '#/$defs/UUID'
+      origin:
+        $ref: '#/$defs/Origin'
+      title:
+        type: string
+        minLength: 3
+        maxLength: 200
+      description:
+        type: string
+        minLength: 5
+      category:
+        anyOf:
+          - $ref: '#/$defs/TriageCategory'
+          - type: 'null'
+      editor_context:
+        anyOf:
+          - $ref: '#/$defs/EditorContext'
+          - type: 'null'
       external_references:
         type: array
         items:

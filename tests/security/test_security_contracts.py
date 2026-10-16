@@ -309,7 +309,10 @@ def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
                 operations.append(f"{method.upper()} {path}")
     assert operations == [
         "POST /v1/workspaces/{workspace_id}/consultations",
+        "POST /v1/workspaces/{workspace_id}/consultations/drafts",
         "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
+        "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit",
+        "PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}",
         "POST /v1/workspaces/{workspace_id}/proposals",
         "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit",
         "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",

@@ -40,6 +40,8 @@ class Action(str, Enum):
 
     CONSULTATION_READ = "consultation:read"
     CONSULTATION_CREATE = "consultation:create"
+    CONSULTATION_UPDATE = "consultation:update"
+    CONSULTATION_SUBMIT = "consultation:submit"
     CONSULTATION_TRIAGE = "consultation:triage"
 
     PROPOSAL_READ = "proposal:read"
@@ -77,6 +79,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.MEMBERSHIP_REVOKE,
             Action.MEMBERSHIP_TRANSFER_OWNERSHIP,
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.CONSULTATION_TRIAGE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
@@ -94,6 +98,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.MEMBERSHIP_UPDATE_ROLE,
             Action.MEMBERSHIP_REVOKE,
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.CONSULTATION_TRIAGE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
@@ -105,6 +111,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
     "triager": frozenset(
         {
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.CONSULTATION_TRIAGE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
@@ -114,6 +122,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
     "approver": frozenset(
         {
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.APPROVAL_DECIDE,
@@ -122,6 +132,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
     "contributor": frozenset(
         {
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.WORK_ITEM_UPDATE,

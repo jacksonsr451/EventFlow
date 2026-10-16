@@ -10,6 +10,7 @@ ORIGIN_VALUES = ("web", "vscode", "desktop", "external")
 TRIAGE_CATEGORY_VALUES = ("bug", "feature", "chore", "docs", "security")
 PRIORITY_VALUES = ("critical", "high", "medium", "low")
 CONSULTATION_STATUS_VALUES = (
+    "draft",
     "open",
     "triaging",
     "proposed",

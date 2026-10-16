@@ -64,8 +64,9 @@ section 3.1) and for contract tests.
 
 | DTO | Used by |
 |---|---|
-| `CreateConsultationRequest` | `POST /v1/workspaces/{workspace_id}/consultations` |
-| `Consultation` | detail GET and create/list/triage responses |
+| `CreateConsultationRequest` | `POST /v1/workspaces/{workspace_id}/consultations` and `POST .../consultations/drafts` |
+| `Consultation` | detail GET and create/create-draft/update-draft/submit-draft/list/triage responses |
+| `UpdateConsultationDraftRequest` | `PATCH .../consultations/{consultation_id}` |
 | `TriageConsultationRequest` | `POST .../consultations/{consultation_id}/triage` |
 | `CreateProposalRequest` | `POST /v1/workspaces/{workspace_id}/proposals` |
 | `Proposal` | detail GET and create/submit responses |
@@ -164,6 +165,9 @@ Amendment A-02, every unsafe operation a client may retry accepts an
 | Operation | Header | Required |
 |---|---|---|
 | `POST .../consultations` | `Idempotency-Key` | No (required for offline clients) |
+| `POST .../consultations/drafts` | `Idempotency-Key` | No (required for offline clients) |
+| `PATCH .../consultations/{consultation_id}` | `Idempotency-Key` | No |
+| `POST .../consultations/{consultation_id}/submit` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/triage` | `Idempotency-Key` | No |
 | `POST .../proposals` | `Idempotency-Key` | No |
 | `POST .../proposals/{proposal_id}/submit` | `Idempotency-Key` | No |

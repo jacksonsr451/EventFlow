@@ -20,7 +20,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from eventflow_work_management.authorization.policy import Action
+from eventflow_work_management.authorization.policy import ADMINISTRATOR_ROLES
 from eventflow_work_management.authorization.service import AuthorizationContext
 from eventflow_work_management.hashing import fingerprint
 from eventflow_work_management.models import Consultation
@@ -45,8 +45,13 @@ from eventflow_work_management.security.errors import ProblemError
 
 CREATE_OPERATION = "consultation.create"
 TRIAGE_OPERATION = "consultation.triage"
+DRAFT_CREATE_OPERATION = "consultation.draft.create"
+DRAFT_UPDATE_OPERATION = "consultation.draft.update"
+DRAFT_SUBMIT_OPERATION = "consultation.draft.submit"
 
 DEFAULT_PRIORITY = "medium"
+
+DRAFT_STATUS = "draft"
 
 TRIAGE_START_STATUSES = frozenset({"open", "reopened"})
 
@@ -185,6 +190,71 @@ class ConsultationService:
         idempotency_key: str | None = None,
         correlation_id: UUID | None = None,
     ) -> IntakeResult:
+        """Direct multi-source intake: the consultation enters OPEN immediately."""
+        return self._create(
+            context,
+            status="open",
+            operation=CREATE_OPERATION,
+            audit_action="consultation.created",
+            project_id=project_id,
+            origin=origin,
+            title=title,
+            description=description,
+            category=category,
+            editor_context=editor_context,
+            external_references=external_references,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+        )
+
+    def create_draft(
+        self,
+        context: AuthorizationContext,
+        *,
+        project_id: UUID,
+        origin: str,
+        title: str,
+        description: str,
+        category: str | None = None,
+        editor_context: dict | None = None,
+        external_references: list | None = None,
+        idempotency_key: str | None = None,
+        correlation_id: UUID | None = None,
+    ) -> IntakeResult:
+        """Create a consultation in DRAFT state; it is not yet eligible for triage."""
+        return self._create(
+            context,
+            status=DRAFT_STATUS,
+            operation=DRAFT_CREATE_OPERATION,
+            audit_action="consultation.draft_created",
+            project_id=project_id,
+            origin=origin,
+            title=title,
+            description=description,
+            category=category,
+            editor_context=editor_context,
+            external_references=external_references,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+        )
+
+    def _create(
+        self,
+        context: AuthorizationContext,
+        *,
+        status: str,
+        operation: str,
+        audit_action: str,
+        project_id: UUID,
+        origin: str,
+        title: str,
+        description: str,
+        category: str | None,
+        editor_context: dict | None,
+        external_references: list | None,
+        idempotency_key: str | None,
+        correlation_id: UUID | None,
+    ) -> IntakeResult:
         self._validate_origin(origin)
         self._validate_category(category)
         self._validate_editor_context(editor_context)
@@ -203,7 +273,7 @@ class ConsultationService:
         )
         if idempotency_key is not None:
             replay = self._replay(
-                context.workspace_id, CREATE_OPERATION, idempotency_key, request_fingerprint
+                context.workspace_id, operation, idempotency_key, request_fingerprint
             )
             if replay is not None:
                 return replay
@@ -212,7 +282,7 @@ class ConsultationService:
             record = (
                 self.idempotency.reserve(
                     workspace_id=context.workspace_id,
-                    operation=CREATE_OPERATION,
+                    operation=operation,
                     idempotency_key=idempotency_key,
                     request_fingerprint=request_fingerprint,
                 )
@@ -230,10 +300,11 @@ class ConsultationService:
                 category=category,
                 editor_context=editor_context,
                 external_references=external_references,
+                status=status,
             )
             self.audit.append(
                 workspace_id=context.workspace_id,
-                action="consultation.created",
+                action=audit_action,
                 entity_type="consultation",
                 entity_id=consultation.id,
                 actor_id=context.actor_id,
@@ -258,12 +329,201 @@ class ConsultationService:
             if idempotency_key is not None:
                 replay = self._replay(
                     context.workspace_id,
-                    CREATE_OPERATION,
+                    operation,
                     idempotency_key,
                     request_fingerprint,
                 )
                 if replay is not None:
                     return replay
+            raise
+        return IntakeResult(consultation=consultation, replayed=False)
+
+    def update_draft(
+        self,
+        context: AuthorizationContext,
+        consultation_id: UUID,
+        *,
+        changes: dict[str, object],
+        if_match: str | None = None,
+        idempotency_key: str | None = None,
+        correlation_id: UUID | None = None,
+    ) -> IntakeResult:
+        """Apply a partial update to a draft owned by the caller (or an admin)."""
+        if not changes:
+            raise _validation("At least one field must be provided.")
+        if "origin" in changes:
+            self._validate_origin(changes["origin"])
+        if "category" in changes:
+            self._validate_category(changes["category"])
+        if "editor_context" in changes:
+            self._validate_editor_context(changes["editor_context"])
+        if "project_id" in changes:
+            self._require_project(context.workspace_id, changes["project_id"])
+
+        request_fingerprint = fingerprint(
+            {
+                "consultation_id": str(consultation_id),
+                "version": if_match,
+                "changes": {
+                    key: str(value) if isinstance(value, UUID) else value
+                    for key, value in sorted(changes.items())
+                },
+            }
+        )
+        if idempotency_key is not None:
+            replay = self._replay(
+                context.workspace_id,
+                DRAFT_UPDATE_OPERATION,
+                idempotency_key,
+                request_fingerprint,
+            )
+            if replay is not None:
+                return replay
+
+        try:
+            consultation = self.consultations.get_for_update(
+                workspace_id=context.workspace_id, consultation_id=consultation_id
+            )
+            if consultation is None:
+                raise _not_found()
+            self._require_draft_owner(context, consultation)
+            if if_match is not None and if_match != consultation_etag(consultation):
+                raise _precondition_failed()
+            if consultation.status != DRAFT_STATUS:
+                raise _conflict(
+                    "Only a draft consultation can be edited.",
+                    code="INVALID_STATE",
+                )
+            record = (
+                self.idempotency.reserve(
+                    workspace_id=context.workspace_id,
+                    operation=DRAFT_UPDATE_OPERATION,
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=request_fingerprint,
+                )
+                if idempotency_key is not None
+                else None
+            )
+            self.consultations.update_draft(
+                consultation, changes=changes, updated_at=_now()
+            )
+            self.audit.append(
+                workspace_id=context.workspace_id,
+                action="consultation.draft_updated",
+                entity_type="consultation",
+                entity_id=consultation.id,
+                actor_id=context.actor_id,
+                snapshot={
+                    "consultation_id": str(consultation.id),
+                    "fields": sorted(changes),
+                },
+                correlation_id=correlation_id,
+            )
+            if record is not None:
+                self.idempotency.complete(
+                    record,
+                    response_status=200,
+                    response_body={"consultation_id": str(consultation.id)},
+                )
+            self._session.commit()
+        except IntegrityError:
+            self._session.rollback()
+            if idempotency_key is not None:
+                replay = self._replay(
+                    context.workspace_id,
+                    DRAFT_UPDATE_OPERATION,
+                    idempotency_key,
+                    request_fingerprint,
+                )
+                if replay is not None:
+                    return replay
+            raise
+        except ProblemError:
+            self._session.rollback()
+            raise
+        return IntakeResult(consultation=consultation, replayed=False)
+
+    def submit_draft(
+        self,
+        context: AuthorizationContext,
+        consultation_id: UUID,
+        *,
+        if_match: str | None = None,
+        idempotency_key: str | None = None,
+        correlation_id: UUID | None = None,
+    ) -> IntakeResult:
+        """Transition a draft owned by the caller (or an admin) to OPEN."""
+        request_fingerprint = fingerprint(
+            {"consultation_id": str(consultation_id), "version": if_match}
+        )
+        if idempotency_key is not None:
+            replay = self._replay(
+                context.workspace_id,
+                DRAFT_SUBMIT_OPERATION,
+                idempotency_key,
+                request_fingerprint,
+            )
+            if replay is not None:
+                return replay
+
+        try:
+            consultation = self.consultations.get_for_update(
+                workspace_id=context.workspace_id, consultation_id=consultation_id
+            )
+            if consultation is None:
+                raise _not_found()
+            self._require_draft_owner(context, consultation)
+            if if_match is not None and if_match != consultation_etag(consultation):
+                raise _precondition_failed()
+            if consultation.status != DRAFT_STATUS:
+                raise _conflict(
+                    "Only a draft consultation can be submitted.",
+                    code="INVALID_STATE",
+                )
+            record = (
+                self.idempotency.reserve(
+                    workspace_id=context.workspace_id,
+                    operation=DRAFT_SUBMIT_OPERATION,
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=request_fingerprint,
+                )
+                if idempotency_key is not None
+                else None
+            )
+            self.consultations.submit_draft(consultation, submitted_at=_now())
+            self.audit.append(
+                workspace_id=context.workspace_id,
+                action="consultation.submitted",
+                entity_type="consultation",
+                entity_id=consultation.id,
+                actor_id=context.actor_id,
+                snapshot={
+                    "consultation_id": str(consultation.id),
+                    "status": consultation.status,
+                },
+                correlation_id=correlation_id,
+            )
+            if record is not None:
+                self.idempotency.complete(
+                    record,
+                    response_status=200,
+                    response_body={"consultation_id": str(consultation.id)},
+                )
+            self._session.commit()
+        except IntegrityError:
+            self._session.rollback()
+            if idempotency_key is not None:
+                replay = self._replay(
+                    context.workspace_id,
+                    DRAFT_SUBMIT_OPERATION,
+                    idempotency_key,
+                    request_fingerprint,
+                )
+                if replay is not None:
+                    return replay
+            raise
+        except ProblemError:
+            self._session.rollback()
             raise
         return IntakeResult(consultation=consultation, replayed=False)
 
@@ -426,6 +686,22 @@ class ConsultationService:
         return IntakeResult(consultation=consultation, replayed=False)
 
     # -- internals --------------------------------------------------------
+
+    @staticmethod
+    def _require_draft_owner(
+        context: AuthorizationContext, consultation: Consultation
+    ) -> None:
+        """Only the draft author or a workspace administrator may mutate a draft."""
+        if consultation.author_id == context.actor_id:
+            return
+        if context.role in ADMINISTRATOR_ROLES:
+            return
+        raise ProblemError(
+            status_code=403,
+            code="FORBIDDEN",
+            detail="Only the draft author or a workspace administrator may do this.",
+            title="Forbidden",
+        )
 
     def _replay(
         self,

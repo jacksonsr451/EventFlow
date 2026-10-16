@@ -59,7 +59,10 @@ ERROR_SCHEMA_REF = "../schemas/work_management.yaml#/$defs/ErrorResponse"
 
 EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "POST /v1/workspaces/{workspace_id}/consultations",
+    "POST /v1/workspaces/{workspace_id}/consultations/drafts",
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
+    "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit",
+    "PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}",
     "POST /v1/workspaces/{workspace_id}/proposals",
     "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit",
     "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",

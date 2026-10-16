@@ -18,6 +18,18 @@ SORT_COLUMNS = {
     "status": Consultation.status,
 }
 
+_DRAFT_UPDATABLE_FIELDS = frozenset(
+    {
+        "project_id",
+        "origin",
+        "title",
+        "description",
+        "category",
+        "editor_context",
+        "external_references",
+    }
+)
+
 
 class ConsultationRepository(Repository):
     def __init__(self, session: Session) -> None:
@@ -69,6 +81,7 @@ class ConsultationRepository(Repository):
         category: str | None = None,
         editor_context: dict | None = None,
         external_references: list | None = None,
+        status: str = "open",
     ) -> Consultation:
         """Add a consultation and flush without committing.
 
@@ -85,11 +98,36 @@ class ConsultationRepository(Repository):
             description=description,
             category=category,
             priority=priority,
-            status="open",
+            status=status,
             editor_context=editor_context,
             external_references=external_references or [],
         )
         self._session.add(consultation)
+        self._session.flush()
+        return consultation
+
+    def update_draft(
+        self,
+        consultation: Consultation,
+        *,
+        changes: dict[str, object],
+        updated_at: datetime,
+    ) -> Consultation:
+        """Apply a whitelisted partial update to a draft and flush."""
+        for field, value in changes.items():
+            if field not in _DRAFT_UPDATABLE_FIELDS:
+                raise ValueError(f"unexpected draft field: {field}")
+            setattr(consultation, field, value)
+        consultation.updated_at = updated_at
+        self._session.flush()
+        return consultation
+
+    def submit_draft(
+        self, consultation: Consultation, *, submitted_at: datetime
+    ) -> Consultation:
+        """Transition a draft to OPEN and flush."""
+        consultation.status = "open"
+        consultation.updated_at = submitted_at
         self._session.flush()
         return consultation
 

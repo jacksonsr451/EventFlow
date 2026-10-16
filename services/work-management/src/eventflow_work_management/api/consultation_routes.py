@@ -50,6 +50,16 @@ class CreateConsultationRequest(BaseModel):
     external_references: list[str] | None = None
 
 
+class UpdateConsultationDraftRequest(BaseModel):
+    project_id: UUID | None = None
+    origin: str | None = Field(default=None, pattern=ORIGIN_PATTERN)
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    description: str | None = Field(default=None, min_length=5)
+    category: str | None = Field(default=None, pattern=CATEGORY_PATTERN)
+    editor_context: dict | None = None
+    external_references: list[str] | None = None
+
+
 class TriageConsultationRequest(BaseModel):
     category: str = Field(pattern=CATEGORY_PATTERN)
     priority: str = Field(pattern=PRIORITY_PATTERN)
@@ -135,6 +145,36 @@ def create_consultation(
     return _consultation_payload(result.consultation)
 
 
+@router.post("/v1/workspaces/{workspace_id}/consultations/drafts", status_code=201)
+def create_consultation_draft(
+    workspace_id: UUID,
+    payload: CreateConsultationRequest,
+    request: Request,
+    response: Response,
+    principal: AuthenticatedPrincipal = Depends(require_csrf),
+    session: Session = Depends(database_session),
+    request_correlation_id: UUID | None = Depends(correlation_id),
+):
+    context = _authorize(session, principal, workspace_id, Action.CONSULTATION_CREATE)
+    result = ConsultationService(session).create_draft(
+        context,
+        project_id=payload.project_id,
+        origin=payload.origin,
+        title=payload.title,
+        description=payload.description,
+        category=payload.category,
+        editor_context=payload.editor_context,
+        external_references=payload.external_references,
+        idempotency_key=_idempotency_key(request),
+        correlation_id=request_correlation_id,
+    )
+    response.headers["ETag"] = consultation_etag(result.consultation)
+    response.headers["Location"] = (
+        f"/v1/workspaces/{workspace_id}/consultations/{result.consultation.id}"
+    )
+    return _consultation_payload(result.consultation)
+
+
 @router.get("/v1/workspaces/{workspace_id}/consultations")
 def list_consultations(
     workspace_id: UUID,
@@ -187,6 +227,52 @@ def get_consultation(
     consultation = ConsultationService(session).get(context, consultation_id)
     response.headers["ETag"] = consultation_etag(consultation)
     return _consultation_payload(consultation)
+
+
+@router.patch("/v1/workspaces/{workspace_id}/consultations/{consultation_id}")
+def update_consultation_draft(
+    workspace_id: UUID,
+    consultation_id: UUID,
+    payload: UpdateConsultationDraftRequest,
+    request: Request,
+    response: Response,
+    principal: AuthenticatedPrincipal = Depends(require_csrf),
+    session: Session = Depends(database_session),
+    request_correlation_id: UUID | None = Depends(correlation_id),
+):
+    context = _authorize(session, principal, workspace_id, Action.CONSULTATION_UPDATE)
+    result = ConsultationService(session).update_draft(
+        context,
+        consultation_id,
+        changes=payload.model_dump(exclude_unset=True),
+        if_match=request.headers.get("if-match"),
+        idempotency_key=_idempotency_key(request),
+        correlation_id=request_correlation_id,
+    )
+    response.headers["ETag"] = consultation_etag(result.consultation)
+    return _consultation_payload(result.consultation)
+
+
+@router.post("/v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit")
+def submit_consultation_draft(
+    workspace_id: UUID,
+    consultation_id: UUID,
+    request: Request,
+    response: Response,
+    principal: AuthenticatedPrincipal = Depends(require_csrf),
+    session: Session = Depends(database_session),
+    request_correlation_id: UUID | None = Depends(correlation_id),
+):
+    context = _authorize(session, principal, workspace_id, Action.CONSULTATION_SUBMIT)
+    result = ConsultationService(session).submit_draft(
+        context,
+        consultation_id,
+        if_match=request.headers.get("if-match"),
+        idempotency_key=_idempotency_key(request),
+        correlation_id=request_correlation_id,
+    )
+    response.headers["ETag"] = consultation_etag(result.consultation)
+    return _consultation_payload(result.consultation)
 
 
 @router.post("/v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage")

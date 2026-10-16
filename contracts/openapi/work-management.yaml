@@ -143,6 +143,64 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/consultations/drafts:
+    post:
+      operationId: createConsultationDraft
+      tags: [Consultations]
+      summary: Create a draft consultation
+      description: >-
+        Records a consultation in DRAFT state. A draft is an unsubmitted intake
+        that cannot be triaged until it is submitted, which transitions it to
+        OPEN. Drafts let offline-capable clients persist intake before submission.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateConsultationRequest'
+      responses:
+        '201':
+          description: Draft consultation created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created consultation resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Consultation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
   /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage:
     post:
       operationId: triageConsultation
@@ -166,6 +224,57 @@ paths:
       responses:
         '200':
           description: Consultation triaged successfully.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Consultation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit:
+    post:
+      operationId: submitConsultationDraft
+      tags: [Consultations]
+      summary: Submit a draft consultation
+      description: >-
+        Transitions a DRAFT consultation to OPEN, making it eligible for triage.
+        Only the draft author or a workspace administrator may submit it. An
+        already-submitted consultation returns 409 Conflict.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Draft submitted and now in OPEN state.
           headers:
             ETag:
               $ref: '#/components/headers/ETag'
@@ -228,6 +337,62 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    patch:
+      operationId: updateConsultationDraft
+      tags: [Consultations]
+      summary: Edit a draft consultation
+      description: >-
+        Applies a partial update to a DRAFT consultation. Only the draft author
+        or a workspace administrator may edit it, and only while it remains in
+        DRAFT state; editing any other status returns 409 Conflict.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateConsultationDraftRequest'
+      responses:
+        '200':
+          description: Draft consultation updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Consultation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
         default:

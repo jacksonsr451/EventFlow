@@ -211,7 +211,9 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
+    [*] --> DRAFT: Create Draft (Web/VSCode/Desktop)
     [*] --> OPEN: Submit (Web/VSCode/Desktop)
+    DRAFT --> OPEN: Submit Draft
     OPEN --> TRIAGING: Start Triage
     TRIAGING --> PROPOSED: Proposal Drafted
     TRIAGING --> REJECTED: Invalid / Out of Scope
@@ -272,6 +274,9 @@ follows: *Any Authenticated / Author / Proposer / Assignee* → `contributor`;
 
 | Entity | From State | To State | Authorized Role | Pre-conditions | Invariants Enforced | Side Effects & Domain Events | Error Codes |
 |---|---|---|---|---|---|---|---|
+| **Consultation** | `None` | `DRAFT` | `Author` | Valid title and description; optional reporter category; consent granted if editor context present | Status initialized to `DRAFT`; not eligible for triage | `consultation.draft_created` event published | `400 Bad Request` |
+| **Consultation** | `DRAFT` | `DRAFT` | `Author`, `Admin` | Draft is in `DRAFT` state; `If-Match` valid when supplied | Editable fields only; status unchanged | `consultation.draft_updated` event published | `403 Forbidden`, `409 Conflict`, `412 Precondition Failed` |
+| **Consultation** | `DRAFT` | `OPEN` | `Author`, `Admin` | Draft is in `DRAFT` state; `If-Match` valid when supplied | Status becomes `OPEN`; eligible for triage | `consultation.submitted` event published | `403 Forbidden`, `409 Conflict`, `412 Precondition Failed` |
 | **Consultation** | `None` | `OPEN` | `Any Authenticated` | Valid title and description; consent granted if editor context present | Status initialized to `OPEN` | `consultation.created` event published | `400 Bad Request` |
 | **Consultation** | `OPEN` | `TRIAGING` | `Triager`, `Maintainer` | Consultation is in `OPEN` or `REOPENED` | Category and priority must be assigned | `consultation.triaged` event published | `409 Conflict` |
 | **Consultation** | `TRIAGING` | `PROPOSED` | `Author`, `Maintainer` | A valid Proposal references this `consultation_id` | `active_proposal_id` linked | Consultation status locked to `PROPOSED` | `400 Bad Request`, `409 Conflict` |
