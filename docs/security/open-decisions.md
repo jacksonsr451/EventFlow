@@ -5,25 +5,30 @@ implementation. Until each is resolved, the most restrictive behaviour applies.
 A decision that changes a system boundary, consistency guarantee, or
 infrastructure choice becomes an ADR; the rest are recorded in the owning issue.
 
-Status: Open. Each item names the issue that owns the decision and the criteria
-for closing it.
+Status: Open for the remaining items. OD-01 and OD-02 are resolved by
+[ADR-009](../adr/ADR-009-oidc-authentication-and-secure-sessions.md); each
+unresolved item below names its owner and closure criteria.
 
-## OD-01 — Identity provider
+## OD-01 — Identity provider (Resolved)
 
 - **Question:** Which identity provider and OAuth 2.0 / OIDC implementation is
   authoritative for EventFlow?
 - **Context:** [oauth-and-credentials.md](oauth-and-credentials.md) requires
   Authorization Code with PKCE regardless of provider.
 - **Owner:** [Issue #10](https://github.com/jacksonsr451/EventFlow/issues/10).
-- **Closure criteria:** provider selected, token format fixed, redirect allowlist
-  defined.
+- **Decision:** Keycloak with OIDC Authorization Code + PKCE S256; access-token
+  format is signed JWT; issuer and exact redirect allowlist are configuration.
+- **Resolution:** [ADR-009](../adr/ADR-009-oidc-authentication-and-secure-sessions.md).
 
-## OD-02 — Session and token lifetime
+## OD-02 — Session and token lifetime (Resolved)
 
 - **Question:** What are the access-token lifetime, refresh-token lifetime, and
   idle timeout?
 - **Owner:** [Issue #10](https://github.com/jacksonsr451/EventFlow/issues/10).
-- **Closure criteria:** values documented and consistent with `OA-06`/`OA-09`.
+- **Decision:** 5-minute access token, 30-minute BFF idle timeout, 12-hour
+  absolute EventFlow session; Keycloak refresh rotation enabled. Realm token and
+  session settings must match and remain deployment-configurable.
+- **Resolution:** [ADR-009](../adr/ADR-009-oidc-authentication-and-secure-sessions.md).
 
 ## OD-03 — Key management
 

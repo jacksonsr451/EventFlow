@@ -17,6 +17,7 @@ approved; it does not mean the choice has already been implemented.
 | [ADR-006](ADR-006-product-scope-and-bounded-contexts.md) | Product Scope, Bounded Contexts, and Monorepo Architecture | Accepted |
 | [ADR-007](ADR-007-multi-client-monorepo-layout-and-contracts.md) | Multi-Client Monorepo Layout and Shared Contracts | Accepted |
 | [ADR-008](ADR-008-work-management-persistence.md) | Work Management Persistence Stack and Database Schema | Accepted |
+| [ADR-009](ADR-009-oidc-authentication-and-secure-sessions.md) | OIDC Authentication and Secure Sessions | Accepted |
 
 Future candidates such as detailed Inventory concurrency, event versioning,
 OpenTelemetry instrumentation and detailed client adapters are not additional ADRs in

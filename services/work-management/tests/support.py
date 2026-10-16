@@ -17,11 +17,10 @@ from uuid import UUID
 import testrunner
 from alembic import command
 from alembic.config import Config
+from eventflow_work_management import config
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
-
-from eventflow_work_management import config
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_INI = SERVICE_ROOT / "alembic.ini"
@@ -46,8 +45,8 @@ def require_database_url() -> str:
 
 
 def _target_url(admin_url: str, database: str) -> str:
-    return make_url(admin_url).set(database=database).render_as_string(
-        hide_password=False
+    return (
+        make_url(admin_url).set(database=database).render_as_string(hide_password=False)
     )
 
 
@@ -92,7 +91,9 @@ def temporary_empty_database(admin_url: str) -> Iterator[tuple[str, Engine]]:
         config.assert_safe_test_database_name(name)
         try:
             with admin_engine.connect() as connection:
-                connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+                connection.execute(
+                    text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+                )
         finally:
             admin_engine.dispose()
 
@@ -114,7 +115,9 @@ def migrated_engine(admin_url: str) -> Iterator[Engine]:
 
 @contextmanager
 def session_scope(engine: Engine) -> Iterator[Session]:
-    factory = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False, future=True)
+    factory = sessionmaker(
+        bind=engine, expire_on_commit=False, autoflush=False, future=True
+    )
     session = factory()
     try:
         yield session
@@ -134,7 +137,9 @@ def fixed_uuid(value: int) -> UUID:
     return UUID(f"00000000-0000-4000-8000-{value:012d}")
 
 
-def create_workspace(session: Session, *, name: str = "Acme Inc", slug: str | None = None):
+def create_workspace(
+    session: Session, *, name: str = "Acme Inc", slug: str | None = None
+):
     from eventflow_work_management.models import Workspace
 
     workspace = Workspace(id=uuid.uuid4(), name=name, slug=slug or unique_slug())
@@ -143,7 +148,9 @@ def create_workspace(session: Session, *, name: str = "Acme Inc", slug: str | No
     return workspace
 
 
-def create_project(session: Session, workspace, *, key: str | None = None, name: str = "Payments"):
+def create_project(
+    session: Session, workspace, *, key: str | None = None, name: str = "Payments"
+):
     from eventflow_work_management.models import Project
 
     project = Project(
@@ -188,7 +195,9 @@ def create_consultation(
     return consultation
 
 
-def create_proposal(session: Session, workspace, project, consultation, *, version: int = 1):
+def create_proposal(
+    session: Session, workspace, project, consultation, *, version: int = 1
+):
     from eventflow_work_management.models import Proposal
 
     proposal = Proposal(

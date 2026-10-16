@@ -55,7 +55,9 @@ class ConsultationRepository(Repository):
         )
         return self._session.execute(statement).scalar_one_or_none()
 
-    def list_for_project(self, *, workspace_id: UUID, project_id: UUID) -> list[Consultation]:
+    def list_for_project(
+        self, *, workspace_id: UUID, project_id: UUID
+    ) -> list[Consultation]:
         statement = (
             select(Consultation)
             .where(

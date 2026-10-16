@@ -1,13 +1,11 @@
 # Local development infrastructure.
 #
-# Only the Work Management PostgreSQL instance is defined today (ADR-008).
-# Other services (Kafka, the Order Processing databases, etc.) are added by the
-# issues that own them. Credentials are never committed: provide them through a
-# local, git-ignored `.env` file (see `.env.example`).
+# Keycloak is an opt-in, loopback-only development profile. Its generated
+# credentials and test identity live under ignored .local-data. The realm
+# definition itself is imported from the version-controlled infra/keycloak file.
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: eventflow-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -21,6 +19,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.3
+    profiles: ["auth"]
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?set KEYCLOAK_ADMIN_USERNAME in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PORT:-8082}:8080"
+    volumes:
+      - ${KEYCLOAK_REALM_IMPORT_FILE:-./infra/keycloak/realm-eventflow-test.json}:/opt/keycloak/data/import/eventflow-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
 volumes:
   postgres-data:

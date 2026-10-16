@@ -109,7 +109,9 @@ class ApprovalRepository(Repository):
             idempotency_key=idempotency_key,
         )
         if stored is not None:
-            return self._replay(stored, request_fingerprint, workspace_id, proposal_id, proposal_version)
+            return self._replay(
+                stored, request_fingerprint, workspace_id, proposal_id, proposal_version
+            )
 
         proposal = self._session.get(Proposal, proposal_id)
         if proposal is None or proposal.workspace_id != workspace_id:
@@ -119,9 +121,16 @@ class ApprovalRepository(Repository):
                 f"proposal version {proposal.version} does not match {proposal_version}"
             )
 
-        if self._existing_approval(workspace_id, proposal_id, proposal_version) is not None:
+        if (
+            self._existing_approval(workspace_id, proposal_id, proposal_version)
+            is not None
+        ):
             replay = self._replay_if_available(
-                workspace_id, proposal_id, proposal_version, idempotency_key, request_fingerprint
+                workspace_id,
+                proposal_id,
+                proposal_version,
+                idempotency_key,
+                request_fingerprint,
             )
             if replay is not None:
                 return replay
@@ -137,7 +146,11 @@ class ApprovalRepository(Repository):
         except IntegrityError as exc:
             self._session.rollback()
             replay = self._replay_if_available(
-                workspace_id, proposal_id, proposal_version, idempotency_key, request_fingerprint
+                workspace_id,
+                proposal_id,
+                proposal_version,
+                idempotency_key,
+                request_fingerprint,
             )
             if replay is not None:
                 return replay
@@ -162,11 +175,17 @@ class ApprovalRepository(Repository):
         except IntegrityError as exc:
             self._session.rollback()
             replay = self._replay_if_available(
-                workspace_id, proposal_id, proposal_version, idempotency_key, request_fingerprint
+                workspace_id,
+                proposal_id,
+                proposal_version,
+                idempotency_key,
+                request_fingerprint,
             )
             if replay is not None:
                 return replay
-            raise AlreadyDecided("a decision already exists for this proposal version") from exc
+            raise AlreadyDecided(
+                "a decision already exists for this proposal version"
+            ) from exc
 
         proposal.status = _DECISION_TO_PROPOSAL_STATUS[decision]
         self._audit.append(
@@ -191,11 +210,17 @@ class ApprovalRepository(Repository):
         except IntegrityError as exc:
             self._session.rollback()
             replay = self._replay_if_available(
-                workspace_id, proposal_id, proposal_version, idempotency_key, request_fingerprint
+                workspace_id,
+                proposal_id,
+                proposal_version,
+                idempotency_key,
+                request_fingerprint,
             )
             if replay is not None:
                 return replay
-            raise AlreadyDecided("a decision already exists for this proposal version") from exc
+            raise AlreadyDecided(
+                "a decision already exists for this proposal version"
+            ) from exc
         return DecisionResult(approval=approval, replayed=False)
 
     def _replay_if_available(

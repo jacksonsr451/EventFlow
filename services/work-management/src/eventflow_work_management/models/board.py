@@ -16,8 +16,16 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from eventflow_work_management.db.base import Base, TimestampMixin, check_in, check_regex
-from eventflow_work_management.models.enums import PRIORITY_VALUES, TRIAGE_CATEGORY_VALUES
+from eventflow_work_management.db.base import (
+    Base,
+    TimestampMixin,
+    check_in,
+    check_regex,
+)
+from eventflow_work_management.models.enums import (
+    PRIORITY_VALUES,
+    TRIAGE_CATEGORY_VALUES,
+)
 
 RANK_PATTERN = "^[0-9a-zA-Z_-]+$"
 
@@ -36,7 +44,9 @@ class Board(TimestampMixin, Base):
     workspace_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    columns: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    columns: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -91,14 +101,20 @@ class BoardCard(TimestampMixin, Base):
             name="fk_board_cards_workspace_project_work_item",
             ondelete="CASCADE",
         ),
-        UniqueConstraint("board_id", "work_item_id", name="uq_board_cards_board_work_item"),
-        UniqueConstraint("board_id", "column_id", "rank", name="uq_board_cards_column_rank"),
+        UniqueConstraint(
+            "board_id", "work_item_id", name="uq_board_cards_board_work_item"
+        ),
+        UniqueConstraint(
+            "board_id", "column_id", "rank", name="uq_board_cards_column_rank"
+        ),
         UniqueConstraint("workspace_id", "id", name="uq_board_cards_workspace_id"),
         CheckConstraint("char_length(column_id) >= 1", name="column_id_min_length"),
         CheckConstraint(check_regex("rank", RANK_PATTERN), name="rank_format"),
         CheckConstraint("char_length(title) >= 3", name="title_min_length"),
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
-        CheckConstraint(check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"),
+        CheckConstraint(
+            check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"
+        ),
         Index("ix_board_cards_workspace_id", "workspace_id"),
         Index("ix_board_cards_project_id", "project_id"),
         Index("ix_board_cards_board_id", "board_id"),

@@ -53,7 +53,9 @@ class Consultation(TimestampMixin, Base):
     external_references: Mapped[list] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
-    active_proposal_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    active_proposal_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -64,10 +66,15 @@ class Consultation(TimestampMixin, Base):
         ),
         UniqueConstraint("workspace_id", "id", name="uq_consultations_workspace_id"),
         UniqueConstraint(
-            "workspace_id", "project_id", "id", name="uq_consultations_workspace_project_id"
+            "workspace_id",
+            "project_id",
+            "id",
+            name="uq_consultations_workspace_project_id",
         ),
         CheckConstraint(check_in("origin", ORIGIN_VALUES), name="origin_values"),
-        CheckConstraint(check_in("status", CONSULTATION_STATUS_VALUES), name="status_values"),
+        CheckConstraint(
+            check_in("status", CONSULTATION_STATUS_VALUES), name="status_values"
+        ),
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
         CheckConstraint(
             f"category IS NULL OR {check_in('category', TRIAGE_CATEGORY_VALUES)}",
@@ -75,7 +82,9 @@ class Consultation(TimestampMixin, Base):
         ),
         CheckConstraint("char_length(title) >= 3", name="title_min_length"),
         CheckConstraint("char_length(description) >= 5", name="description_min_length"),
-        CheckConstraint("jsonb_typeof(external_references) = 'array'", name="references_is_array"),
+        CheckConstraint(
+            "jsonb_typeof(external_references) = 'array'", name="references_is_array"
+        ),
         Index("ix_consultations_workspace_id", "workspace_id"),
         Index("ix_consultations_project_id", "project_id"),
         Index("ix_consultations_status", "status"),

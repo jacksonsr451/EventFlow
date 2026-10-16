@@ -60,10 +60,14 @@ class WorkItemRepository(Repository):
         )
         return self._session.execute(statement).scalar_one_or_none()
 
-    def list_for_project(self, *, workspace_id: UUID, project_id: UUID) -> list[WorkItem]:
+    def list_for_project(
+        self, *, workspace_id: UUID, project_id: UUID
+    ) -> list[WorkItem]:
         statement = (
             select(WorkItem)
-            .where(WorkItem.workspace_id == workspace_id, WorkItem.project_id == project_id)
+            .where(
+                WorkItem.workspace_id == workspace_id, WorkItem.project_id == project_id
+            )
             .order_by(WorkItem.created_at)
         )
         return list(self._session.execute(statement).scalars())

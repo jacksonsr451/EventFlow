@@ -5,7 +5,10 @@ controls, policy, verification, and owning issue, and from every control to its
 acceptance criterion. It exists so that a reviewer can identify, at a glance,
 which critical controls are still unimplemented.
 
-Status: Specified (Phase 0). No control in this matrix is **Implemented**.
+Status: Specified (Phase 0). Issue #10 implements backend authentication
+controls OA-01 through OA-04, OA-06, and OA-10; OA-07 through OA-09 remain
+partially implemented or specified because client runtimes and provider-wide
+revocation are not complete. Other controls remain in their documented states.
 
 - Threats and controls are defined in [threat-model.md](threat-model.md).
 - Risks are defined in [risk-register.md](risk-register.md).
@@ -74,16 +77,16 @@ Every control listed here is referenced by at least one threat. "State" uses the
 
 | Control | Policy | State | Acceptance criterion | Verification | Owner |
 |---|---|---|---|---|---|
-| OA-01 | oauth-and-credentials.md | Specified | Auth flow uses PKCE S256; a flow without a verifier is rejected | Issue #10 tests | Issue #10 |
-| OA-02 | oauth-and-credentials.md | Specified | A tampered or absent state is rejected; a valid state passes | Issue #10 tests | Issue #10 |
-| OA-03 | oauth-and-credentials.md | Specified | A redirect to an unregistered URI is rejected | Issue #10 tests | Issue #10 |
-| OA-04 | oauth-and-credentials.md | Specified | No token appears in a URL; code exchange requires the verifier | tests/security/test_security_contracts.py | Issue #10 |
+| OA-01 | oauth-and-credentials.md | Implemented | Auth flow uses PKCE S256; a flow without a verifier is rejected | services/work-management/tests/test_authentication_keycloak_integration.py; packages/auth/tests/auth.test.mjs | Issue #10 |
+| OA-02 | oauth-and-credentials.md | Implemented | A tampered or absent state is rejected; a valid state passes | services/work-management/tests/test_authentication_keycloak_integration.py; packages/auth/tests/auth.test.mjs | Issue #10 |
+| OA-03 | oauth-and-credentials.md | Implemented | A redirect to an unregistered URI is rejected | services/work-management/tests/test_authentication_unit.py | Issue #10 |
+| OA-04 | oauth-and-credentials.md | Implemented | No token appears in a URL; code exchange requires the verifier | services/work-management/tests/test_authentication_keycloak_integration.py | Issue #10 |
 | OA-05 | oauth-and-credentials.md | Specified (Pending Decision) | Each integration declares a minimal scope set; elevated scopes need consent | Issue #27 review | Issues #27, #28 |
-| OA-06 | oauth-and-credentials.md | Specified | Reusing a rotated refresh token invalidates the family and emits credential.revoked | Issue #10 tests | Issue #10 |
-| OA-07 | oauth-and-credentials.md | Specified | Web uses HttpOnly cookies; Desktop keychain; VS Code SecretStorage | tests/security/test_security_docs.py | Issues #10, #23, #25 |
-| OA-08 | oauth-and-credentials.md | Specified | Credentials are TLS-protected and encrypted at rest | Issue #10 tests | Issue #10 |
-| OA-09 | oauth-and-credentials.md | Specified | Logout and revocation invalidate access and refresh tokens | Issue #10 tests | Issue #10 |
-| OA-10 | oauth-and-credentials.md | Specified | No token, secret, or code appears in logs, traces, metrics, or errors | tests/security/test_security_docs.py | Issue #10 |
+| OA-06 | oauth-and-credentials.md | Implemented | Keycloak rotates refresh tokens; re-use invalidates the BFF session | services/work-management/tests/test_authentication_keycloak_integration.py | Issue #10 |
+| OA-07 | oauth-and-credentials.md | Partially Implemented | Web uses HttpOnly cookies; desktop/VS Code adapters require platform secure stores | packages/auth/tests/auth.test.mjs | Issues #10, #23, #25 |
+| OA-08 | oauth-and-credentials.md | Partially Implemented | BFF tokens are encrypted at rest; production TLS and external key management are deployment requirements | services/work-management/tests/test_authentication_persistence_integration.py | Issue #10 |
+| OA-09 | oauth-and-credentials.md | Partially Implemented | BFF logout revokes the local session and requests provider refresh-token revocation | services/work-management/tests/test_authentication_keycloak_integration.py | Issue #10 |
+| OA-10 | oauth-and-credentials.md | Implemented | No token, secret, or code appears in access logs or public errors | services/work-management/tests/test_authentication_unit.py | Issue #10 |
 | SC-01 | untrusted-content.md | Specified | A crafted instruction in ingested text does not change system behaviour | tests/security/test_security_docs.py | Issues #27, #45 |
 | SC-02 | untrusted-content.md | Specified | Issue, PR, and commit text is handled as data in every pipeline | Issue #27 tests | Issues #27, #28 |
 | SC-03 | untrusted-content.md | Specified | A snippet containing a secret is blocked or redacted and emits a security event | Issue #24 tests | Issue #24 |

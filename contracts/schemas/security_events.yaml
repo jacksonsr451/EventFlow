@@ -35,6 +35,14 @@ $defs:
     type: string
     enum:
       - auth.failure
+      - auth.success
+      - auth.replay_detected
+      - auth.refresh_success
+      - auth.refresh_failure
+      - auth.logout
+      - session.created
+      - session.expired
+      - session.revoked
       - authz.denial
       - tenant.cross_access_attempt
       - webhook.verification_failure

@@ -337,7 +337,8 @@ benchmark-results/
 # ============================================================
 
 .local/
-.local-data/
+.local-data/*
+!.local-data/.gitkeep
 dev-data/
 scratch/
 

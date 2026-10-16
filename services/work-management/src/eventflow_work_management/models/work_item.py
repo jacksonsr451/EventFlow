@@ -80,18 +80,29 @@ class WorkItem(TimestampMixin, Base):
         ),
         UniqueConstraint("workspace_id", "id", name="uq_work_items_workspace_id"),
         UniqueConstraint(
-            "workspace_id", "project_id", "id", name="uq_work_items_workspace_project_id"
+            "workspace_id",
+            "project_id",
+            "id",
+            name="uq_work_items_workspace_project_id",
         ),
-        UniqueConstraint(
-            "origin_proposal_id", name="uq_work_items_origin_proposal"
+        UniqueConstraint("origin_proposal_id", name="uq_work_items_origin_proposal"),
+        CheckConstraint(
+            "origin_proposal_version >= 1", name="proposal_version_positive"
         ),
-        CheckConstraint("origin_proposal_version >= 1", name="proposal_version_positive"),
         CheckConstraint("char_length(title) >= 5", name="title_min_length"),
-        CheckConstraint("char_length(description) >= 10", name="description_min_length"),
-        CheckConstraint(check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"),
+        CheckConstraint(
+            "char_length(description) >= 10", name="description_min_length"
+        ),
+        CheckConstraint(
+            check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"
+        ),
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
-        CheckConstraint(check_in("status", WORK_ITEM_STATUS_VALUES), name="status_values"),
-        CheckConstraint("jsonb_typeof(acceptance_criteria) = 'array'", name="criteria_is_array"),
+        CheckConstraint(
+            check_in("status", WORK_ITEM_STATUS_VALUES), name="status_values"
+        ),
+        CheckConstraint(
+            "jsonb_typeof(acceptance_criteria) = 'array'", name="criteria_is_array"
+        ),
         CheckConstraint(
             "jsonb_array_length(acceptance_criteria) >= 1", name="criteria_not_empty"
         ),

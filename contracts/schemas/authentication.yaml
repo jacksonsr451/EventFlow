@@ -1,0 +1,65 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://contracts.eventflow.invalid/schemas/authentication.yaml
+title: EventFlow Authentication Schemas
+description: >-
+  Public authentication response DTOs. OAuth access and refresh tokens are never
+  represented in the browser BFF response schemas.
+
+$defs:
+  UUID:
+    type: string
+    format: uuid
+    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+  RFC3339DateTime:
+    type: string
+    format: date-time
+
+  AuthenticatedPrincipalResponse:
+    type: object
+    additionalProperties: false
+    required: [user_id]
+    properties:
+      user_id:
+        $ref: '#/$defs/UUID'
+        description: Stable EventFlow internal identity UUID; issuer and subject are not exposed.
+
+  BffSessionResponse:
+    type: object
+    additionalProperties: false
+    required: [user_id, session_id, expires_at, csrf_token]
+    properties:
+      user_id:
+        $ref: '#/$defs/UUID'
+      session_id:
+        $ref: '#/$defs/UUID'
+      expires_at:
+        $ref: '#/$defs/RFC3339DateTime'
+        description: Current rolling idle expiration, bounded by the absolute session lifetime.
+      csrf_token:
+        type: string
+        minLength: 32
+        maxLength: 128
+        description: Session-bound anti-CSRF token; never an OAuth access or refresh token.
+
+  AuthenticationSession:
+    type: object
+    additionalProperties: false
+    required: [session_id, client_id, source, created_at, last_seen_at, expires_at, current]
+    properties:
+      session_id:
+        $ref: '#/$defs/UUID'
+      client_id:
+        type: string
+        enum: [eventflow-web-bff, eventflow-desktop, eventflow-vscode]
+      source:
+        type: string
+        enum: [web, desktop, vscode]
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      last_seen_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      expires_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      current:
+        type: boolean
