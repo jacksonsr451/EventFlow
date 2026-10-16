@@ -18,8 +18,10 @@ from eventflow_work_management.api.errors import (
     authentication_dependency_error_handler,
     authentication_error_handler,
     oidc_error_handler,
+    problem_error_handler,
     problem_response,
 )
+from eventflow_work_management.api.workspace_routes import router as workspace_router
 from eventflow_work_management.config import database_url
 from eventflow_work_management.db.engine import create_engine_from_url, session_factory
 from eventflow_work_management.security.config import AuthSettings
@@ -27,6 +29,7 @@ from eventflow_work_management.security.crypto import TokenCipher
 from eventflow_work_management.security.errors import (
     AuthenticationDependencyError,
     AuthenticationError,
+    ProblemError,
 )
 from eventflow_work_management.security.logging import install_access_log_redaction
 from eventflow_work_management.security.oidc import OIDCClient, OIDCError
@@ -80,8 +83,15 @@ def create_app(
         CORSMiddleware,
         allow_origins=list(auth_settings.allowed_origins),
         allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Correlation-ID"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-CSRF-Token",
+            "X-Correlation-ID",
+            "If-Match",
+            "Idempotency-Key",
+        ],
         expose_headers=["X-Correlation-ID"],
         max_age=600,
     )
@@ -107,6 +117,7 @@ def create_app(
         AuthenticationDependencyError, authentication_dependency_error_handler
     )
     app.add_exception_handler(OIDCError, oidc_error_handler)
+    app.add_exception_handler(ProblemError, problem_error_handler)
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_error(request: Request, exc: RequestValidationError):
@@ -170,5 +181,6 @@ def create_app(
         return {"status": "ready"}
 
     app.include_router(authentication_router)
+    app.include_router(workspace_router)
 
     return app

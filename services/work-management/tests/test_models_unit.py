@@ -25,6 +25,8 @@ EXPECTED_TABLES = {
     "audit_records",
     "idempotency_records",
     "remote_integration_references",
+    "workspace_memberships",
+    "workspace_invitations",
 }
 
 AUTHENTICATION_TABLES = {

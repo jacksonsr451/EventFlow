@@ -37,3 +37,17 @@ WORK_ITEM_STATUS_VALUES = (
 )
 REMOTE_PROVIDER_VALUES = ("github", "gitlab")
 REMOTE_RESOURCE_TYPE_VALUES = ("issue", "pull_request", "merge_request")
+
+# Work Management authorization vocabulary (Issue #9). The role order is
+# intentional: it is roughly ascending privilege, with ``owner`` last so
+# assignability and elevation checks can compare positions.
+WORKSPACE_ROLE_VALUES = (
+    "viewer",
+    "contributor",
+    "triager",
+    "approver",
+    "admin",
+    "owner",
+)
+MEMBERSHIP_STATE_VALUES = ("active", "revoked")
+INVITATION_STATE_VALUES = ("pending", "accepted", "revoked", "expired")

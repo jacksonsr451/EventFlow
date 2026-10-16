@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from eventflow_work_management.security.errors import (
     AuthenticationDependencyError,
     AuthenticationError,
+    ProblemError,
 )
 from eventflow_work_management.security.oidc import OIDCError, OIDCProviderUnavailable
 
@@ -65,6 +66,24 @@ async def authentication_error_handler(request: Request, exc: AuthenticationErro
         401: "Authentication required",
         403: "Forbidden",
     }.get(exc.status_code, "Authentication failed")
+    return problem_response(
+        request,
+        status_code=exc.status_code,
+        title=title,
+        detail=exc.detail,
+        code=exc.code,
+    )
+
+
+async def problem_error_handler(request: Request, exc: ProblemError):
+    """Map a sanitized domain problem to RFC 9457 without leaking internals."""
+    title = exc.title or {
+        400: "Invalid request",
+        403: "Forbidden",
+        404: "Not found",
+        409: "Conflict",
+        412: "Precondition failed",
+    }.get(exc.status_code, "Request failed")
     return problem_response(
         request,
         status_code=exc.status_code,
