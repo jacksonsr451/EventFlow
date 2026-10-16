@@ -19,6 +19,9 @@ servers:
 tags:
   - name: Consultations
   - name: Triage
+  - name: Attachments
+  - name: Evidence
+  - name: History
   - name: Proposals
   - name: Approvals
   - name: WorkItems
@@ -393,6 +396,354 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/attachments:
+    post:
+      operationId: createConsultationAttachment
+      tags: [Attachments]
+      summary: Upload a consultation attachment
+      description: >-
+        Accepts a base64-encoded object, validates its size, filename, and content
+        type, scans it through the configured malware scanner, and records the
+        outcome. An object that is not proven clean is quarantined or rejected and
+        is never downloadable.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateAttachmentRequest'
+      responses:
+        '201':
+          description: Attachment recorded; its status reflects the scan verdict.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created attachment resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationAttachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listConsultationAttachments
+      tags: [Attachments]
+      summary: List a consultation's attachments
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The consultation's attachment metadata.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationAttachmentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/attachments/{attachment_id}:
+    get:
+      operationId: getConsultationAttachment
+      tags: [Attachments]
+      summary: Read one attachment's metadata
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Attachment metadata.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationAttachment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    delete:
+      operationId: deleteConsultationAttachment
+      tags: [Attachments]
+      summary: Delete an attachment and its stored object
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Attachment metadata and object were removed.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/attachments/{attachment_id}/content:
+    get:
+      operationId: downloadConsultationAttachment
+      tags: [Attachments]
+      summary: Download an available attachment's object
+      description: >-
+        Serves the stored object as an opaque download with a nosniff header. A
+        quarantined or rejected attachment returns 409 and never exposes bytes.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The attachment object as an opaque byte stream.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Content-Disposition:
+              description: Forces the object to be saved rather than rendered.
+              schema:
+                type: string
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/evidence:
+    post:
+      operationId: createConsultationEvidence
+      tags: [Evidence]
+      summary: Add structured evidence to a consultation
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateEvidenceRequest'
+      responses:
+        '201':
+          description: Evidence recorded.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created evidence resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationEvidence'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listConsultationEvidence
+      tags: [Evidence]
+      summary: List a consultation's evidence
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The consultation's evidence.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationEvidenceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/history:
+    get:
+      operationId: listConsultationHistory
+      tags: [History]
+      summary: Read a consultation's lifecycle timeline
+      description: >-
+        Returns the append-only audit timeline for one consultation, oldest first,
+        including intake, draft, triage, attachment, and evidence events.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of consultation lifecycle events.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationHistoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
         default:
@@ -1698,6 +2049,12 @@ components:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
     ConsultationId:
       name: consultation_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    AttachmentId:
+      name: attachment_id
       in: path
       required: true
       schema:

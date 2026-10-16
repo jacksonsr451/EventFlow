@@ -27,6 +27,9 @@ EXPECTED_TABLES = {
     "remote_integration_references",
     "workspace_memberships",
     "workspace_invitations",
+    "consultation_attachments",
+    "consultation_attachment_blobs",
+    "consultation_evidence",
 }
 
 AUTHENTICATION_TABLES = {
@@ -136,6 +139,9 @@ def test_enum_check_values_match_contract():
         "ProposalStatus": model_enums.PROPOSAL_STATUS_VALUES,
         "ApprovalDecision": model_enums.APPROVAL_DECISION_VALUES,
         "WorkItemStatus": model_enums.WORK_ITEM_STATUS_VALUES,
+        "AttachmentStatus": model_enums.ATTACHMENT_STATUS_VALUES,
+        "AttachmentScanVerdict": model_enums.ATTACHMENT_SCAN_VERDICT_VALUES,
+        "EvidenceKind": model_enums.EVIDENCE_KIND_VALUES,
     }
     for name, expected in expectations.items():
         assert tuple(defs[name]["enum"]) == expected, (

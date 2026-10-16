@@ -113,7 +113,32 @@ classDiagram
         +DateTime updated_at
     }
 
+    class ConsultationAttachment {
+        +UUID attachment_id
+        +UUID consultation_id
+        +UUID uploaded_by
+        +String file_name
+        +String content_type
+        +Integer size_bytes
+        +String checksum_sha256
+        +AttachmentStatus status
+        +AttachmentScanVerdict scan_verdict
+    }
+
+    class ConsultationEvidence {
+        +UUID evidence_id
+        +UUID consultation_id
+        +UUID created_by
+        +EvidenceKind kind
+        +String description
+        +String content
+        +UUID attachment_id
+    }
+
     Consultation "1" --> "0..*" Proposal : derives
+    Consultation "1" --> "0..*" ConsultationAttachment : attaches
+    Consultation "1" --> "0..*" ConsultationEvidence : evidenced by
+    ConsultationEvidence "0..*" --> "0..1" ConsultationAttachment : cites
     Proposal "1" --> "0..*" Approval : evaluates
     Approval "1" --> "0..1" WorkItem : authorizes
     WorkItem "1" --> "1..*" BoardCard : projects into
@@ -257,6 +282,38 @@ stateDiagram-v2
     IN_PROGRESS --> CANCELLED: Obsoleted
     DONE --> [*]
     CANCELLED --> [*]
+```
+
+### 3.4 Consultation Attachments, Evidence, and History
+
+Attachments and evidence are supporting records that enrich a Consultation
+without changing its identity or bypassing triage. They are not part of the
+Consultation → Proposal → Approval → WorkItem → BoardCard chain and never create
+a Proposal, Approval, WorkItem, or BoardCard.
+
+- **Attachment lifecycle.** An upload is validated (filename, size, declared vs.
+  sniffed content type against a published allowlist), then scanned through an
+  injected, fail-closed scanner. A `clean` verdict becomes `available`; an
+  `unknown` verdict is `quarantined` and never downloadable; an `infected`
+  verdict is `rejected` and its bytes are not stored. Every outcome is recorded
+  in the append-only audit trail. Deletion removes the object and its metadata
+  and is restricted to the uploader or a workspace administrator.
+- **Evidence.** Evidence is `text`, `link`, or a reference to an `available`
+  attachment in the same consultation; a quarantined or rejected attachment can
+  never be cited. Text and link evidence require inline `content`.
+- **History.** The consultation history endpoint is a read-only,
+  cursor-paginated projection of the append-only audit records for that
+  consultation, so intake, draft edits, triage, uploads, evidence, and deletion
+  appear as one ordered timeline.
+
+```mermaid
+stateDiagram-v2
+    [*] --> AVAILABLE: Clean scan
+    [*] --> QUARANTINED: Unknown scan (fail closed)
+    [*] --> REJECTED: Infected scan (bytes not stored)
+    AVAILABLE --> [*]: Deleted by uploader or admin
+    QUARANTINED --> [*]: Deleted by uploader or admin
+    REJECTED --> [*]: Deleted by uploader or admin
 ```
 
 ---

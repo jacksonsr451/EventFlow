@@ -10,7 +10,16 @@ the clients ([Issue #14](https://github.com/jacksonsr451/EventFlow/issues/14),
 [Issue #22](https://github.com/jacksonsr451/EventFlow/issues/22)),
 and future AI assistance ([Issue #45](https://github.com/jacksonsr451/EventFlow/issues/45)).
 
-Status: Specified (Phase 0).
+Status: Partially implemented. The Work Management consultation service
+([Issue #4](https://github.com/jacksonsr451/EventFlow/issues/4)) implements the
+attachment controls AT-01, AT-02, AT-03, AT-04, AT-05, AT-06, AT-07 and AT-09:
+uploads are size- and quota-bounded, content-sniffed against a published
+allowlist, scanned through an injected fail-closed scanner that quarantines every
+unscanned object, stored tenant-scoped with no public path, downloaded only
+through an authorized endpoint with `nosniff`, and deleted with their metadata.
+Encryption at rest (AT-08) and the scanning provider selection remain owned by
+[Issue #12](https://github.com/jacksonsr451/EventFlow/issues/12). The source-code
+and editor-context controls remain specified (Phase 0).
 
 ## Principle
 

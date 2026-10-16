@@ -63,6 +63,8 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit",
     "PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}",
+    "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/attachments",
+    "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/evidence",
     "POST /v1/workspaces/{workspace_id}/proposals",
     "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit",
     "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",

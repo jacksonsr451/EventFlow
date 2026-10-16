@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from eventflow_work_management.hashing import fingerprint
@@ -67,4 +67,30 @@ class AuditRepository(Repository):
             )
             .order_by(AuditRecord.occurred_at, AuditRecord.created_at)
         )
+        return list(self._session.execute(statement).scalars())
+
+    def list_page_for_entity(
+        self,
+        workspace_id: UUID,
+        entity_type: str,
+        entity_id: UUID,
+        *,
+        limit: int,
+        after: tuple[datetime, UUID] | None = None,
+    ) -> list[AuditRecord]:
+        """Return a keyset page of the audit trail, oldest first."""
+        statement = select(AuditRecord).where(
+            AuditRecord.workspace_id == workspace_id,
+            AuditRecord.entity_type == entity_type,
+            AuditRecord.entity_id == entity_id,
+        )
+        if after is not None:
+            occurred_at, after_id = after
+            statement = statement.where(
+                tuple_(AuditRecord.occurred_at, AuditRecord.id)
+                > tuple_(occurred_at, after_id)
+            )
+        statement = statement.order_by(
+            AuditRecord.occurred_at, AuditRecord.id
+        ).limit(limit)
         return list(self._session.execute(statement).scalars())

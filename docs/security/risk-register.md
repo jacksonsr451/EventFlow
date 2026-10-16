@@ -47,14 +47,14 @@ never counted as an implemented security control.
 | R-020 | Webhooks | TM-WH-06 | Undetectable forgeries after secret compromise | low | high | Specified | Issues #27, #28 | WH-08, WH-10 | tests/security/test_security_docs.py |
 | R-021 | Webhooks | TM-WH-07 | Duplicate effects from blind retries | medium | medium | Specified | Issue #46 | WH-09, WH-05 | tests/security/test_security_docs.py |
 | R-022 | Webhooks | TM-WH-08 | Repository data disclosure through logged payloads | medium | medium | Specified (Pending Decision) | Issues #27, #28 | WH-10 | tests/security/test_security_docs.py |
-| R-023 | Attachments | TM-AT-01 | Endpoint compromise from a malicious attachment | medium | high | Specified | Issues #4, #12 | AT-03, AT-02 | tests/security/test_security_docs.py |
-| R-024 | Attachments | TM-AT-02 | Control bypass through a disguised file type | medium | medium | Specified | Issue #12 | AT-01, AT-02 | tests/security/test_security_docs.py |
-| R-025 | Attachments | TM-AT-03 | Object overwrite or exposure via path traversal | low | high | Specified | Issue #12 | AT-07 | tests/security/test_security_docs.py |
-| R-026 | Attachments | TM-AT-04 | Cross-tenant attachment disclosure | medium | critical | Specified | Issue #47 | TI-04, AT-04 | tests/security/test_security_contracts.py |
-| R-027 | Attachments | TM-AT-05 | Unauthorized download through a leaked link | medium | high | Specified | Issue #9 | AT-05, TI-03 | tests/security/test_security_contracts.py |
-| R-028 | Attachments | TM-AT-06 | Script execution from inline HTML or SVG | medium | high | Specified | Issues #14, #22 | AT-06 | tests/security/test_security_docs.py |
-| R-029 | Attachments | TM-AT-07 | Availability and cost impact from large uploads | medium | medium | Specified | Issue #12 | AT-02 | tests/security/test_security_docs.py |
-| R-030 | Attachments | TM-AT-08 | Deleted attachments remaining retrievable | medium | medium | Specified | Issue #12 | AT-09, DG-04 | tests/security/test_security_docs.py |
+| R-023 | Attachments | TM-AT-01 | Endpoint compromise from a malicious attachment | medium | high | Implemented | Issues #4, #12 | AT-03, AT-02 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-024 | Attachments | TM-AT-02 | Control bypass through a disguised file type | medium | medium | Implemented | Issue #4 | AT-01, AT-02 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-025 | Attachments | TM-AT-03 | Object overwrite or exposure via path traversal | low | high | Implemented | Issue #4 | AT-07 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-026 | Attachments | TM-AT-04 | Cross-tenant attachment disclosure | medium | critical | Partially Implemented | Issues #4, #47 | TI-04, AT-04 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-027 | Attachments | TM-AT-05 | Unauthorized download through a leaked link | medium | high | Implemented | Issues #4, #9 | AT-05, TI-03 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-028 | Attachments | TM-AT-06 | Script execution from inline HTML or SVG | medium | high | Implemented | Issues #4, #14, #22 | AT-06 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-029 | Attachments | TM-AT-07 | Availability and cost impact from large uploads | medium | medium | Implemented | Issue #4 | AT-02 | services/work-management/tests/test_consultation_attachment_integration.py |
+| R-030 | Attachments | TM-AT-08 | Deleted attachments remaining retrievable | medium | medium | Implemented | Issues #4, #12 | AT-09, DG-04 | services/work-management/tests/test_consultation_attachment_integration.py |
 | R-031 | Tenant isolation | TM-MT-01 | Cross-tenant read via insecure direct object reference | high | critical | Specified | Issue #47 | TI-01, TI-04 | tests/security/test_security_contracts.py |
 | R-032 | Tenant isolation | TM-MT-02 | Cross-tenant write through a foreign workspace_id | high | critical | Specified | Issue #47 | TI-02, TI-04 | tests/security/test_security_contracts.py |
 | R-033 | Tenant isolation | TM-MT-03 | Resource discovery through enumerable identifiers | medium | medium | Specified | Issue #47 | TI-03, TI-07 | tests/security/test_security_contracts.py |
