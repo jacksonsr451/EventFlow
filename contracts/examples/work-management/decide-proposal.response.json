@@ -1,0 +1,45 @@
+{
+  "approval": {
+    "approval_id": "a1b2c3d4-0000-0000-0000-000000000005",
+    "proposal_id": "b2c3d4e5-0000-0000-0000-000000000006",
+    "proposal_version": 1,
+    "workspace_id": "d234f567-8901-2345-6789-01bcde234567",
+    "decider_id": "c3d4e5f6-0000-0000-0000-000000000007",
+    "decision": "approved",
+    "decision_justification": "Technical approach is sound and acceptance criteria are comprehensive.",
+    "idempotency_key": "9f8e7d6c-5b4a-3210-fedc-ba9876543210",
+    "decided_at": "2023-01-01T12:00:00Z",
+    "audit_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "work_item": {
+    "work_item_id": "d4e5f6a7-0000-0000-0000-000000000008",
+    "workspace_id": "d234f567-8901-2345-6789-01bcde234567",
+    "project_id": "e345a678-9012-3456-7890-12cdef345678",
+    "origin_proposal_id": "b2c3d4e5-0000-0000-0000-000000000006",
+    "origin_proposal_version": 1,
+    "origin_approval_id": "a1b2c3d4-0000-0000-0000-000000000005",
+    "title": "Enforce non-empty cart validation",
+    "description": "Add a domain validation rule requiring at least one item.",
+    "acceptance_criteria": [
+      "The order constructor rejects an empty items collection."
+    ],
+    "category": "bug",
+    "priority": "high",
+    "status": "ready",
+    "created_at": "2023-01-01T12:00:00Z",
+    "updated_at": "2023-01-01T12:00:00Z"
+  },
+  "board_card": {
+    "card_id": "e5f6a7b8-0000-0000-0000-000000000009",
+    "workspace_id": "d234f567-8901-2345-6789-01bcde234567",
+    "board_id": "f6a7b8c9-0000-0000-0000-00000000000a",
+    "column_id": "ready",
+    "work_item_id": "d4e5f6a7-0000-0000-0000-000000000008",
+    "rank": "0hzzzzz",
+    "title": "Enforce non-empty cart validation",
+    "priority": "high",
+    "category": "bug",
+    "created_at": "2023-01-01T12:00:00Z",
+    "updated_at": "2023-01-01T12:00:00Z"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "project_id": "e345a678-9012-3456-7890-12cdef345678",
+  "origin": "vscode",
+  "title": "Null pointer on empty cart checkout payload",
+  "description": "Submitting an empty cart checkout returns 500 instead of 400 Bad Request.",
+  "editor_context": {
+    "repository": "github.com/jacksonsr451/EventFlow",
+    "branch": "main",
+    "commit_sha": "1670d908234a56c78d9012e34f56789012345678",
+    "file_path": "services/orders/src/eventflow_orders/domain/order.py",
+    "line_start": 42,
+    "line_end": 58,
+    "consent_granted": true
+  },
+  "external_references": [
+    "https://github.com/jacksonsr451/EventFlow/issues/42"
+  ]
+}

@@ -5,9 +5,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import testrunner
-from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
-
 from eventflow_work_management.repositories import (
     ApprovalRepository,
     BoardCardRepository,
@@ -15,6 +12,8 @@ from eventflow_work_management.repositories import (
     WorkItemRepository,
 )
 from eventflow_work_management.repositories.errors import EntityNotFound
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from support import (
     create_consultation,
     create_project,
@@ -96,7 +95,9 @@ def test_board_card_cross_project_is_rejected():
             _add_card(session, workspace, board_a, work_item_b)
         session.rollback()
 
-        remaining = session.execute(text("SELECT count(*) FROM board_cards")).scalar_one()
+        remaining = session.execute(
+            text("SELECT count(*) FROM board_cards")
+        ).scalar_one()
         assert remaining == 0
 
 
@@ -238,5 +239,7 @@ def test_missing_board_is_rejected_without_partial_write():
             )
         session.rollback()
 
-        remaining = session.execute(text("SELECT count(*) FROM board_cards")).scalar_one()
+        remaining = session.execute(
+            text("SELECT count(*) FROM board_cards")
+        ).scalar_one()
         assert remaining == 0

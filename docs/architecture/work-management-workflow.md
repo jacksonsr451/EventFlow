@@ -261,6 +261,15 @@ stateDiagram-v2
 
 ## 4. Comprehensive Transition Matrix
 
+The "Authorized Role" column uses descriptive role names. The authoritative RBAC
+vocabulary is owned by [Issue #9](https://github.com/jacksonsr451/EventFlow/issues/9)
+(`owner`, `admin`, `triager`, `approver`, `contributor`, `viewer`); the public
+API declares each operation's allowed roles in `x-required-roles`
+([work-management-api.md](work-management-api.md)). The descriptive names map as
+follows: *Any Authenticated / Author / Proposer / Assignee* → `contributor`;
+*Triager / Maintainer* → `triager`; *Reviewer / Approver* → `approver`;
+*Admin* → `admin` / `owner`.
+
 | Entity | From State | To State | Authorized Role | Pre-conditions | Invariants Enforced | Side Effects & Domain Events | Error Codes |
 |---|---|---|---|---|---|---|---|
 | **Consultation** | `None` | `OPEN` | `Any Authenticated` | Valid title and description; consent granted if editor context present | Status initialized to `OPEN` | `consultation.created` event published | `400 Bad Request` |
@@ -457,13 +466,13 @@ flowchart LR
      "target_board_id": "d4e5f6a7-0000-0000-0000-000000000004"
    }
    ```
-   *Response (200 OK):* Returns created `Approval`, `WorkItem` (status: `READY`), and `BoardCard` (column: `Ready`, rank: `0|hzzzzz:`).
+   *Response (200 OK):* Returns created `Approval`, `WorkItem` (status: `READY`), and `BoardCard` (column: `Ready`, rank: `0hzzzzz`, valid under the persisted rank constraint).
 
 ### 7.2 Negative Scenarios
 
 1. **Attempting to Approve Stale Version:**
    - Approver sends `proposal_version: 1`, but the author updated the proposal to version `2`.
-   - Response: `409 Conflict` with error details: `{"error_code": "STALE_VERSION", "message": "Proposal version 1 is superseded by version 2"}`.
+   - Response: `409 Conflict` with a problem+json body carrying `"code": "STALE_VERSION"` and `"detail": "Proposal version 1 is superseded by version 2"`.
 2. **Attempting to Bypass Approval to Create WorkItem:**
    - Client calls `POST /v1/workspaces/.../work-items` directly.
    - Response: `405 Method Not Allowed` or `403 Forbidden`. Work items cannot be created directly; they only arise from approved proposals.
@@ -472,7 +481,7 @@ flowchart LR
    - Response: `422 Unprocessable Entity` (`Schema validation failed: consent_granted must be true`).
 4. **Self-Approval Violation:**
    - User Alice drafts proposal P1 and calls `/decide` to approve P1 in an enterprise workspace.
-   - Response: `403 Forbidden` (`{"error_code": "SELF_APPROVAL_DISALLOWED", "message": "Proposer cannot approve their own proposal"}`.)
+   - Response: `403 Forbidden` with a problem+json body carrying `"code": "SELF_APPROVAL_DISALLOWED"` and `"detail": "Proposer cannot approve their own proposal"`.
 
 ---
 

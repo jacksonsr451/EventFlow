@@ -5,11 +5,10 @@ from __future__ import annotations
 import pathlib
 
 import testrunner
-from sqlalchemy import CheckConstraint, UniqueConstraint
-
 from eventflow_work_management import models  # noqa: F401  (registers tables)
 from eventflow_work_management.db import Base
 from eventflow_work_management.models import enums as model_enums
+from sqlalchemy import CheckConstraint, UniqueConstraint
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 SCHEMA_PATH = REPO_ROOT / "contracts" / "schemas" / "work_management.yaml"
@@ -44,7 +43,9 @@ def test_tenant_tables_carry_workspace_id():
     for name in TENANT_TABLES:
         table = Base.metadata.tables[name]
         assert "workspace_id" in table.columns, f"{name} is missing workspace_id"
-        assert not table.columns["workspace_id"].nullable, f"{name}.workspace_id must be NOT NULL"
+        assert not table.columns["workspace_id"].nullable, (
+            f"{name}.workspace_id must be NOT NULL"
+        )
 
 
 def test_approval_has_one_decision_per_proposal_version():
@@ -59,7 +60,11 @@ def test_approval_has_one_decision_per_proposal_version():
 
 def test_work_item_origin_columns_are_required():
     table = Base.metadata.tables["work_items"]
-    for column in ("origin_proposal_id", "origin_proposal_version", "origin_approval_id"):
+    for column in (
+        "origin_proposal_id",
+        "origin_proposal_version",
+        "origin_approval_id",
+    ):
         assert column in table.columns
         assert not table.columns[column].nullable
 
@@ -124,9 +129,13 @@ def test_enum_check_values_match_contract():
         "WorkItemStatus": model_enums.WORK_ITEM_STATUS_VALUES,
     }
     for name, expected in expectations.items():
-        assert tuple(defs[name]["enum"]) == expected, f"{name} drifted from the contract"
+        assert tuple(defs[name]["enum"]) == expected, (
+            f"{name} drifted from the contract"
+        )
 
     provider = defs["RemoteIntegrationReference"]["properties"]["provider"]["enum"]
-    resource_type = defs["RemoteIntegrationReference"]["properties"]["remote_resource_type"]["enum"]
+    resource_type = defs["RemoteIntegrationReference"]["properties"][
+        "remote_resource_type"
+    ]["enum"]
     assert tuple(provider) == model_enums.REMOTE_PROVIDER_VALUES
     assert tuple(resource_type) == model_enums.REMOTE_RESOURCE_TYPE_VALUES

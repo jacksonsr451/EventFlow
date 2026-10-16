@@ -291,8 +291,12 @@ def test_mutating_request_bodies_do_not_declare_tenant(wm_openapi):
     assert not violations, f"request bodies declaring a tenant: {violations}"
 
 
-def test_idempotency_key_declared_only_on_decide(wm_openapi):
-    """Idempotency-Key must be declared only on the approval decision endpoint."""
+def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
+    """Idempotency-Key must be declared on the retryable mutating operations.
+
+    Amendment A-02 (owned by Issue #11) extends the header beyond the approval
+    decision to every unsafe operation a client may replay.
+    """
     operations = []
     for path, item in wm_openapi["paths"].items():
         for method, operation in item.items():
@@ -305,7 +309,12 @@ def test_idempotency_key_declared_only_on_decide(wm_openapi):
             if "Idempotency-Key" in names:
                 operations.append(f"{method.upper()} {path}")
     assert operations == [
-        "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide"
+        "POST /v1/workspaces/{workspace_id}/consultations",
+        "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
+        "POST /v1/workspaces/{workspace_id}/proposals",
+        "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit",
+        "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",
+        "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}",
     ], f"unexpected Idempotency-Key declarations: {operations}"
 
 

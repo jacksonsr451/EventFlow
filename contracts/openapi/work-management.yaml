@@ -3,9 +3,16 @@ info:
   title: EventFlow Work Management API
   version: 1.0.0
   description: >-
-    Authoritative HTTP contract for Work Management (Consultations, Triage,
-    Proposals, Approvals, WorkItems, and BoardCards). Shared by Webapp,
-    VS Code Extension, and Desktop Application clients.
+    Authoritative, versioned HTTP contract for Work Management (Consultations,
+    Triage, Proposals, Approvals, WorkItems, and BoardCards). Shared by the
+    Webapp, VS Code Extension, and Desktop Application clients. The public API
+    version is carried in the `/v1/` URL prefix; breaking changes require a new
+    prefix. Errors use RFC 9457 problem details
+    (application/problem+json). Mutating operations that a client may retry
+    accept an optional `Idempotency-Key`; the approval decision requires it.
+    Authorization requirements are declared per operation through
+    `x-required-roles` and must be enforced by the backend. See
+    `docs/architecture/work-management-api.md` for the compatibility policy.
 servers:
   - url: https://api.eventflow.invalid
     description: Planned Work Management Gateway / BFF endpoint
@@ -16,44 +23,44 @@ tags:
   - name: Approvals
   - name: WorkItems
   - name: Boards
-
 paths:
   /v1/workspaces/{workspace_id}/consultations:
     post:
       operationId: createConsultation
       tags: [Consultations]
       summary: Submit a new consultation (raw intake)
+      description: >-
+        Records a raw intake consultation in OPEN state. A consultation is not
+        a task and never enters a board directly. Priority starts at medium until
+        an authorized triage operation assigns the classified priority.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [project_id, origin, title, description]
-              properties:
-                project_id:
-                  $ref: '../schemas/work_management.yaml#/$defs/UUID'
-                origin:
-                  $ref: '../schemas/work_management.yaml#/$defs/Origin'
-                title:
-                  type: string
-                  minLength: 3
-                  maxLength: 200
-                description:
-                  type: string
-                  minLength: 5
-                editor_context:
-                  $ref: '../schemas/work_management.yaml#/$defs/EditorContext'
-                external_references:
-                  type: array
-                  items:
-                    type: string
+              $ref: '../schemas/work_management.yaml#/$defs/CreateConsultationRequest'
       responses:
         '201':
           description: Consultation recorded in OPEN state.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created consultation resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
@@ -64,11 +71,26 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
     get:
       operationId: listConsultations
       tags: [Consultations]
       summary: List consultations within a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [created_at, updated_at, priority, status]
+      x-default-sort-fields: [created_at, consultation_id]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - name: status
@@ -81,137 +103,279 @@ paths:
           required: false
           schema:
             $ref: '../schemas/work_management.yaml#/$defs/TriageCategory'
+        - name: priority
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/Priority'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: List of consultations.
+          description: A page of consultations.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '../schemas/work_management.yaml#/$defs/Consultation'
+                $ref: '../schemas/work_management.yaml#/$defs/ConsultationPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage:
     post:
       operationId: triageConsultation
       tags: [Triage]
       summary: Classify and triage an intake consultation
+      security:
+        - bearerAuth: []
+      x-required-roles: [triager, admin, owner]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [category, priority, triage_notes]
-              properties:
-                category:
-                  $ref: '../schemas/work_management.yaml#/$defs/TriageCategory'
-                priority:
-                  $ref: '../schemas/work_management.yaml#/$defs/Priority'
-                triage_notes:
-                  type: string
-                  minLength: 5
-                bug_criteria:
-                  $ref: '../schemas/work_management.yaml#/$defs/BugCriteria'
-                feature_criteria:
-                  $ref: '../schemas/work_management.yaml#/$defs/FeatureCriteria'
-                chore_criteria:
-                  $ref: '../schemas/work_management.yaml#/$defs/ChoreCriteria'
-                docs_criteria:
-                  $ref: '../schemas/work_management.yaml#/$defs/DocsCriteria'
-                security_criteria:
-                  $ref: '../schemas/work_management.yaml#/$defs/SecurityCriteria'
+              $ref: '../schemas/work_management.yaml#/$defs/TriageConsultationRequest'
       responses:
         '200':
           description: Consultation triaged successfully.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
                 $ref: '../schemas/work_management.yaml#/$defs/Consultation'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}:
+    get:
+      operationId: getConsultation
+      tags: [Consultations]
+      summary: Retrieve one consultation within a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested consultation.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Consultation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/workspaces/{workspace_id}/proposals:
     post:
       operationId: createProposal
       tags: [Proposals]
       summary: Draft a proposal derived from a triaged consultation
+      description: >-
+        Creates a proposal in DRAFT state. It does not create a WorkItem or
+        allocate execution capacity. The referenced consultation must be
+        visible in this workspace and in a state that permits proposal creation;
+        an invalid lifecycle state returns 409. Each accepted creation receives
+        the next version for that consultation, starting at version 1.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [consultation_id, title, technical_description, scope, justification, acceptance_criteria, category, priority]
-              properties:
-                consultation_id:
-                  $ref: '../schemas/work_management.yaml#/$defs/UUID'
-                title:
-                  type: string
-                  minLength: 5
-                  maxLength: 200
-                technical_description:
-                  type: string
-                  minLength: 10
-                scope:
-                  type: string
-                  minLength: 5
-                justification:
-                  type: string
-                  minLength: 5
-                acceptance_criteria:
-                  type: array
-                  minItems: 1
-                  items:
-                    type: string
-                category:
-                  $ref: '../schemas/work_management.yaml#/$defs/TriageCategory'
-                priority:
-                  $ref: '../schemas/work_management.yaml#/$defs/Priority'
-                estimated_hours:
-                  type: number
-                  minimum: 0.5
+              $ref: '../schemas/work_management.yaml#/$defs/CreateProposalRequest'
       responses:
         '201':
           description: Proposal created in DRAFT state. Does not create a WorkItem.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created proposal resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
                 $ref: '../schemas/work_management.yaml#/$defs/Proposal'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit:
     post:
       operationId: submitProposalForReview
       tags: [Proposals]
       summary: Submit a draft proposal for formal peer review
+      description: >-
+        Only the proposal's proposer or an authorized workspace administrator
+        may submit it. It must be in DRAFT or CHANGES_REQUESTED; an invalid
+        lifecycle state returns 409.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProposalId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Proposal transitioned to IN_REVIEW.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Proposal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/proposals/{proposal_id}:
+    get:
+      operationId: getProposal
+      tags: [Proposals]
+      summary: Retrieve one proposal version within a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/ProposalId'
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: Proposal transitioned to IN_REVIEW.
+          description: The requested proposal version.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
                 $ref: '../schemas/work_management.yaml#/$defs/Proposal'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide:
     post:
@@ -219,64 +383,72 @@ paths:
       tags: [Approvals]
       summary: Formally approve, reject, or request changes on a proposal
       description: >-
-        Submits an approval decision. When decision is 'approved', atomically
-        and idempotently generates the WorkItem and initial BoardCard.
+        Submits an approval decision bound to an exact proposal version. When
+        the decision is 'approved', the WorkItem and initial BoardCard are
+        required by this contract to be generated atomically and idempotently.
+        The Idempotency-Key header is required. A successful HTTP replay is a
+        contract requirement; the current persistence repository provides
+        database-level idempotent decision-effect recovery but does not
+        rehydrate the full HTTP response body or integrate the complete
+        decision, WorkItem, BoardCard, and response replay workflow.
+      security:
+        - bearerAuth: []
+      x-required-roles: [approver, admin, owner]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/ProposalId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [proposal_version, decision, decision_justification]
-              properties:
-                proposal_version:
-                  type: integer
-                  minimum: 1
-                decision:
-                  $ref: '../schemas/work_management.yaml#/$defs/ApprovalDecision'
-                decision_justification:
-                  type: string
-                  minLength: 3
-                target_board_id:
-                  $ref: '../schemas/work_management.yaml#/$defs/UUID'
+              $ref: '../schemas/work_management.yaml#/$defs/DecideProposalRequest'
       responses:
         '200':
           description: Decision recorded. If approved, includes generated WorkItem and BoardCard.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
-                required: [approval]
-                properties:
-                  approval:
-                    $ref: '../schemas/work_management.yaml#/$defs/Approval'
-                  work_item:
-                    $ref: '../schemas/work_management.yaml#/$defs/WorkItem'
-                  board_card:
-                    $ref: '../schemas/work_management.yaml#/$defs/BoardCard'
+                $ref: '../schemas/work_management.yaml#/$defs/DecideProposalResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Stale version, concurrent decision, or conflict.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/workspaces/{workspace_id}/work-items:
     get:
       operationId: listWorkItems
       tags: [WorkItems]
       summary: List authorized work items
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [created_at, updated_at, priority, status]
+      x-default-sort-fields: [created_at, work_item_id]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - name: status
@@ -284,74 +456,348 @@ paths:
           required: false
           schema:
             $ref: '../schemas/work_management.yaml#/$defs/WorkItemStatus'
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/TriageCategory'
+        - name: priority
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/Priority'
+        - name: assignee_id
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: List of active work items.
+          description: A page of authorized work items.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '../schemas/work_management.yaml#/$defs/WorkItem'
+                $ref: '../schemas/work_management.yaml#/$defs/WorkItemPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/work-items/{work_item_id}:
+    get:
+      operationId: getWorkItem
+      tags: [WorkItems]
+      summary: Retrieve one work item within a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: work_item_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested work item.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/WorkItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/boards/{board_id}:
+    get:
+      operationId: getBoard
+      tags: [Boards]
+      summary: Retrieve one board within a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested board and its column definitions.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Board'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/workspaces/{workspace_id}/boards/{board_id}/cards:
     get:
       operationId: listBoardCards
       tags: [Boards]
       summary: List cards in a Kanban board
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [rank, created_at, updated_at, priority]
+      x-default-sort-fields: [column_id, rank, card_id]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
-        - name: board_id
-          in: path
-          required: true
+        - $ref: '#/components/parameters/BoardId'
+        - name: column_id
+          in: query
+          required: false
           schema:
-            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+            type: string
+            minLength: 1
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: Cards grouped or ranked by column.
+          description: A page of board cards ranked by column.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '../schemas/work_management.yaml#/$defs/BoardCard'
+                $ref: '../schemas/work_management.yaml#/$defs/BoardCardPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}:
+    get:
+      operationId: getBoardCard
+      tags: [Boards]
+      summary: Retrieve one board card and its strong ETag
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/BoardCardId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested card; its ETag is a strong validator for this card resource.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/BoardCard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
     patch:
       operationId: moveBoardCard
       tags: [Boards]
-      summary: Move card to another column or update its rank
+      summary: Move a board card to another column or rank
+      description: >-
+        The card identified by the path must belong to this board, and the
+        destination column must be defined by the board. Its WorkItem must
+        remain in the same workspace and project as the board. Foreign
+        resources are not disclosed; invalid lifecycle or rank conflicts return
+        409.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, admin, owner]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
-        - name: board_id
-          in: path
-          required: true
-          schema:
-            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/BoardCardId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [card_id, target_column_id, target_rank]
-              properties:
-                card_id:
-                  $ref: '../schemas/work_management.yaml#/$defs/UUID'
-                target_column_id:
-                  type: string
-                target_rank:
-                  type: string
+              $ref: '../schemas/work_management.yaml#/$defs/MoveBoardCardRequest'
       responses:
         '200':
-          description: Card position updated.
+          description: Card position updated; ETag validates the resulting card representation.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
                 $ref: '../schemas/work_management.yaml#/$defs/BoardCard'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        JWT validation and authorization must be enforced by the gateway. Required
+        issuer, audience, algorithms, and claims remain deployment
+        configuration; workspace membership and RBAC checks are server-side
+        requirements. Issue #11 defines these requirements but implements no
+        authentication or authorization runtime.
+
+  schemas:
+    Problem400:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 400
+    Problem401:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 401
+    Problem403:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 403
+    Problem404:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 404
+    Problem409:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 409
+    Problem412:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 412
+    Problem422:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 422
+    Problem503:
+      allOf:
+        - $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+        - type: object
+          properties:
+            status:
+              const: 503
+
   parameters:
     WorkspaceId:
       name: workspace_id
@@ -371,48 +817,183 @@ components:
       required: true
       schema:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    BoardId:
+      name: board_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    BoardCardId:
+      name: card_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
     CorrelationId:
       name: X-Correlation-ID
       in: header
       required: false
+      description: >-
+        Existing business workflow identifier when applicable. The gateway
+        generates one when absent, validates a supplied UUID, and returns the
+        effective value in X-Correlation-ID.
       schema:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
     IdempotencyKey:
       name: Idempotency-Key
       in: header
       required: true
+      description: >-
+        Stable client key for one approval-decision operation. The key namespace
+        is (workspace_id, operationId, key), matching the persistence uniqueness
+        scope. Within that namespace, an equivalent request replays the original
+        HTTP status and body, including concurrent duplicates; a different
+        request fingerprint returns 409. The same key in another workspace or
+        operation is independent. This is a contract requirement, not a claim
+        that an HTTP handler currently implements replay.
+      x-idempotency-scope: [workspace_id, operationId]
       schema:
         type: string
         minLength: 8
         maxLength: 128
+        pattern: '^[A-Za-z0-9._~-]{8,128}$'
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >-
+        Optional stable client key for a retryable operation. When supplied, the
+        key namespace is (workspace_id, operationId, key). Within that namespace,
+        an equivalent request replays the original HTTP status and body,
+        including concurrent duplicates; a different request fingerprint
+        returns 409. The same key in another workspace or operation is
+        independent. This is a contract requirement, not a claim that an HTTP
+        handler currently implements replay. Offline-capable clients must send
+        it.
+      x-idempotency-scope: [workspace_id, operationId]
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._~-]{8,128}$'
+    PageLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return in one page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    PageCursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned as page_info.next_cursor by the previous page.
+      x-cursor-binding: [workspace_id, operationId, filters, sort]
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+    Sort:
+      name: sort
+      in: query
+      required: false
+      description: >-
+        Comma-separated sort keys; prefix a key with '-' for descending order.
+        Allowed keys are listed per operation. Ordering is deterministic and
+        keyset-based, with the resource identifier as a unique final tie-breaker.
+        The contract does not promise snapshot isolation across pages.
+      x-ordering: stable_keyset_with_resource_id_tiebreaker
+      x-snapshot-isolation: false
+      schema:
+        type: string
+        pattern: '^-?[a-z_]+(,-?[a-z_]+)*$'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: >-
+        Optional strong ETag validator previously returned for this exact
+        resource. Weak validators and wildcard/list forms are not accepted; a
+        stale value yields 412 Precondition Failed.
+      schema:
+        type: string
+        pattern: '^"[^"]+"$'
+
+  headers:
+    CorrelationId:
+      description: Business workflow correlation identifier.
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    RequestId:
+      description: Identifier for this HTTP request.
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    ETag:
+      description: Opaque entity or collection version used for optimistic concurrency.
+      schema:
+        type: string
+        pattern: '^"[^"]+"$'
 
   responses:
     BadRequest:
-      description: Invalid request payload or parameter.
+      description: Malformed request, invalid parameter, or validation failure.
       content:
         application/problem+json:
           schema:
-            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+            $ref: '#/components/schemas/Problem400'
     Unauthorized:
       description: Authentication is missing or invalid.
       content:
         application/problem+json:
           schema:
-            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+            $ref: '#/components/schemas/Problem401'
     Forbidden:
-      description: User lacks authorization or RBAC role for this action.
+      description: The principal is authenticated but lacks the required workspace role.
       content:
         application/problem+json:
           schema:
-            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+            $ref: '#/components/schemas/Problem403'
     NotFound:
-      description: Resource was not found.
+      description: >-
+        The resource does not exist or is not visible to the caller; existence
+        of another workspace's resource is never disclosed.
       content:
         application/problem+json:
           schema:
-            $ref: '../schemas/work_management.yaml#/$defs/ErrorResponse'
+            $ref: '#/components/schemas/Problem404'
     Conflict:
-      description: Conflict due to optimistic locking, invalid state transition, or duplicate.
+      description: >-
+        Optimistic-locking, idempotency, or invalid state-transition conflict.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem409'
+    PreconditionFailed:
+      description: The If-Match precondition did not match the current entity version.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem412'
+    UnprocessableEntity:
+      description: The request is syntactically correct but semantically invalid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem422'
+    ServiceUnavailable:
+      description: A required authoritative dependency is temporarily unavailable.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem503'
+    UnexpectedError:
+      description: >-
+        Unexpected server failure. The response uses a sanitized problem body;
+        a mutation must not expose internal details or leave a partial database
+        effect.
       content:
         application/problem+json:
           schema:

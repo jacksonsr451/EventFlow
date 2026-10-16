@@ -6,14 +6,13 @@ import threading
 from uuid import uuid4
 
 import testrunner
-from sqlalchemy import text
-
 from eventflow_work_management.repositories import (
     AlreadyDecided,
     ApprovalRepository,
     IdempotencyConflict,
     ProposalRepository,
 )
+from sqlalchemy import text
 from support import (
     create_consultation,
     create_project,
@@ -61,13 +60,19 @@ def test_same_key_replays_without_new_effects():
         workspace, proposal = _setup(session)
         repository = ApprovalRepository(session)
 
-        first = repository.decide(idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal))
-        second = repository.decide(idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal))
+        first = repository.decide(
+            idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal)
+        )
+        second = repository.decide(
+            idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal)
+        )
 
         assert first.replayed is False
         assert second.replayed is True
         assert first.approval.id == second.approval.id
-        approval_count = session.execute(text("SELECT count(*) FROM approvals")).scalar_one()
+        approval_count = session.execute(
+            text("SELECT count(*) FROM approvals")
+        ).scalar_one()
         idempotency_count = session.execute(
             text("SELECT count(*) FROM idempotency_records")
         ).scalar_one()
@@ -81,7 +86,9 @@ def test_same_key_different_request_conflicts():
         workspace, proposal = _setup(session)
         repository = ApprovalRepository(session)
 
-        repository.decide(idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal))
+        repository.decide(
+            idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal)
+        )
 
         with testrunner.raises(IdempotencyConflict):
             repository.decide(
@@ -97,10 +104,15 @@ def test_new_key_for_decided_version_is_rejected():
         workspace, proposal = _setup(session)
         repository = ApprovalRepository(session)
 
-        repository.decide(idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal))
+        repository.decide(
+            idempotency_key="decision-key-0001", **_decide_kwargs(workspace, proposal)
+        )
 
         with testrunner.raises(AlreadyDecided):
-            repository.decide(idempotency_key="decision-key-0002", **_decide_kwargs(workspace, proposal))
+            repository.decide(
+                idempotency_key="decision-key-0002",
+                **_decide_kwargs(workspace, proposal),
+            )
         session.rollback()
 
 
@@ -138,8 +150,13 @@ def test_concurrent_same_key_has_exactly_one_effect():
         assert len({result.approval.id for result in results}) == 1
 
         with session_scope(engine) as session:
-            assert session.execute(text("SELECT count(*) FROM approvals")).scalar_one() == 1
             assert (
-                session.execute(text("SELECT count(*) FROM idempotency_records")).scalar_one()
+                session.execute(text("SELECT count(*) FROM approvals")).scalar_one()
+                == 1
+            )
+            assert (
+                session.execute(
+                    text("SELECT count(*) FROM idempotency_records")
+                ).scalar_one()
                 == 1
             )

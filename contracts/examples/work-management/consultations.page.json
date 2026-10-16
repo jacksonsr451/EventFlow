@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "consultation_id": "c123e456-7890-1234-5678-90abcdef1234",
+      "workspace_id": "d234f567-8901-2345-6789-01bcde234567",
+      "project_id": "e345a678-9012-3456-7890-12cdef345678",
+      "author_id": "f456b789-0123-4567-8901-23def4567890",
+      "origin": "web",
+      "title": "How to reset password?",
+      "description": "Users cannot reset their passwords via the webapp.",
+      "status": "open",
+      "priority": "medium",
+      "created_at": "2023-01-01T12:00:00Z",
+      "updated_at": "2023-01-01T12:00:00Z"
+    }
+  ],
+  "page_info": {
+    "next_cursor": null,
+    "has_more": false
+  }
+}

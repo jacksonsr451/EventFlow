@@ -5,9 +5,8 @@ from __future__ import annotations
 import threading
 from uuid import uuid4
 
-from sqlalchemy import text
-
 from eventflow_work_management.repositories import ProposalRepository
+from sqlalchemy import text
 from support import (
     create_consultation,
     create_project,
@@ -70,5 +69,7 @@ def test_concurrent_proposals_never_duplicate_versions():
                     {"cid": consultation_id},
                 ).scalars()
             )
-        assert len(versions) == len(set(versions)), "duplicate proposal versions persisted"
+        assert len(versions) == len(set(versions)), (
+            "duplicate proposal versions persisted"
+        )
         assert set(versions) == set(successes)

@@ -74,9 +74,11 @@ Application code validates first; the database is the last line of defense.
   `remote_integration_references` row whose `entity_type` names a Work
   Management entity to reference an entity that exists in the same workspace.
   Unknown entity types are forward-compatible and are not validated here.
-- **Idempotency.** The decision and its `idempotency_records` row are written in
-  one transaction; a retry with the same key and fingerprint returns the stored
-  result, a different request under the same key conflicts.
+- **Idempotency.** The implemented approval-decision repository and its
+  `idempotency_records` row are written in one transaction; a retry with the
+  same key and fingerprint returns the stored repository result, and a different
+  request under the same key conflicts. Other A-02 HTTP operations are contract
+  requirements, not persistence/runtime integrations implemented here.
 
 ## Idempotency
 
@@ -85,8 +87,12 @@ reserves `(workspace_id, operation, idempotency_key)`, writes the Approval, the
 proposal status change, an audit record and the idempotency record, then commits
 once. Concurrent retries with the same key resolve to a single effect: the loser
 of the unique-insert race reads the stored result and replays it. This implements
-ADR-007 section 3.6 for `.../decide` and provides the storage primitive for
-Amendment A-02, which is not applied here.
+ADR-007 section 3.6 for `.../decide` and provides the storage primitive that
+Amendment A-02 relies on; A-02 itself is a contract change applied by
+[Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
+Only the approval repository path currently uses this mechanism; HTTP status and
+body replay at the API boundary and other A-02 operation integrations are not
+implemented by the persistence layer.
 
 ## Tenant Isolation Scope
 

@@ -62,7 +62,7 @@ flowchart TD
             Proposals["Proposals & Reviews"]
             Approvals["Approvals Engine (Idempotent / Audit)"]
             Kanban["WorkItems & Kanban Boards"]
-            ContractsWork["Contracts: contracts/openapi/work-management.yaml<br/>contracts/asyncapi/work-events.yaml"]
+            ContractsWork["Contracts: contracts/openapi/work-management.yaml<br/>Work Management events: deferred to Issue #46"]
         end
 
         subgraph Clients["Work Management Client Layer"]
@@ -144,7 +144,7 @@ EventFlow/
 ├── .github/              # Shared CI/CD workflows and automation
 ├── contracts/            # Machine-readable interface contracts (OpenAPI, AsyncAPI, Schemas)
 │   ├── openapi/          # HTTP contracts (orders.yaml, work-management.yaml)
-│   ├── asyncapi/         # Asynchronous contracts (workflow.yaml, work-events.yaml)
+│   ├── asyncapi/         # Order workflow.yaml; Work Management events deferred to Issue #46
 │   └── schemas/          # Common and domain-specific JSON Schemas
 ├── docs/                 # Architectural documentation, ADRs, and guides
 │   ├── adr/              # Architecture Decision Records

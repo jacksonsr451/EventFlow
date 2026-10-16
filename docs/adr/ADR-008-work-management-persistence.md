@@ -21,8 +21,8 @@ to:
 3. How are the Work Management workflow invariants — an Approval is bound to one
    Proposal version, a WorkItem can only be created from an approved Proposal,
    audit history is append-only — enforced?
-4. How is idempotency persisted so that retried approval decisions have
-   exactly-once effects (ADR-007 section 3.6)?
+4. How is idempotency persisted so retried approval decisions have at-most-once
+   local database effects (ADR-007 section 3.6)?
 5. How do migrations run in local development and CI?
 
 The following constraints already apply:
@@ -132,13 +132,16 @@ defense.
 
 Idempotency is persisted in `idempotency_records`, keyed by
 `UNIQUE (workspace_id, operation, idempotency_key)`. Each record stores a SHA-256
-request fingerprint and the stored response status/body. The domain change (for
+request fingerprint and response status/body metadata. The domain change (for
 example an Approval) and its idempotency record are written in the **same**
-transaction. A retry with the same key and fingerprint returns the stored
-result; the same key with a different fingerprint is a conflict. This implements
-ADR-007 section 3.6 for the one endpoint that currently declares
-`Idempotency-Key` (`.../decide`) and provides the storage primitive for
-Amendment A-02.
+transaction. A retry with the same key and fingerprint recovers the same
+persisted approval result; a different fingerprint conflicts. The repository
+does not yet rehydrate the full HTTP body from its stored response metadata.
+This implements ADR-007 section 3.6 for `ApprovalRepository.decide` only. The table
+provides a persistence primitive for other A-02 operation scopes, but their
+repository integrations and HTTP response replay are not implemented by Issue
+#12. [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11) defines
+those as API contract requirements; this ADR does not claim runtime completion.
 
 ### 6. Transactions and repositories
 
@@ -169,8 +172,9 @@ end-to-end. This deferral is recorded so it is not mistaken for completeness.
 - Composite foreign keys make cross-tenant references unrepresentable.
 - Alembic migrations give reviewable, reversible schema history and avoid
   `create_all()` drift.
-- The idempotency table satisfies ADR-007 section 3.6 and is reused when
-  Amendment A-02 extends the header to more endpoints.
+- The idempotency table supports ADR-007 section 3.6. The implemented
+  `ApprovalRepository.decide` path uses it; other A-02 endpoint integrations
+  remain future runtime work.
 
 ### Negative
 

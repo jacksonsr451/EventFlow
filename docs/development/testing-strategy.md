@@ -41,6 +41,17 @@ are detailed per transition in
 [order-processing/reliability.md](../architecture/order-processing/reliability.md);
 runtime coverage begins with Issues #50–#54.
 
+## Work Management API (Contract Level)
+
+`tests/contracts/test_work_management_api.py` verifies the versioned public Work
+Management contract: bearer authentication and `x-required-roles` authorization
+requirements on every operation, a single RFC 9457 `problem+json` error shape
+whose core properties align with the shared model, cursor pagination with filtering
+and sorting, `ETag`/`If-Match` concurrency, `Idempotency-Key` on every retryable
+operation, DTO references, and per-flow example payloads under
+`contracts/examples/work-management/`. The policy is documented in
+[work-management-api.md](../architecture/work-management-api.md).
+
 ## Work Management Persistence (Implemented)
 
 The Work Management service persists its bounded context in PostgreSQL

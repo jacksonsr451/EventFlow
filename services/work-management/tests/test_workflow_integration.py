@@ -5,9 +5,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import testrunner
-from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
-
 from eventflow_work_management.repositories import (
     ApprovalRepository,
     AuditRepository,
@@ -17,6 +14,8 @@ from eventflow_work_management.repositories import (
     ProposalRepository,
     WorkItemRepository,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from support import (
     create_consultation,
     create_project,
@@ -27,7 +26,9 @@ from support import (
 )
 
 
-def _approve(session, workspace, consultation, *, decision="approved", key="decision-key-0001"):
+def _approve(
+    session, workspace, consultation, *, decision="approved", key="decision-key-0001"
+):
     proposal = ProposalRepository(session).create(
         workspace_id=workspace.id,
         project_id=consultation.project_id,
@@ -123,7 +124,9 @@ def test_work_item_requires_approved_proposal():
         workspace = create_workspace(session)
         project = create_project(session, workspace)
         consultation = create_consultation(session, workspace, project)
-        proposal, decision = _approve(session, workspace, consultation, decision="changes_requested")
+        proposal, decision = _approve(
+            session, workspace, consultation, decision="changes_requested"
+        )
 
         with testrunner.raises(IntegrityError):
             WorkItemRepository(session).create_from_approved_proposal(
@@ -188,7 +191,9 @@ def test_audit_records_are_append_only():
             session.commit()
         session.rollback()
 
-        remaining = session.execute(text("SELECT count(*) FROM audit_records")).scalar_one()
+        remaining = session.execute(
+            text("SELECT count(*) FROM audit_records")
+        ).scalar_one()
         assert remaining == 1
 
 
@@ -210,7 +215,9 @@ def test_audit_records_cannot_be_truncated():
             session.commit()
         session.rollback()
 
-        remaining = session.execute(text("SELECT count(*) FROM audit_records")).scalar_one()
+        remaining = session.execute(
+            text("SELECT count(*) FROM audit_records")
+        ).scalar_one()
         assert remaining == 1
 
 
@@ -236,7 +243,9 @@ def test_work_item_origin_cannot_be_updated_to_invalid_version():
 
         with testrunner.raises(Exception):
             session.execute(
-                text("UPDATE work_items SET origin_proposal_version = :v WHERE id = :id"),
+                text(
+                    "UPDATE work_items SET origin_proposal_version = :v WHERE id = :id"
+                ),
                 {"v": proposal.version + 1, "id": work_item.id},
             )
             session.commit()

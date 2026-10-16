@@ -224,20 +224,15 @@ shape (`contracts/schemas/common.yaml#/$defs/Error`, exposed as
 `contracts/schemas/http.yaml#/$defs/ErrorResponse`). Clients implement a single
 error handler against this model.
 
-**Current reality (two shapes).** Work Management still defines a custom
-`ErrorResponse` (`error_code`, `message`, `details`, `timestamp`) in
-`contracts/schemas/work_management.yaml#/$defs/ErrorResponse`. Both domains use
-the `application/problem+json` media type, so this is a genuine shape
-incompatibility, not a media-type distinction. Until
-[Amendment A-01](#amendment-a-01--align-work-management-errors-with-rfc-9457) is
-applied:
-
-- Clients must use the per-domain generated error type.
-- `packages/domain`/`packages/api-client` map the Work Management shape into the
-  shared client error model **at the boundary**; application code only sees the
-  unified model. This mapping is temporary and must not leak into domain types.
-- A single shared handler without a mapping layer is possible only after the
-  amendment.
+**Current reality (one shape).** [Amendment A-01](#amendment-a-01--align-work-management-errors-with-rfc-9457)
+was applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
+Work Management now defines an RFC 9457 problem shape in
+`contracts/schemas/work_management.yaml#/$defs/ErrorResponse`, and every
+`application/problem+json` response in `contracts/openapi/work-management.yaml`
+uses it. The definition is structurally compatible with the shared `Error`
+model but is declared locally, so the Work Management contracts keep no
+reference to Order Processing schemas. Clients implement a single error handler
+against this model; the temporary per-domain mapping is no longer required.
 
 Clients must handle:
 - `400 Bad Request` — validation failure; display field-level errors.
@@ -261,10 +256,18 @@ is stored per platform:
 | Desktop | OS keychain / secure store (for example `tauri-plugin-stronghold` or a keyring plugin), not a plain JSON store |
 | VS Code | VS Code `SecretStorage` API |
 
-RBAC roles (`submitter`, `triager`, `proposer`, `approver`, `assignee`,
-`viewer`) are enforced by the backend. Clients use role information only to
-show or hide UI elements; they must never assume a role grants access without
-a backend response confirming it.
+The authoritative RBAC role vocabulary is owned by
+[Issue #9](https://github.com/jacksonsr451/EventFlow/issues/9): `owner`,
+`admin`, `triager`, `approver`, `contributor`, `viewer`. This supersedes the
+provisional list previously written here (`submitter`, `triager`, `proposer`,
+`approver`, `assignee`, `viewer`) and the descriptive names in the
+[workflow specification](../architecture/work-management-workflow.md) transition
+matrix. The public API declares each operation's allowed roles in the
+`x-required-roles` extension
+([work-management-api.md](../architecture/work-management-api.md)). Roles are
+enforced by the backend. Clients use role information only to show or hide UI
+elements; they must never assume a role grants access without a backend response
+confirming it.
 
 A shared token must not grant cross-workspace access. The backend scopes every
 request to the caller's workspaces and returns `403`/`404` rather than leaking
@@ -277,11 +280,11 @@ assets; the concrete policy is defined in
 #### 3.6 Idempotency
 
 **Principle.** Any unsafe HTTP operation that a client may retry — after a
-timeout, a network failure, or an offline replay — must carry a client-generated
-`Idempotency-Key`. The backend stores the key together with the resulting
-response inside the same local transaction that performs the domain change, so a
-retry returns the stored response and never repeats side effects. Storage and
-retention are backend implementation parameters
+timeout, a network failure, or an offline replay — must accept a client-generated
+`Idempotency-Key`, and clients must include it before automatic replay. When a
+key is supplied, the implementation is required to store it with the request
+fingerprint and resulting response in the same local transaction as the domain
+change. Storage and retention are backend implementation parameters
 ([Issue #7](https://github.com/jacksonsr451/EventFlow/issues/7)).
 
 **Semantics.**
@@ -291,13 +294,16 @@ retention are backend implementation parameters
   idempotency conflict; the client must use a new key for a genuinely new intent.
 - New key → new operation.
 
-**Current contract.** `contracts/openapi/work-management.yaml` declares
-`Idempotency-Key` **only** on
-`POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide`. No other
-mutating endpoint accepts it, so only approval decisions are currently
-replay-safe. Clients must not assume consultation, triage, proposal, or card
-operations are idempotent. Extending the header to the remaining unsafe endpoints
-is [Amendment A-02](#amendment-a-02--idempotency-for-mutating-endpoints).
+**Current contract.** [Amendment A-02](#amendment-a-02--idempotency-for-mutating-endpoints)
+was applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
+`contracts/openapi/work-management.yaml` declares `Idempotency-Key` on every
+unsafe operation a client may retry — consultation create, triage, proposal
+create, proposal submit, and board card move — and it remains **required** on
+`POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide`. The header
+is optional elsewhere, so a request without it has no replay guarantee; offline
+clients must send it before auto-replaying a queued write. This describes the
+API contract, not implemented HTTP handlers: the current persistence suite
+proves database-level idempotency for proposal decisions only.
 
 #### 3.7 Offline and Synchronization
 
@@ -305,19 +311,21 @@ The backend is the single source of truth. Read operations always fetch from the
 backend; stale local data is never presented as authoritative.
 
 The Desktop and VS Code clients maintain a local queue of pending operations.
-Only operations with a defined idempotency contract may be **auto-replayed**
-(currently only approval decisions, which carry a stored `Idempotency-Key`).
-Other writes (consultation, triage, proposal, card move) may be queued while
-offline, but they must **not** be replayed automatically until
-[Amendment A-02](#amendment-a-02--idempotency-for-mutating-endpoints) is applied;
-the client keeps them pending and surfaces them for explicit user confirmation
-when connectivity returns.
+Operations with a defined idempotency contract may be **auto-replayed** only
+when they carry the `Idempotency-Key` generated when they were enqueued and an
+HTTP handler implementing the contract is available. Since
+[Amendment A-02](#amendment-a-02--idempotency-for-mutating-endpoints) was
+applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11),
+every unsafe operation accepts the header, so queued consultation, triage,
+proposal, and card-move writes are contractually replayable once that key is
+attached. The HTTP replay implementation remains pending.
 
 Conflict handling uses **optimistic locking**, not silent last-writer-wins:
 approval decisions submit `proposal_version`. On `409`, the client reloads the
 entity and asks the user to re-confirm; a new `Idempotency-Key` is generated only
-for a new, deliberate intent. Board cards have no version field today, so
-offline reordering is out of scope until the contract provides one (Issues
+for a new, deliberate intent. Board-card ETag/If-Match semantics are now in the
+contract, but automatic offline reordering remains pending a runtime that
+enforces those preconditions (Issues
 [#8](https://github.com/jacksonsr451/EventFlow/issues/8) /
 [#42](https://github.com/jacksonsr451/EventFlow/issues/42)).
 
@@ -364,62 +372,77 @@ exposing GitHub credentials to client code.
 Contract compatibility tests verify that the generated TypeScript types are
 structurally compatible with the JSON Schema source after each schema update.
 
-## Amendment Proposals (Not Applied)
+## Amendment Proposals
 
-The two proposals below describe how to remove the divergences explained in
-sections 3.4 and 3.6. They require modifying contracts already accepted in
-[Issue #2](https://github.com/jacksonsr451/EventFlow/issues/2), so they are
-**proposals only** and are **not applied** by this ADR. They must be scheduled
-and reviewed as a dedicated contract revision before being implemented.
+The two proposals below describe how the divergences explained in sections 3.4
+and 3.6 were removed. Both were **applied** by
+[Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11), which modified
+contracts accepted in [Issue #2](https://github.com/jacksonsr451/EventFlow/issues/2)
+as a dedicated, reviewed contract revision. The text is retained to record the
+rationale, the compatibility assessment, and the required tests.
 
 ### Amendment A-01 — Align Work Management errors with RFC 9457
+
+- **Status:** Applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
 
 - **Affected files:** `contracts/schemas/work_management.yaml`
   (`$defs/ErrorResponse`) and every `application/problem+json` response in
   `contracts/openapi/work-management.yaml`.
 - **Change:** replace the custom `ErrorResponse` (`error_code`, `message`,
-  `details`, `timestamp`) with an RFC 9457 problem shape (`type`, `title`,
-  `status`, `detail`, `instance`, optional `correlation_id`, `request_id`,
-  `errors[]`), reusing the shared Order Processing `Error` definition or a
-  newly extracted shared schema.
-- **Expected behaviour:** both bounded contexts emit one problem+json shape; a
-  single shared error handler and a single generated error type replace the
-  per-domain mapping described in 3.4.
+  `details`, `timestamp`) with an RFC 9457 problem shape. Standard RFC members
+  (`type`, `title`, `status`, `detail`, `instance`) remain optional as specified
+  by RFC 9457 (`type` defaults semantically to `about:blank`); the required
+  EventFlow `correlation_id` and optional `request_id`, `code`, and `errors[]`
+  are extensions. The Work Management contract declares a local compatible
+  definition to preserve bounded-context isolation and Orders behavior.
+- **Expected behaviour:** both bounded contexts emit RFC 9457 problem documents;
+  clients use one RFC-aware error-handling path while generated requiredness
+  follows each domain schema (Orders remains unchanged).
 - **Compatibility:** breaking for any consumer that reads `error_code`,
   `message`, `details`, or `timestamp`. No consumer is implemented yet (Issue #2
   defines contracts only), so a coordinated change before first implementation
   is low risk. If that assumption changes, keep `error_code` as a deprecated
   extension field for one version.
 - **Required tests:** draft-2020-12 schema validation; positive and negative
-  problem+json fixtures per endpoint; a boundary test asserting a single shared
-  `ErrorResponse` definition; a cross-domain error-type compatibility test.
+  problem+json fixtures; a boundary test asserting a single Work Management
+  `ErrorResponse` definition; a cross-domain core-shape compatibility test; and
+  a check that an included problem `status` matches the HTTP response status.
 - **Owner:** [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11)
   with [Issue #49](https://github.com/jacksonsr451/EventFlow/issues/49).
 
 ### Amendment A-02 — Idempotency for mutating endpoints
 
-- **Affected endpoints (all currently unsafe and non-idempotent):**
+- **Status:** Applied by [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
+- **Affected endpoints (previously unsafe and non-idempotent):**
   `POST /v1/workspaces/{workspace_id}/consultations`,
   `POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage`,
   `POST /v1/workspaces/{workspace_id}/proposals`,
   `POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/submit`, and
-  `PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards`.
+  `PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}`.
+  The card-specific URI gives `If-Match` the same target resource as the
+  `BoardCard` detail ETag; this correction is made before any API client is
+  released.
   `POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide` already
   declares `Idempotency-Key` and needs no change.
-- **Change:** add an `Idempotency-Key` request header parameter (same UUID
-  constraints as the existing `decide` parameter) to each endpoint above. The
-  backend persists `(workspace_id, idempotency_key, request_fingerprint,
-  response_status, response_body)` in the same transaction as the domain change.
+- **Change:** add an `Idempotency-Key` request header parameter with the same
+  grammar and length constraints as the existing `decide` parameter to each endpoint above. Keys
+  use the same safe token grammar and length constraints across operations. The
+  key scope is `(workspace_id, operationId, key)`; implementations persist the
+  request fingerprint and replayable response with the domain change in one
+  transaction.
 - **Expected behaviour:** same key + equivalent request → the stored response is
   returned and no extra effect occurs; same key + different request → `409`;
-  headers missing → the request is processed once without replay protection
-  (acceptable for one-time online clients, not for queued offline writes).
+  optional headers omitted → no deduplication or replay guarantee applies; each
+  attempt may execute, so clients must not auto-replay such a write.
 - **Compatibility:** additive and optional, so not breaking for existing callers
   that omit the header; mandatory for offline-capable Desktop and VS Code
   clients.
 - **Required tests:** per-endpoint duplicate-submission tests (same key → a
   single effect; different body → `409`); a concurrent-submission test; an
-  offline-queue replay test asserting exactly-once effects.
+  offline-queue replay contract test. Persistence-level tests prove database
+  effects only for the currently implemented approval decision; the API contract
+  does not imply that HTTP handlers or other endpoint integrations exist, and
+  does not promise exactly-once external side effects.
 - **Owner:** [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11),
   with domain behaviour in [Issue #4](https://github.com/jacksonsr451/EventFlow/issues/4),
   [Issue #6](https://github.com/jacksonsr451/EventFlow/issues/6), and
@@ -495,8 +518,12 @@ this phase because:
   [Issue #23](https://github.com/jacksonsr451/EventFlow/issues/23) (VS Code),
   and [Issue #25](https://github.com/jacksonsr451/EventFlow/issues/25)
   (Desktop).
-- TypeScript code generation tooling is selected in
-  [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
+- [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11) defines the
+  versioned Work Management API contract and extracts the request/response DTOs
+  that generation consumes; the TypeScript code-generation tooling itself is
+  selected when `packages/` is created
+  ([Issue #33](https://github.com/jacksonsr451/EventFlow/issues/33) /
+  [Issue #13](https://github.com/jacksonsr451/EventFlow/issues/13)).
 - Workspace tooling (pnpm or npm workspaces) is configured in
   [Issue #33](https://github.com/jacksonsr451/EventFlow/issues/33).
 - See [client-integration.md](../architecture/client-integration.md) for

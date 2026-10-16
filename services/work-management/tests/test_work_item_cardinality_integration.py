@@ -12,13 +12,12 @@ import threading
 from uuid import uuid4
 
 import testrunner
-from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
-
 from eventflow_work_management.repositories import (
     ApprovalRepository,
     WorkItemRepository,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from support import (
     create_consultation,
     create_project,

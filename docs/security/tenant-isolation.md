@@ -67,7 +67,8 @@ and in every asynchronous consumer, without exception.
 | Authenticated, not a member | Valid token, no membership for the target workspace | `404 Not Found` |
 | Authenticated, insufficient role | Member, but lacks the required RBAC permission | `403 Forbidden` |
 | Cross-tenant object id | Object exists in another workspace | `404 Not Found` |
-| Stale or conflicting write | Optimistic-locking or idempotency conflict | `409 Conflict` |
+| Stale `If-Match` validator | ETag precondition fails | `412 Precondition Failed` |
+| Stale proposal version or idempotency conflict | Domain version or key-fingerprint conflict | `409 Conflict` |
 | Not authenticated at all | Anonymous request to a protected route | `401 Unauthorized` |
 
 A client-supplied `workspace_id` never grants access. Body payloads for mutating

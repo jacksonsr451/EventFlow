@@ -5,9 +5,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import testrunner
-from sqlalchemy.exc import IntegrityError
-
 from eventflow_work_management.repositories import RemoteReferenceRepository
+from sqlalchemy.exc import IntegrityError
 from support import (
     create_consultation,
     create_project,
