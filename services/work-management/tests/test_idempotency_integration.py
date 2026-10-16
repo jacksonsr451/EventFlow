@@ -27,7 +27,7 @@ def _setup(session):
     workspace = create_workspace(session)
     project = create_project(session, workspace)
     consultation = create_consultation(session, workspace, project)
-    proposal = ProposalRepository(session).create(
+    proposal = ProposalRepository(session).add(
         workspace_id=workspace.id,
         project_id=project.id,
         consultation_id=consultation.id,
@@ -40,6 +40,7 @@ def _setup(session):
         category="feature",
         priority="medium",
     )
+    session.commit()
     return workspace, proposal
 
 

@@ -53,7 +53,9 @@ class Action(str, Enum):
 
     PROPOSAL_READ = "proposal:read"
     PROPOSAL_CREATE = "proposal:create"
+    PROPOSAL_UPDATE = "proposal:update"
     PROPOSAL_SUBMIT = "proposal:submit"
+    PROPOSAL_DUPLICATE = "proposal:duplicate"
     APPROVAL_DECIDE = "approval:decide"
 
     WORK_ITEM_READ = "work_item:read"
@@ -97,6 +99,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
+            Action.PROPOSAL_UPDATE,
+            Action.PROPOSAL_DUPLICATE,
             Action.APPROVAL_DECIDE,
             Action.WORK_ITEM_UPDATE,
             Action.BOARD_MANAGE,
@@ -119,6 +123,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
+            Action.PROPOSAL_UPDATE,
+            Action.PROPOSAL_DUPLICATE,
             Action.APPROVAL_DECIDE,
             Action.WORK_ITEM_UPDATE,
             Action.BOARD_MANAGE,
@@ -135,6 +141,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
+            Action.PROPOSAL_UPDATE,
+            Action.PROPOSAL_DUPLICATE,
             Action.WORK_ITEM_UPDATE,
         }
     ),
@@ -148,6 +156,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
+            Action.PROPOSAL_UPDATE,
+            Action.PROPOSAL_DUPLICATE,
             Action.APPROVAL_DECIDE,
         }
     ),
@@ -161,6 +171,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
+            Action.PROPOSAL_UPDATE,
+            Action.PROPOSAL_DUPLICATE,
             Action.WORK_ITEM_UPDATE,
             Action.BOARD_MANAGE,
         }

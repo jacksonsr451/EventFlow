@@ -1,4 +1,11 @@
-"""Proposal model."""
+"""Proposal model.
+
+A Proposal is an independent, reviewable plan derived from a Consultation
+(Issue #6). One consultation may produce zero, one, or many proposals: each
+proposal is its own aggregate with its own ``proposal_id`` and its own revision
+history, so the version counter is scoped to the proposal and starts at 1. A
+proposal never creates an Approval, WorkItem, BoardCard, or remote issue.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +34,12 @@ from eventflow_work_management.models.enums import (
 
 
 class Proposal(TimestampMixin, Base):
-    """A versioned, reviewable plan derived from a Consultation."""
+    """One independent proposal (aggregate root) derived from a consultation.
+
+    The row always holds the current revision; every accepted content edit
+    writes an immutable ``proposal_revisions`` snapshot and increments
+    ``version``. Independent proposals never share a version counter.
+    """
 
     __tablename__ = "proposals"
 
@@ -46,6 +58,9 @@ class Proposal(TimestampMixin, Base):
     scope: Mapped[str] = mapped_column(Text, nullable=False)
     justification: Mapped[str] = mapped_column(Text, nullable=False)
     acceptance_criteria: Mapped[list] = mapped_column(JSONB, nullable=False)
+    checklist: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
     category: Mapped[str] = mapped_column(String(16), nullable=False)
     priority: Mapped[str] = mapped_column(String(16), nullable=False)
     risks: Mapped[list] = mapped_column(
@@ -60,6 +75,12 @@ class Proposal(TimestampMixin, Base):
     )
     proposer_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     reviewer_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    duplicated_from_proposal_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
+    superseded_by_proposal_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -78,8 +99,17 @@ class Proposal(TimestampMixin, Base):
             name="fk_proposals_workspace_project",
             ondelete="CASCADE",
         ),
-        UniqueConstraint(
-            "consultation_id", "version", name="uq_proposals_consultation_version"
+        ForeignKeyConstraint(
+            ["workspace_id", "duplicated_from_proposal_id"],
+            ["proposals.workspace_id", "proposals.id"],
+            name="fk_proposals_workspace_duplicated_from",
+            ondelete="SET NULL",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "superseded_by_proposal_id"],
+            ["proposals.workspace_id", "proposals.id"],
+            name="fk_proposals_workspace_superseded_by",
+            ondelete="SET NULL",
         ),
         UniqueConstraint("workspace_id", "id", name="uq_proposals_workspace_id"),
         UniqueConstraint(
@@ -111,6 +141,7 @@ class Proposal(TimestampMixin, Base):
         CheckConstraint(
             "jsonb_array_length(acceptance_criteria) >= 1", name="criteria_not_empty"
         ),
+        CheckConstraint("jsonb_typeof(checklist) = 'array'", name="checklist_is_array"),
         CheckConstraint("jsonb_typeof(risks) = 'array'", name="risks_is_array"),
         CheckConstraint(
             "jsonb_typeof(dependencies) = 'array'", name="dependencies_is_array"

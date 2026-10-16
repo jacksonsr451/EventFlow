@@ -73,11 +73,17 @@ section 3.1) and for contract tests.
 | `ReclassifyConsultationRequest` | `POST .../consultations/{consultation_id}/reclassify` (Issue #5) |
 | `TriageTemplate`, `TriageTemplates` | `GET .../consultations/triage-templates` (Issue #5) |
 | `CreateProposalRequest` | `POST /v1/workspaces/{workspace_id}/proposals` |
-| `Proposal` | detail GET and create/submit responses |
+| `Proposal` | detail GET and list/create/update/submit/duplicate responses |
+| `ChecklistItem` | the checklist entry used by `CreateProposalRequest`, `UpdateProposalRequest`, and `Proposal` (Issue #6) |
+| `UpdateProposalRequest` | `PATCH .../proposals/{proposal_id}` (Issue #6) |
+| `DuplicateProposalRequest` | `POST .../proposals/{proposal_id}/duplicate` (Issue #6) |
+| `ProposalPreview` | `POST .../proposals/preview` (Issue #6) |
+| `ProposalRevision`, `ProposalRevisionPage` | `GET .../proposals/{proposal_id}/revisions` (Issue #6) |
+| `ProposalPage` | `GET .../consultations/{consultation_id}/proposals` (Issue #6) |
 | `DecideProposalRequest` | `POST .../proposals/{proposal_id}/decide` |
 | `DecideProposalResponse` | `POST .../proposals/{proposal_id}/decide` (200) |
 | `MoveBoardCardRequest` | `PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}` |
-| `ConsultationPage`, `WorkItemPage`, `BoardCardPage` | list responses |
+| `ConsultationPage`, `ProposalPage`, `ProposalRevisionPage`, `WorkItemPage`, `BoardCardPage` | list responses |
 | `WorkItem`, `Board` | corresponding detail GET responses |
 | `CreateWorkspaceRequest`, `UpdateWorkspaceRequest` | workspace administration (Issue #9) |
 | `CreateProjectRequest`, `UpdateProjectRequest` | project administration (Issue #9) |
@@ -180,7 +186,9 @@ Amendment A-02, every unsafe operation a client may retry accepts an
 | `POST .../consultations/{consultation_id}/attachments` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/evidence` | `Idempotency-Key` | No |
 | `POST .../proposals` | `Idempotency-Key` | No |
+| `PATCH .../proposals/{proposal_id}` | `Idempotency-Key` | No |
 | `POST .../proposals/{proposal_id}/submit` | `Idempotency-Key` | No |
+| `POST .../proposals/{proposal_id}/duplicate` | `Idempotency-Key` | No |
 | `POST .../proposals/{proposal_id}/decide` | `Idempotency-Key` | Yes |
 | `PATCH .../boards/{board_id}/cards/{card_id}` | `Idempotency-Key` | No |
 
@@ -353,6 +361,50 @@ is authoritative and the OpenAPI is generated to match.
   metadata (category, title, description, guidance, and required fields) for the
   differentiated categories. They are guidance contracts, not client UIs.
 
+### 8.4 Consultation task proposals (Issue #6)
+
+Issue #6 makes the Proposal a first-class, independent aggregate. One triaged
+consultation may yield **zero, one, or many** proposals; the relationship is
+1→N and is never collapsed. Each proposal has its own identity and its own
+revision counter starting at 1, so two proposals of the same consultation are
+both "version 1" and are distinguished by `proposal_id`.
+
+| Operation | Method and path | Required role (`x-required-roles`) |
+|---|---|---|
+| Preview proposal | `POST .../proposals/preview` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+| Create proposal | `POST .../proposals` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+| List proposals | `GET .../consultations/{consultation_id}/proposals` | any member (incl. `viewer`) |
+| Read proposal | `GET .../proposals/{proposal_id}` | any member (incl. `viewer`) |
+| Read revisions | `GET .../proposals/{proposal_id}/revisions` | any member (incl. `viewer`) |
+| Edit proposal | `PATCH .../proposals/{proposal_id}` | proposer, or `owner`/`admin` |
+| Submit for review | `POST .../proposals/{proposal_id}/submit` | proposer, or `owner`/`admin` |
+| Duplicate proposal | `POST .../proposals/{proposal_id}/duplicate` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+
+- **Eligibility.** A proposal may only be derived from a consultation whose
+  manual triage has completed (`triaged_at` recorded) and whose status is
+  `triaging`, `proposed`, or `reopened`; raw `open`/`draft` intake and terminal
+  states return `409 INVALID_STATE`. Preview and create enforce the same rule.
+- **Preview.** `POST .../proposals/preview` validates and normalizes a
+  prospective proposal (including checklist item ids and evidence references)
+  and returns a `ProposalPreview` without persisting anything.
+- **Revisions.** Editing a `draft` or `changes_requested` proposal with content
+  changes increments `version` and appends an immutable `ProposalRevision`
+  snapshot; the revision history is read-only and cursor-paginated. A
+  `proposal.revised` audit record accompanies each edit.
+- **Lifecycle.** `submit` moves `draft`/`changes_requested` to `in_review`; an
+  already-submitted proposal returns `409 INVALID_STATE`. Creating, editing,
+  previewing, submitting, or duplicating a proposal **never** creates an
+  Approval, WorkItem, BoardCard, or remote issue.
+- **Duplication.** `duplicate` creates a new independent `draft` at version 1
+  that references its source through `duplicated_from_proposal_id`. With
+  `supersede_source: true` the source becomes `superseded` and records
+  `superseded_by_proposal_id`. Duplication never fabricates downstream work.
+- **Concurrency and idempotency.** `PATCH`, `submit`, and `duplicate` honour a
+  strong `If-Match` (`412` on a stale validator) and accept an optional
+  `Idempotency-Key`; an equivalent replay returns the original resource without
+  repeating effects. Audit actions are `proposal.created`, `proposal.revised`,
+  `proposal.submitted`, and `proposal.duplicated`.
+
 ## 9. Internal events
 
 Versioned internal events (for example `work_item.created`,
@@ -373,6 +425,7 @@ not invent one.
 | ETag / If-Match | `ETag` header, `IfMatch` parameter | `test_optimistic_concurrency_declares_if_match_and_412` |
 | Idempotency (A-02) | `Idempotency-Key` parameters | `test_idempotency_key_declared_on_retryable_operations` |
 | Authorization | `bearerAuth`, `x-required-roles` | `test_every_operation_requires_bearer_auth`, `test_every_operation_declares_authorization_roles` |
+| Consultation task proposals (Issue #6) | section 8.4, `Proposal*` DTOs | `services/work-management/tests/test_proposal_api_integration.py`, `services/work-management/tests/test_proposal_unit.py` |
 | Per-flow examples | `contracts/examples/work-management/` | `test_per_flow_examples_validate` |
 
 ## 11. Related documents

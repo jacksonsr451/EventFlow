@@ -32,6 +32,8 @@ EXPECTED_TABLES = {
     "consultation_attachments",
     "consultation_attachment_blobs",
     "consultation_evidence",
+    "proposal_revisions",
+    "proposal_evidence",
 }
 
 EXPECTED_TRIGGERS = {
@@ -40,12 +42,16 @@ EXPECTED_TRIGGERS = {
     "trg_audit_records_no_delete",
     "trg_audit_records_no_truncate",
     "trg_remote_references_entity_guard",
+    "trg_proposal_revisions_no_update",
+    "trg_proposal_revisions_no_delete",
+    "trg_proposal_revisions_no_truncate",
 }
 
 EXPECTED_FUNCTIONS = {
     "eventflow_validate_work_item_origin",
     "eventflow_validate_remote_reference",
     "eventflow_audit_records_block_mutation",
+    "eventflow_proposal_revisions_block_mutation",
 }
 
 
@@ -101,7 +107,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         tables = _tables(engine)
         assert EXPECTED_TABLES <= tables
         assert "alembic_version" in tables
-        assert _revision(engine) == "0006_attachments_evidence"
+        assert _revision(engine) == "0007_proposal_task_proposals"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
         assert EXPECTED_CONSTRAINTS <= _constraints(engine)
@@ -112,7 +118,7 @@ def test_upgrade_is_idempotent():
     with temporary_empty_database(admin_url) as (url, engine):
         run_migrations(url)
         run_migrations(url)
-        assert _revision(engine) == "0006_attachments_evidence"
+        assert _revision(engine) == "0007_proposal_task_proposals"
 
 
 def test_downgrade_removes_tables_triggers_and_functions():

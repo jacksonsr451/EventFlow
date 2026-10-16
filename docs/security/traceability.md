@@ -17,6 +17,16 @@ recorded in the append-only, tamper-evident audit trail (SO-06). Verified by
 `services/work-management/tests/test_consultation_triage_integration.py` and
 `services/work-management/tests/test_triage_criteria_unit.py`.
 
+Issue #6 extends the same manual-authority and append-only guarantees to
+consultation task proposals: one triaged consultation may yield many independent
+proposals, but every create/edit/submit/duplicate is an authorized human action
+gated by an RBAC check (SC-07) and recorded in the append-only audit trail, and
+each proposal's revision history is immutable and tamper-evident (SO-06). No
+proposal operation creates an Approval, WorkItem, BoardCard, or remote issue
+(SC-04). Verified by
+`services/work-management/tests/test_proposal_api_integration.py` and
+`services/work-management/tests/test_proposal_unit.py`.
+
 - Threats and controls are defined in [threat-model.md](threat-model.md).
 - Risks are defined in [risk-register.md](risk-register.md).
 - Control state values are defined in the [risk register legend](risk-register.md#control-state-legend).
@@ -100,7 +110,7 @@ Every control listed here is referenced by at least one threat. "State" uses the
 | SC-04 | untrusted-content.md | Specified | No authoritative state changes without human confirmation | Issue #46 tests | Issue #46 |
 | SC-05 | untrusted-content.md | Specified | Stored script content does not execute in the application origin | Issue #14 tests | Issues #13, #14 |
 | SC-06 | untrusted-content.md | Specified | Model output is validated before use; input is separated from instructions | Issue #45 tests | Issue #45 |
-| SC-07 | untrusted-content.md | Specified | An RBAC check gates every authoritative effect | Issue #9 tests | Issue #9 |
+| SC-07 | untrusted-content.md | Specified | An RBAC check gates every authoritative effect | Issue #9 tests; services/work-management/tests/test_proposal_api_integration.py | Issue #9 |
 | AT-01 | untrusted-content.md | Implemented | A file whose content contradicts its declared type is rejected | services/work-management/tests/test_consultation_attachment_integration.py | Issue #4 |
 | AT-02 | untrusted-content.md | Implemented | An upload above the size limit or the per-consultation quota is rejected | services/work-management/tests/test_consultation_attachment_integration.py | Issue #4 |
 | AT-03 | untrusted-content.md | Implemented | Malware is quarantined and rejected; attachment.rejected is emitted | services/work-management/tests/test_consultation_attachment_integration.py | Issues #4, #12 |
@@ -123,7 +133,7 @@ Every control listed here is referenced by at least one threat. "State" uses the
 | WH-11 | webhooks.md | Specified (Pending Decision) | App permissions are read-only unless an approved justification exists | Issue #27 review | Issues #27, #28 |
 | TI-01 | tenant-isolation.md | Specified | A request body cannot alter the effective tenant | tests/security/test_security_contracts.py | Issue #47 |
 | TI-02 | tenant-isolation.md | Specified | A non-member using a foreign path workspace_id is denied | Issue #47 tests | Issue #47 |
-| TI-03 | tenant-isolation.md | Specified | A cross-tenant access returns 404, never 403 | tests/security/test_security_contracts.py | Issue #47 |
+| TI-03 | tenant-isolation.md | Specified | A cross-tenant access returns 404, never 403 | tests/security/test_security_contracts.py; services/work-management/tests/test_proposal_api_integration.py | Issue #47 |
 | TI-04 | tenant-isolation.md | Specified | Every query, projection, and export includes the tenant predicate | Issue #47 tests | Issue #12 |
 | TI-05 | tenant-isolation.md | Specified | Tenant-data cache keys include the workspace id | Issue #12 tests | Issue #12 |
 | TI-06 | tenant-isolation.md | Specified | Only an owner or admin changes roles; roles do not cross workspaces | Issue #9 tests | Issue #9 |
@@ -147,7 +157,7 @@ Every control listed here is referenced by at least one threat. "State" uses the
 | SO-03 | security-observability.md | Specified (Pending Decision) | Security events reach the approved destination | Issue #47 tests | Issue #47 |
 | SO-04 | security-observability.md | Specified | High and critical events alert the on-call channel | Issue #47 tests | Issue #47 |
 | SO-05 | security-observability.md | Specified | An event can be correlated with its request via correlation_id | tests/security/test_security_contracts.py | Issue #47 |
-| SO-06 | security-observability.md | Specified | Approval and security audit records are append-only and tamper-evident | Issue #7 tests | Issue #7 |
+| SO-06 | security-observability.md | Specified | Approval and security audit records are append-only and tamper-evident | Issue #7 tests; services/work-management/tests/test_proposal_api_integration.py | Issue #7 |
 | SO-07 | security-observability.md | Specified | Only security maintainers can read security logs | Issue #47 tests | Issue #47 |
 | SO-08 | security-observability.md | Specified (Pending Decision) | Security events are retained for the approved period | Issue #47 tests | Issue #47 |
 | SO-09 | security-observability.md | Specified | Metrics avoid raw user, workspace, and event-id labels | Issue #47 tests | Issue #47 |

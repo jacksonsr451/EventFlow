@@ -29,7 +29,7 @@ from support import (
 def _approve(
     session, workspace, consultation, *, decision="approved", key="decision-key-0001"
 ):
-    proposal = ProposalRepository(session).create(
+    proposal = ProposalRepository(session).add(
         workspace_id=workspace.id,
         project_id=consultation.project_id,
         consultation_id=consultation.id,

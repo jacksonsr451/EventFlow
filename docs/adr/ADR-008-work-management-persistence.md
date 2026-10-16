@@ -162,6 +162,47 @@ exists: RLS policies need a verified caller identity and workspace claim from
 RLS before that context exists would create policies that cannot be tested
 end-to-end. This deferral is recorded so it is not mistaken for completeness.
 
+## Amendment Proposals
+
+### Amendment A-01 — Independent proposals and immutable revisions (Issue #6)
+
+**Status:** Accepted.
+
+**Context.** The original schema made `proposals` unique on
+`(consultation_id, version)`, which implied a single version chain per
+Consultation and prevented one Consultation from producing several independent
+Proposals. [Issue #6](https://github.com/jacksonsr451/EventFlow/issues/6)
+requires a 1→N relationship: a triaged Consultation may yield zero, one, or many
+Proposals, each with its own identity and its own revision counter.
+
+**Decision.**
+
+- `proposals` no longer carries `UNIQUE (consultation_id, version)`. A Proposal's
+  `version` is scoped to its own `proposal_id` and starts at 1.
+- A new `proposal_revisions` table stores the immutable snapshot of each accepted
+  revision, with `UNIQUE (proposal_id, version)` and a workspace-bound composite
+  foreign key to `proposals`. `BEFORE UPDATE`/`BEFORE DELETE`/`BEFORE TRUNCATE`
+  triggers (`eventflow_proposal_revisions_block_mutation`) make the history
+  append-only.
+- A new `proposal_evidence` table links a Proposal to `consultation_evidence`
+  rows in the same workspace (composite primary key
+  `(proposal_id, evidence_id)`).
+- `proposals` gains `checklist` (`JSONB`), `duplicated_from_proposal_id`, and
+  `superseded_by_proposal_id`, with self-referencing composite foreign keys that
+  keep a duplicate/superseding Proposal in the same workspace and project.
+- No proposal operation creates an `Approval`, `WorkItem`, `BoardCard`, or remote
+  issue; those remain gated behind the existing approval path.
+
+**Consequences.** The `(consultation_id, version)` uniqueness documented in
+section 4 and in
+[work-management-persistence.md](../architecture/work-management-persistence.md)
+is superseded by `UNIQUE (proposal_id, version)` on `proposal_revisions`.
+`ApprovalRepository` continues to bind a decision to a `(proposal_id,
+proposal_version)` pair, which remains unambiguous because `proposal_id`
+identifies the Proposal. Verified by
+`services/work-management/tests/test_proposal_api_integration.py`,
+`services/work-management/tests/test_proposal_unit.py`, and the migration tests.
+
 ## Consequences
 
 ### Positive

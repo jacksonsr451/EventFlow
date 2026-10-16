@@ -18,6 +18,8 @@ EXPECTED_TABLES = {
     "projects",
     "consultations",
     "proposals",
+    "proposal_revisions",
+    "proposal_evidence",
     "approvals",
     "work_items",
     "boards",

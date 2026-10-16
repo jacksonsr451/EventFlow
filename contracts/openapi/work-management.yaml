@@ -849,6 +849,113 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/proposals:
+    get:
+      operationId: listProposals
+      tags: [Proposals]
+      summary: List the independent proposals derived from one consultation
+      description: >-
+        Returns every independent proposal derived from the consultation. The
+        list is never collapsed: two proposals of the same consultation appear
+        as distinct resources, each with its own proposal_id and version history.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [created_at, updated_at, version, status]
+      x-default-sort-fields: [created_at, proposal_id]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ProposalStatus'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of proposals.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProposalPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/proposals/preview:
+    post:
+      operationId: previewProposal
+      tags: [Proposals]
+      summary: Preview a normalized proposal draft without persisting it
+      description: >-
+        Validates and normalizes a prospective proposal exactly like creation
+        but persists nothing and creates no downstream resource. It lets a
+        client review the normalized checklist, dependencies, and evidence
+        before committing. A consultation that cannot yield a proposal returns
+        409.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateProposalRequest'
+      responses:
+        '200':
+          description: The normalized, unpersisted proposal draft.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProposalPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
   /v1/workspaces/{workspace_id}/proposals:
     post:
       operationId: createProposal
@@ -857,9 +964,11 @@ paths:
       description: >-
         Creates a proposal in DRAFT state. It does not create a WorkItem or
         allocate execution capacity. The referenced consultation must be
-        visible in this workspace and in a state that permits proposal creation;
-        an invalid lifecycle state returns 409. Each accepted creation receives
-        the next version for that consultation, starting at version 1.
+        visible in this workspace and have completed manual triage; an invalid
+        lifecycle state returns 409. One consultation may yield zero, one, or
+        many independent proposals: each accepted creation is version 1 of a new
+        proposal with its own proposal_id, and the version counter is scoped to
+        that proposal rather than the consultation.
       security:
         - bearerAuth: []
       x-required-roles: [contributor, triager, approver, admin, owner]
@@ -992,6 +1101,168 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    patch:
+      operationId: updateProposal
+      tags: [Proposals]
+      summary: Edit a draft proposal and append a new revision
+      description: >-
+        Applies a partial content edit to a draft or changes-requested proposal
+        and appends an immutable revision, incrementing the proposal's version.
+        Only the proposer or a workspace administrator may edit it. An invalid
+        lifecycle state returns 409 and a stale If-Match returns 412. It never
+        creates an Approval, WorkItem, or BoardCard.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProposalId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateProposalRequest'
+      responses:
+        '200':
+          description: The revised proposal at its new version.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Proposal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/proposals/{proposal_id}/revisions:
+    get:
+      operationId: listProposalRevisions
+      tags: [Proposals]
+      summary: List the immutable revision history of a proposal
+      description: >-
+        Returns the append-only revision snapshots for one proposal, oldest
+        first. Versions are scoped to this proposal_id and start at 1.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProposalId'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of proposal revisions.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProposalRevisionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/proposals/{proposal_id}/duplicate:
+    post:
+      operationId: duplicateProposal
+      tags: [Proposals]
+      summary: Duplicate a proposal into a new independent draft
+      description: >-
+        Creates a new independent draft proposal copied from the source. The
+        copy has its own proposal_id and starts at version 1; it is not a
+        version of the source. It never creates an Approval, WorkItem, or
+        BoardCard. When supersede_source is true the source is marked
+        superseded and linked to the copy.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProposalId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/DuplicateProposalRequest'
+      responses:
+        '201':
+          description: The new independent draft proposal.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created proposal resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Proposal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
         default:

@@ -28,6 +28,8 @@ from eventflow_work_management.models.membership import (
     WorkspaceMembership,
 )
 from eventflow_work_management.models.proposal import Proposal
+from eventflow_work_management.models.proposal_evidence import ProposalEvidence
+from eventflow_work_management.models.proposal_revision import ProposalRevision
 from eventflow_work_management.models.work_item import WorkItem
 from eventflow_work_management.models.workspace import Project, Workspace
 
@@ -47,6 +49,8 @@ __all__ = [
     "OIDCLoginTransaction",
     "Project",
     "Proposal",
+    "ProposalEvidence",
+    "ProposalRevision",
     "RemoteIntegrationReference",
     "WorkItem",
     "Workspace",

@@ -54,6 +54,7 @@ classDiagram
         +String scope
         +String justification
         +List~String~ acceptance_criteria
+        +List~ChecklistItem~ checklist
         +TriageCategory category
         +Priority priority
         +List~String~ risks
@@ -62,8 +63,20 @@ classDiagram
         +ProposalStatus status
         +UUID proposer_id
         +UUID reviewer_id
+        +UUID duplicated_from_proposal_id
+        +UUID superseded_by_proposal_id
         +DateTime created_at
         +DateTime updated_at
+    }
+
+    class ProposalRevision {
+        +UUID revision_id
+        +UUID proposal_id
+        +Integer version
+        +UUID author_id
+        +String summary
+        +RevisionSnapshot snapshot
+        +DateTime created_at
     }
 
     class Approval {
@@ -135,10 +148,20 @@ classDiagram
         +UUID attachment_id
     }
 
+    class ProposalEvidence {
+        +UUID proposal_id
+        +UUID evidence_id
+        +UUID workspace_id
+    }
+
     Consultation "1" --> "0..*" Proposal : derives
     Consultation "1" --> "0..*" ConsultationAttachment : attaches
     Consultation "1" --> "0..*" ConsultationEvidence : evidenced by
     ConsultationEvidence "0..*" --> "0..1" ConsultationAttachment : cites
+    Proposal "1" --> "0..*" ProposalRevision : versions
+    Proposal "1" --> "0..*" ProposalEvidence : cites
+    ProposalEvidence "0..*" --> "1" ConsultationEvidence : references
+    Proposal "0..*" --> "0..1" Proposal : duplicated from
     Proposal "1" --> "0..*" Approval : evaluates
     Approval "1" --> "0..1" WorkItem : authorizes
     WorkItem "1" --> "1..*" BoardCard : projects into
@@ -154,11 +177,21 @@ classDiagram
      - Context captured via the VS Code extension (`editor_context`) strictly requires developer consent (`consent_granted: true`).
      - A Consultation may be closed, rejected, or marked as duplicate without ever producing a Proposal.
 2. **Proposal:**
-   - *Responsibility:* Structured technical proposal derived from a triaged Consultation.
-     Contains technical scope, acceptance criteria, architectural impact, and version tracking.
+   - *Responsibility:* An independent structured technical proposal derived from a
+     triaged Consultation. Contains technical scope, acceptance criteria, a
+     checklist, evidence links, architectural impact, and its own revision history.
    - *Invariants:*
-     - Creating a Proposal **does not** create a `WorkItem` or allocate execution capacity.
-     - Any modification to a Proposal increments its `version` integer and sets status back to `DRAFT` or `IN_REVIEW`, superseding previous review states.
+     - One triaged Consultation may yield **zero, one, or many** independent
+       Proposals; the relationship is 1→N and is never collapsed.
+     - Each Proposal has its own identity and its own `version` counter starting at
+       1, so two Proposals of the same Consultation are both version 1 and are
+       distinguished by `proposal_id`.
+     - Creating, editing, previewing, submitting, or duplicating a Proposal
+       **does not** create an `Approval`, `WorkItem`, `BoardCard`, or remote issue,
+       and never allocates execution capacity.
+     - Any accepted content modification increments the Proposal's `version` and
+       appends an immutable `ProposalRevision` snapshot; revision history is
+       append-only and never rewritten.
 3. **Approval:**
    - *Responsibility:* The formal, auditable decision record issued by an authorized reviewer
      evaluating a specific `(proposal_id, proposal_version)`.
@@ -265,17 +298,24 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT: Create from Triaged Consultation
+    [*] --> DRAFT: Create from Triaged Consultation (version 1)
+    DRAFT --> DRAFT: Edit content (version++, append revision)
     DRAFT --> IN_REVIEW: Submit for Review
     IN_REVIEW --> CHANGES_REQUESTED: Peer Reviewer Requests Adjustments
-    CHANGES_REQUESTED --> DRAFT: Edit Scope / Acceptance Criteria (version++)
+    CHANGES_REQUESTED --> DRAFT: Edit Scope / Acceptance Criteria (version++, append revision)
     IN_REVIEW --> REJECTED: Decider Formally Rejects
     IN_REVIEW --> APPROVED: Authorized Decider Approves
-    IN_REVIEW --> SUPERSEDED: Newer version submitted
-    DRAFT --> SUPERSEDED: Abandoned for new version
+    DRAFT --> SUPERSEDED: Duplicated with supersede_source=true
+    CHANGES_REQUESTED --> SUPERSEDED: Duplicated with supersede_source=true
+    IN_REVIEW --> SUPERSEDED: Duplicated with supersede_source=true
     APPROVED --> [*]: WorkItem & BoardCard Created
     REJECTED --> [*]
 ```
+
+A `DRAFT` or `CHANGES_REQUESTED` proposal is editable; each accepted content
+change increments `version` and appends an immutable revision. A proposal in any
+non-`SUPERSEDED` state may be duplicated, optionally marking the source
+`SUPERSEDED`.
 
 ### 3.3 WorkItem State Machine
 
@@ -326,6 +366,34 @@ stateDiagram-v2
     REJECTED --> [*]: Deleted by uploader or admin
 ```
 
+### 3.5 Proposal Revisions, Evidence, and Duplication (Issue #6)
+
+A Proposal is an independent aggregate derived from a triaged Consultation.
+Triage must have completed (a recorded `triaged_at`) and the Consultation must be
+`TRIAGING`, `PROPOSED`, or `REOPENED`; otherwise creation and preview return
+`409 INVALID_STATE`. One Consultation may produce many Proposals, each with its
+own `proposal_id` and its own `version` counter starting at 1.
+
+- **Revisions.** The first accepted creation records revision 1. Every accepted
+  content edit on a `DRAFT`/`CHANGES_REQUESTED` proposal increments `version` and
+  appends an immutable `ProposalRevision` snapshot (the canonical proposal
+  content at that version). The revision list is read-only and cursor-paginated;
+  history is never mutated. The append-only trigger
+  `eventflow_proposal_revisions_block_mutation` rejects `UPDATE`/`DELETE`/`TRUNCATE`
+  at the database level.
+- **Preview.** A proposal can be validated and normalized without persisting
+  anything, returning a prospective version-1 draft.
+- **Evidence.** A Proposal may cite `ConsultationEvidence` from the same
+  Consultation through `ProposalEvidence`; quarantined or foreign evidence can
+  never be cited.
+- **Duplication.** Duplicating a proposal creates a new independent `DRAFT` at
+  version 1 whose `duplicated_from_proposal_id` points at the source. With
+  `supersede_source: true` the source becomes `SUPERSEDED` and records
+  `superseded_by_proposal_id`. Duplication never creates an Approval, WorkItem,
+  BoardCard, or remote issue.
+- **Audit.** The append-only audit actions are `proposal.created`,
+  `proposal.revised`, `proposal.submitted`, and `proposal.duplicated`.
+
 ---
 
 ## 4. Comprehensive Transition Matrix
@@ -349,10 +417,12 @@ follows: *Any Authenticated / Author / Proposer / Assignee* → `contributor`;
 | **Consultation** | `TRIAGING` | `PROPOSED` | `Author`, `Maintainer` | A valid Proposal references this `consultation_id` | `active_proposal_id` linked | Consultation status locked to `PROPOSED` | `400 Bad Request`, `409 Conflict` |
 | **Consultation** | `TRIAGING` | `REJECTED` | `Triager`, `Maintainer` | Explicit rejection justification required | No active proposal may exist | `consultation.rejected` event published | `400 Bad Request` |
 | **Consultation** | `TRIAGING` | `DUPLICATE` | `Triager`, `Maintainer` | Valid target `duplicate_of_id` supplied | Target consultation must exist | Linked to parent consultation | `404 Not Found` |
-| **Proposal** | `None` | `DRAFT` | `Proposer` | Origin Consultation is in `TRIAGING` or `PROPOSED` | `version` starts at 1 | Proposal record created; does **not** create WorkItem | `400 Bad Request`, `404 Not Found` |
-| **Proposal** | `DRAFT` | `IN_REVIEW` | `Proposer`, `Maintainer` | Complete technical description, scope, and $\ge 1$ acceptance criteria | Status changes to `IN_REVIEW` | `proposal.submitted` event published | `422 Unprocessable Entity` |
+| **Proposal** | `None` | `DRAFT` | `Proposer` | Triage completed; origin Consultation is in `TRIAGING`, `PROPOSED`, or `REOPENED` | `version` starts at 1 for this `proposal_id`; revision 1 appended | Proposal record created; does **not** create WorkItem | `400 Bad Request`, `404 Not Found`, `409 INVALID_STATE` |
+| **Proposal** | `DRAFT` | `DRAFT` | `Proposer`, `Admin` | Proposal is `DRAFT`/`CHANGES_REQUESTED`; `If-Match` valid when supplied | `version` incremented; immutable revision appended | `proposal.revised` audit recorded; no downstream work | `403 Forbidden`, `409 INVALID_STATE`, `412 Precondition Failed` |
+| **Proposal** | `DRAFT` | `IN_REVIEW` | `Proposer`, `Maintainer` | Complete technical description, scope, and $\ge 1$ acceptance criteria | Status changes to `IN_REVIEW` | `proposal.submitted` audit recorded | `422 Unprocessable Entity` |
 | **Proposal** | `IN_REVIEW` | `CHANGES_REQUESTED` | `Reviewer`, `Approver` | Decider cannot be proposer (if anti-self-approval active); justification provided | Decision recorded as `CHANGES_REQUESTED` | `proposal.changes_requested` event published | `403 Forbidden` |
-| **Proposal** | `CHANGES_REQUESTED` | `DRAFT` | `Proposer` | New revision prepared; `version` incremented by 1 | Stale version marked `SUPERSEDED` | New version draft created | `409 Conflict` |
+| **Proposal** | `CHANGES_REQUESTED` | `DRAFT` | `Proposer` | New revision prepared; `version` incremented by 1 | Immutable revision appended; no version is mutated in place | New revision available in history | `409 Conflict` |
+| **Proposal** | `DRAFT`, `CHANGES_REQUESTED`, `IN_REVIEW` | `SUPERSEDED` | `Proposer`, `Contributor`, `Triager`, `Approver`, `Admin` | Duplicate created with `supersede_source: true`; source not already `SUPERSEDED` | `superseded_by_proposal_id` set to the new copy | `proposal.duplicated` audit recorded; source becomes terminal | `404 Not Found`, `409 Conflict` |
 | **Proposal** | `IN_REVIEW` | `REJECTED` | `Approver`, `Admin` | Decider possesses `approver` RBAC role; justification provided | Decision recorded as `REJECTED`; terminal for this version | `proposal.rejected` event published | `403 Forbidden`, `409 Conflict` |
 | **Proposal** | `IN_REVIEW` | `APPROVED` | `Approver`, `Admin` | Decider possesses `approver` RBAC role; `proposal_version` matches current; `Idempotency-Key` present | Proposal locked to `APPROVED`; generates WorkItem & BoardCard atomically | `proposal.approved`, `work_item.created`, `board_card.created` events | `403 Forbidden`, `409 Conflict` |
 | **WorkItem** | `None` | `READY` | `System (Approval Handler)` | Generated exclusively via valid, authorized `Approval` | Copies immutable acceptance criteria snapshot | Atomically placed on initial Board column | `500 Internal Error` (atomic rollback) |
