@@ -10,6 +10,13 @@ controls OA-01 through OA-04, OA-06, and OA-10; OA-07 through OA-09 remain
 partially implemented or specified because client runtimes and provider-wide
 revocation are not complete. Other controls remain in their documented states.
 
+Issue #5 reinforces the manual-authority controls: differentiated triage and
+manual reclassification only ever change state through an authorized human
+decision (SC-04) gated by an RBAC check (SC-07), and each reclassification is
+recorded in the append-only, tamper-evident audit trail (SO-06). Verified by
+`services/work-management/tests/test_consultation_triage_integration.py` and
+`services/work-management/tests/test_triage_criteria_unit.py`.
+
 - Threats and controls are defined in [threat-model.md](threat-model.md).
 - Risks are defined in [risk-register.md](risk-register.md).
 - Control state values are defined in the [risk register legend](risk-register.md#control-state-legend).

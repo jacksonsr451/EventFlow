@@ -311,6 +311,7 @@ def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
         "POST /v1/workspaces/{workspace_id}/consultations",
         "POST /v1/workspaces/{workspace_id}/consultations/drafts",
         "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
+        "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/reclassify",
         "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit",
         "PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}",
         "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/attachments",

@@ -61,6 +61,7 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "POST /v1/workspaces/{workspace_id}/consultations",
     "POST /v1/workspaces/{workspace_id}/consultations/drafts",
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
+    "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/reclassify",
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/submit",
     "PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}",
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/attachments",
@@ -537,6 +538,149 @@ def test_triage_criteria_match_the_selected_category(schema):
         },
     }
     assert not validator.is_valid(mismatched_criteria)
+
+
+VALID_CRITERIA = {
+    "bug": {
+        "expected_behavior": "Returns 400 with a problem document.",
+        "observed_behavior": "Raises an unhandled 500 error.",
+        "reproduction_steps": ["Submit an empty cart payload."],
+        "environment": "Python 3.11",
+        "severity": "high",
+        "is_regression": False,
+        "impact": "All empty-cart checkouts fail for every user.",
+    },
+    "feature": {
+        "problem_statement": "Triagers cannot record structured feature intent.",
+        "expected_value": "Consistent, queryable feature triage records.",
+        "functional_requirements": ["Record functional requirements."],
+        "acceptance_criteria": ["Feature triage is verifiable."],
+        "scope": "Backend triage contract only; no client UI.",
+    },
+    "chore": {
+        "maintenance_need": "Upgrade the pinned database driver.",
+        "technical_debt_type": "dependency",
+        "justification": "The current driver is out of support.",
+        "risk_of_inaction": "Unpatched security issues accumulate.",
+        "expected_technical_effect": "A supported, patched driver is pinned.",
+    },
+    "docs": {
+        "affected_document": "docs/architecture/work-management-api.md",
+        "inconsistency_summary": "The triage payload is described incorrectly.",
+        "target_audience": "Backend engineers",
+    },
+    "security": {
+        "vulnerability_type": "broken access control",
+        "severity_rating": "critical",
+        "confidentiality_level": "restricted",
+        "access_restricted_to": ["security-team"],
+        "safe_evidence_handling": True,
+    },
+}
+
+
+def triage_payload(category: str) -> dict:
+    return {
+        "category": category,
+        "priority": "high",
+        "triage_notes": "Reviewed and reproduced against the current build.",
+        f"{category}_criteria": VALID_CRITERIA[category],
+    }
+
+
+def test_triage_request_is_a_discriminated_union(schema):
+    """The triage DTO is a category-discriminated union, not an if/then chain."""
+    definition = schema["$defs"]["TriageConsultationRequest"]
+    assert "oneOf" in definition
+    assert "allOf" not in definition
+    assert definition["discriminator"]["propertyName"] == "category"
+    validator = validator_for(schema, "TriageConsultationRequest")
+    for category in VALID_CRITERIA:
+        assert validator.is_valid(triage_payload(category)), category
+    # Supplying a second category's criteria object must not match any variant.
+    for category in VALID_CRITERIA:
+        other = "bug" if category != "bug" else "feature"
+        payload = triage_payload(category)
+        payload[f"{other}_criteria"] = VALID_CRITERIA[other]
+        assert not validator.is_valid(payload), category
+
+
+def test_differentiated_criteria_require_category_specific_fields(schema):
+    """Bug/feature/chore criteria require their added discriminating fields."""
+    bug = validator_for(schema, "BugCriteria")
+    assert bug.is_valid(VALID_CRITERIA["bug"])
+    assert not bug.is_valid(
+        {k: v for k, v in VALID_CRITERIA["bug"].items() if k != "impact"}
+    )
+    feature = validator_for(schema, "FeatureCriteria")
+    assert feature.is_valid(VALID_CRITERIA["feature"])
+    assert not feature.is_valid(
+        {k: v for k, v in VALID_CRITERIA["feature"].items() if k != "scope"}
+    )
+    chore = validator_for(schema, "ChoreCriteria")
+    assert chore.is_valid(VALID_CRITERIA["chore"])
+    assert not chore.is_valid(
+        {
+            k: v
+            for k, v in VALID_CRITERIA["chore"].items()
+            if k != "expected_technical_effect"
+        }
+    )
+    # Docs and security criteria remain supported unchanged.
+    assert validator_for(schema, "DocsCriteria").is_valid(VALID_CRITERIA["docs"])
+    assert validator_for(schema, "SecurityCriteria").is_valid(
+        VALID_CRITERIA["security"]
+    )
+
+
+def test_reclassification_requires_justification_and_complete_triage(schema):
+    """Reclassification wraps a complete triage payload plus a justification."""
+    validator = validator_for(schema, "ReclassifyConsultationRequest")
+    valid = {
+        "justification": "Initial bug triage conflated two distinct defects.",
+        "triage": triage_payload("feature"),
+    }
+    assert validator.is_valid(valid)
+    assert not validator.is_valid({**valid, "justification": "too short"})
+    assert not validator.is_valid(
+        {key: value for key, value in valid.items() if key != "justification"}
+    )
+    assert not validator.is_valid(
+        {key: value for key, value in valid.items() if key != "triage"}
+    )
+    assert not validator.is_valid(
+        {
+            "justification": valid["justification"],
+            "triage": {
+                key: value
+                for key, value in valid["triage"].items()
+                if key != "feature_criteria"
+            },
+        }
+    )
+
+
+def test_reclassify_and_templates_operations_are_declared(openapi):
+    """Reclassification and templates are versioned operations with roles."""
+    operations = {
+        operation.get("operationId"): operation
+        for _, _, operation in iter_operations(openapi)
+    }
+    reclassify = operations["reclassifyConsultation"]
+    assert reclassify["x-required-roles"] == ["triager", "admin", "owner"]
+    assert "409" in reclassify["responses"]
+    assert "412" in reclassify["responses"]
+    request_ref = reclassify["requestBody"]["content"]["application/json"]["schema"][
+        "$ref"
+    ]
+    assert request_ref.endswith("#/$defs/ReclassifyConsultationRequest")
+    templates = operations["listConsultationTriageTemplates"]
+    assert templates["x-required-roles"] == ["triager", "admin", "owner"]
+    response_ref = templates["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"]
+    assert response_ref.endswith("#/$defs/TriageTemplates")
+
 
 
 def test_approved_decisions_require_target_board_and_generated_resources(schema):

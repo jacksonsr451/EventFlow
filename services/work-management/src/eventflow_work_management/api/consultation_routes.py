@@ -9,10 +9,11 @@ cookie-authenticated callers and accept an optional ``Idempotency-Key``;
 from __future__ import annotations
 
 import re
+from typing import Annotated, Literal, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from eventflow_work_management.api.dependencies import (
@@ -30,6 +31,15 @@ from eventflow_work_management.security.principal import AuthenticatedPrincipal
 from eventflow_work_management.services.consultation import (
     ConsultationService,
     consultation_etag,
+)
+from eventflow_work_management.services.triage_criteria import (
+    CRITERIA_FIELD_FOR_CATEGORY,
+    BugCriteria,
+    ChoreCriteria,
+    DocsCriteria,
+    FeatureCriteria,
+    SecurityCriteria,
+    triage_templates,
 )
 
 router = APIRouter(tags=["Consultations"])
@@ -60,15 +70,66 @@ class UpdateConsultationDraftRequest(BaseModel):
     external_references: list[str] | None = None
 
 
-class TriageConsultationRequest(BaseModel):
-    category: str = Field(pattern=CATEGORY_PATTERN)
+class _TriageRequest(BaseModel):
+    """Shared fields for every category-specific triage variant."""
+
+    model_config = ConfigDict(extra="forbid")
+
     priority: str = Field(pattern=PRIORITY_PATTERN)
     triage_notes: str = Field(min_length=5)
-    bug_criteria: dict | None = None
-    feature_criteria: dict | None = None
-    chore_criteria: dict | None = None
-    docs_criteria: dict | None = None
-    security_criteria: dict | None = None
+
+
+class BugTriageRequest(_TriageRequest):
+    category: Literal["bug"]
+    bug_criteria: BugCriteria
+
+
+class FeatureTriageRequest(_TriageRequest):
+    category: Literal["feature"]
+    feature_criteria: FeatureCriteria
+
+
+class ChoreTriageRequest(_TriageRequest):
+    category: Literal["chore"]
+    chore_criteria: ChoreCriteria
+
+
+class DocsTriageRequest(_TriageRequest):
+    category: Literal["docs"]
+    docs_criteria: DocsCriteria
+
+
+class SecurityTriageRequest(_TriageRequest):
+    category: Literal["security"]
+    security_criteria: SecurityCriteria
+
+
+# The backend discriminated union is authoritative: the ``category`` field
+# selects exactly one criteria variant, mirroring the published ``oneOf`` +
+# ``discriminator`` contract.
+TriageConsultationRequest = Annotated[
+    Union[
+        BugTriageRequest,
+        FeatureTriageRequest,
+        ChoreTriageRequest,
+        DocsTriageRequest,
+        SecurityTriageRequest,
+    ],
+    Field(discriminator="category"),
+]
+
+
+class ReclassifyConsultationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    justification: str = Field(min_length=10)
+    triage: TriageConsultationRequest
+
+
+def _criteria_for(payload) -> dict:
+    """Return the single validated criteria object for a triage variant."""
+    field = CRITERIA_FIELD_FOR_CATEGORY[payload.category]
+    return getattr(payload, field).model_dump()
 
 
 def _authorize(
@@ -215,6 +276,21 @@ def list_consultations(
     }
 
 
+@router.get("/v1/workspaces/{workspace_id}/consultations/triage-templates")
+def list_consultation_triage_templates(
+    workspace_id: UUID,
+    response: Response,
+    principal: AuthenticatedPrincipal = Depends(authenticated_principal),
+    session: Session = Depends(database_session),
+):
+    _authorize(session, principal, workspace_id, Action.CONSULTATION_TRIAGE)
+    templates = triage_templates()
+    response.headers["ETag"] = (
+        '"' + fingerprint(["triage-templates", [t["category"] for t in templates]]) + '"'
+    )
+    return {"templates": templates}
+
+
 @router.get("/v1/workspaces/{workspace_id}/consultations/{consultation_id}")
 def get_consultation(
     workspace_id: UUID,
@@ -287,20 +363,42 @@ def triage_consultation(
     request_correlation_id: UUID | None = Depends(correlation_id),
 ):
     context = _authorize(session, principal, workspace_id, Action.CONSULTATION_TRIAGE)
-    criteria = {
-        "bug_criteria": payload.bug_criteria,
-        "feature_criteria": payload.feature_criteria,
-        "chore_criteria": payload.chore_criteria,
-        "docs_criteria": payload.docs_criteria,
-        "security_criteria": payload.security_criteria,
-    }
     result = ConsultationService(session).triage(
         context,
         consultation_id,
         category=payload.category,
         priority=payload.priority,
         triage_notes=payload.triage_notes,
-        criteria=criteria,
+        criteria=_criteria_for(payload),
+        if_match=request.headers.get("if-match"),
+        idempotency_key=_idempotency_key(request),
+        correlation_id=request_correlation_id,
+    )
+    response.headers["ETag"] = consultation_etag(result.consultation)
+    return _consultation_payload(result.consultation)
+
+
+@router.post("/v1/workspaces/{workspace_id}/consultations/{consultation_id}/reclassify")
+def reclassify_consultation(
+    workspace_id: UUID,
+    consultation_id: UUID,
+    payload: ReclassifyConsultationRequest,
+    request: Request,
+    response: Response,
+    principal: AuthenticatedPrincipal = Depends(require_csrf),
+    session: Session = Depends(database_session),
+    request_correlation_id: UUID | None = Depends(correlation_id),
+):
+    context = _authorize(session, principal, workspace_id, Action.CONSULTATION_TRIAGE)
+    triage = payload.triage
+    result = ConsultationService(session).reclassify(
+        context,
+        consultation_id,
+        category=triage.category,
+        priority=triage.priority,
+        triage_notes=triage.triage_notes,
+        criteria=_criteria_for(triage),
+        justification=payload.justification,
         if_match=request.headers.get("if-match"),
         idempotency_key=_idempotency_key(request),
         correlation_id=request_correlation_id,

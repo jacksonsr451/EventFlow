@@ -145,6 +145,7 @@ def _triage_body():
             "environment": "Python 3.11",
             "severity": "high",
             "is_regression": False,
+            "impact": "All empty-cart checkouts fail for every user.",
         },
     }
 

@@ -344,6 +344,7 @@ def test_triage_is_role_gated_and_optimistic():
                     "environment": "Python 3.11",
                     "severity": "high",
                     "is_regression": False,
+                    "impact": "All empty-cart checkouts fail for every user.",
                 },
             }
 
@@ -357,13 +358,13 @@ def test_triage_is_role_gated_and_optimistic():
                 == 403
             )
 
-            # Criteria must match the selected category.
+            # Criteria must match the selected category (discriminated union).
             mismatch = client.post(
                 f"/v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
                 json={**triage_body, "feature_criteria": {}},
                 headers=_bearer("tina"),
             )
-            assert mismatch.status_code == 422
+            assert mismatch.status_code == 400
 
             # A stale If-Match validator yields 412.
             stale = client.post(
