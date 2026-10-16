@@ -68,6 +68,10 @@ section 3.1) and for contract tests.
 | `Consultation` | detail GET and create/create-draft/update-draft/submit-draft/list/triage responses |
 | `UpdateConsultationDraftRequest` | `PATCH .../consultations/{consultation_id}` |
 | `TriageConsultationRequest` | `POST .../consultations/{consultation_id}/triage` |
+| `BugTriageRequest`, `FeatureTriageRequest`, `ChoreTriageRequest`, `DocsTriageRequest`, `SecurityTriageRequest` | the category-discriminated variants of `TriageConsultationRequest` (Issue #5) |
+| `BugCriteria`, `FeatureCriteria`, `ChoreCriteria`, `DocsCriteria`, `SecurityCriteria` | the per-category criteria objects (Issue #5) |
+| `ReclassifyConsultationRequest` | `POST .../consultations/{consultation_id}/reclassify` (Issue #5) |
+| `TriageTemplate`, `TriageTemplates` | `GET .../consultations/triage-templates` (Issue #5) |
 | `CreateProposalRequest` | `POST /v1/workspaces/{workspace_id}/proposals` |
 | `Proposal` | detail GET and create/submit responses |
 | `DecideProposalRequest` | `POST .../proposals/{proposal_id}/decide` |
@@ -172,6 +176,7 @@ Amendment A-02, every unsafe operation a client may retry accepts an
 | `PATCH .../consultations/{consultation_id}` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/submit` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/triage` | `Idempotency-Key` | No |
+| `POST .../consultations/{consultation_id}/reclassify` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/attachments` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/evidence` | `Idempotency-Key` | No |
 | `POST .../proposals` | `Idempotency-Key` | No |
@@ -312,6 +317,41 @@ and `consultation_id` in the path are locators, never authority.
 - **Idempotency.** Attachment upload and evidence creation accept an optional
   `Idempotency-Key` (section 7); an equivalent replay returns the original
   resource and a different fingerprint returns `409`.
+
+### 8.3 Differentiated triage and reclassification (Issue #5)
+
+Issue #5 makes triage category-specific and adds a manual reclassification
+operation. The triage request is a **category-discriminated union**: the
+`category` field selects exactly one criteria variant (`bug`, `feature`, `chore`,
+`docs`, `security`) and the request must supply that variant's criteria object
+and no other. The contract expresses this as `oneOf` plus a `discriminator` on
+`category`, replacing the earlier `if`/`then` chain; the backend Pydantic union
+is authoritative and the OpenAPI is generated to match.
+
+| Operation | Method and path | Required role (`x-required-roles`) |
+|---|---|---|
+| Triage | `POST .../consultations/{consultation_id}/triage` | `triager`, `admin`, `owner` |
+| Reclassify | `POST .../consultations/{consultation_id}/reclassify` | `triager`, `admin`, `owner` |
+| List triage templates | `GET .../consultations/triage-templates` | `triager`, `admin`, `owner` |
+
+- **Manual only.** Nothing infers a category from free text and nothing creates a
+  Proposal, Approval, WorkItem, or BoardCard. An optional intake `category` is a
+  reporter hint, not a completed triage decision.
+- **Lifecycle.** Triage moves `OPEN`/`REOPENED` to `TRIAGING`; a draft cannot be
+  triaged. Reclassification is only valid after triage has completed (the
+  consultation has a recorded triage) and keeps the current lifecycle state; a
+  raw or untriaged consultation returns `409 INVALID_STATE`.
+- **Justification and audit.** Reclassification requires an explicit
+  `justification` and appends a `consultation.reclassified` audit record carrying
+  the previous and new category, the previous and new criteria snapshot, the
+  justification, the actor, and the correlation id. The audit trail is
+  append-only and visible through the history read.
+- **Concurrency and idempotency.** Both operations honour a strong `If-Match`
+  (`412` on a stale validator) and accept an optional `Idempotency-Key`; a replay
+  returns the original resource without a second audit row.
+- **Templates.** `TriageTemplate`/`TriageTemplates` expose reusable backend
+  metadata (category, title, description, guidance, and required fields) for the
+  differentiated categories. They are guidance contracts, not client UIs.
 
 ## 9. Internal events
 

@@ -42,9 +42,11 @@ from eventflow_work_management.repositories.workspace_repository import (
     ProjectRepository,
 )
 from eventflow_work_management.security.errors import ProblemError
+from eventflow_work_management.services.triage_criteria import validate_criteria
 
 CREATE_OPERATION = "consultation.create"
 TRIAGE_OPERATION = "consultation.triage"
+RECLASSIFY_OPERATION = "consultation.reclassify"
 DRAFT_CREATE_OPERATION = "consultation.draft.create"
 DRAFT_UPDATE_OPERATION = "consultation.draft.update"
 DRAFT_SUBMIT_OPERATION = "consultation.draft.submit"
@@ -55,13 +57,10 @@ DRAFT_STATUS = "draft"
 
 TRIAGE_START_STATUSES = frozenset({"open", "reopened"})
 
-CRITERIA_FIELD_FOR_CATEGORY = {
-    "bug": "bug_criteria",
-    "feature": "feature_criteria",
-    "chore": "chore_criteria",
-    "docs": "docs_criteria",
-    "security": "security_criteria",
-}
+# A consultation may be reclassified only after manual triage has completed.
+# Draft and raw OPEN intake cannot be reclassified; the caller must triage
+# first. Reclassification keeps the current lifecycle state.
+RECLASSIFY_STATUSES = frozenset({"triaging", "reopened"})
 
 ALLOWED_SORT_KEYS = frozenset(SORT_COLUMNS)
 
@@ -596,7 +595,7 @@ class ConsultationService:
     ) -> IntakeResult:
         self._validate_category(category, required=True)
         self._validate_priority(priority, required=True)
-        self._validate_triage_criteria(category, criteria)
+        criteria = validate_criteria(category, criteria)
 
         request_fingerprint = fingerprint(
             {
@@ -658,6 +657,7 @@ class ConsultationService:
                     "category": category,
                     "priority": priority,
                     "status": "triaging",
+                    "criteria": criteria,
                 },
                 correlation_id=correlation_id,
             )
@@ -674,6 +674,135 @@ class ConsultationService:
                 replay = self._replay(
                     context.workspace_id,
                     TRIAGE_OPERATION,
+                    idempotency_key,
+                    request_fingerprint,
+                )
+                if replay is not None:
+                    return replay
+            raise
+        except ProblemError:
+            self._session.rollback()
+            raise
+        return IntakeResult(consultation=consultation, replayed=False)
+
+    def reclassify(
+        self,
+        context: AuthorizationContext,
+        consultation_id: UUID,
+        *,
+        category: str,
+        priority: str,
+        triage_notes: str,
+        criteria: dict,
+        justification: str,
+        if_match: str | None = None,
+        idempotency_key: str | None = None,
+        correlation_id: UUID | None = None,
+    ) -> IntakeResult:
+        """Replace the triage decision on an already-triaged consultation.
+
+        The previous category and criteria snapshot are preserved in an
+        append-only audit record. Reclassification never auto-classifies and
+        never creates downstream Proposal, Approval, WorkItem, or BoardCard
+        records; it only rewrites this consultation's triage decision.
+        """
+        self._validate_category(category, required=True)
+        self._validate_priority(priority, required=True)
+        criteria = validate_criteria(category, criteria)
+        if not justification or len(justification) < 10:
+            raise _validation(
+                "A reclassification justification is required.", status_code=422
+            )
+
+        request_fingerprint = fingerprint(
+            {
+                "consultation_id": str(consultation_id),
+                "category": category,
+                "priority": priority,
+                "triage_notes": triage_notes,
+                "criteria": criteria,
+                "justification": justification,
+            }
+        )
+        if idempotency_key is not None:
+            replay = self._replay(
+                context.workspace_id,
+                RECLASSIFY_OPERATION,
+                idempotency_key,
+                request_fingerprint,
+            )
+            if replay is not None:
+                return replay
+
+        try:
+            consultation = self.consultations.get_for_update(
+                workspace_id=context.workspace_id, consultation_id=consultation_id
+            )
+            if consultation is None:
+                raise _not_found()
+            if if_match is not None and if_match != consultation_etag(consultation):
+                raise _precondition_failed()
+            if (
+                consultation.triaged_at is None
+                or consultation.status not in RECLASSIFY_STATUSES
+            ):
+                raise _conflict(
+                    "The consultation has not completed triage.",
+                    code="INVALID_STATE",
+                )
+            previous_category = consultation.category
+            previous_criteria = consultation.triage_criteria
+            record = (
+                self.idempotency.reserve(
+                    workspace_id=context.workspace_id,
+                    operation=RECLASSIFY_OPERATION,
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=request_fingerprint,
+                )
+                if idempotency_key is not None
+                else None
+            )
+            self.consultations.apply_triage(
+                consultation,
+                category=category,
+                priority=priority,
+                status=consultation.status,
+                triage_notes=triage_notes,
+                triage_criteria=criteria,
+                triaged_by=context.actor_id,
+                triaged_at=_now(),
+            )
+            self.audit.append(
+                workspace_id=context.workspace_id,
+                action="consultation.reclassified",
+                entity_type="consultation",
+                entity_id=consultation.id,
+                actor_id=context.actor_id,
+                snapshot={
+                    "consultation_id": str(consultation.id),
+                    "previous_category": previous_category,
+                    "category": category,
+                    "previous_criteria": previous_criteria,
+                    "criteria": criteria,
+                    "priority": priority,
+                    "justification": justification,
+                    "status": consultation.status,
+                },
+                correlation_id=correlation_id,
+            )
+            if record is not None:
+                self.idempotency.complete(
+                    record,
+                    response_status=200,
+                    response_body={"consultation_id": str(consultation.id)},
+                )
+            self._session.commit()
+        except IntegrityError:
+            self._session.rollback()
+            if idempotency_key is not None:
+                replay = self._replay(
+                    context.workspace_id,
+                    RECLASSIFY_OPERATION,
                     idempotency_key,
                     request_fingerprint,
                 )
@@ -780,16 +909,6 @@ class ConsultationService:
         if editor_context.get("consent_granted") is not True:
             raise _validation(
                 "Editor context requires explicit developer consent.",
-                status_code=422,
-            )
-
-    @staticmethod
-    def _validate_triage_criteria(category: str, criteria: dict) -> None:
-        expected = CRITERIA_FIELD_FOR_CATEGORY[category]
-        provided = {key for key, value in criteria.items() if value is not None}
-        if provided != {expected}:
-            raise _validation(
-                "Triage criteria must match the selected category.",
                 status_code=422,
             )
 

@@ -11,6 +11,7 @@
     ],
     "environment": "Python 3.11 / FastAPI 0.115",
     "severity": "high",
-    "is_regression": false
+    "is_regression": false,
+    "impact": "Every checkout with an empty cart fails for all users."
   }
 }

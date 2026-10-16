@@ -183,18 +183,28 @@ classDiagram
 
 ## 2. Differentiated Triage Criteria
 
-Every raw consultation must undergo categorization during triage before a Proposal
-can be created. Categories enforce distinct criteria to maintain input quality:
+Every raw consultation must undergo manual categorization during triage before a
+Proposal can be created. Triage is a **category-discriminated union**: the
+triager selects exactly one category and supplies that category's structured
+criteria, and no other. Categories enforce distinct criteria to maintain input
+quality:
 
 ```mermaid
 flowchart TD
-    Raw["Raw Consultation (OPEN)"] --> Triage{"Triage Classifier"}
-    Triage -->|Bug| BugNode["Bug Criteria:<br/>Expected vs Observed, Steps, Env, Severity, Regression"]
-    Triage -->|Feature| FeatNode["Feature Criteria:<br/>Problem, Value, Req, Acceptance Criteria, Dependencies"]
-    Triage -->|Chore| ChoreNode["Chore Criteria:<br/>Maintenance Need, Tech Debt Type, Inaction Risk"]
+    Raw["Raw Consultation (OPEN)"] --> Triage{"Manual Triage (category discriminator)"}
+    Triage -->|Bug| BugNode["Bug Criteria:<br/>Expected vs Observed, Steps, Env, Severity, Regression, Impact"]
+    Triage -->|Feature| FeatNode["Feature Criteria:<br/>Problem, Value, Requirements, Acceptance Criteria, Scope"]
+    Triage -->|Chore| ChoreNode["Chore Criteria:<br/>Maintenance Need, Tech Debt Type, Justification, Inaction Risk, Expected Technical Effect"]
     Triage -->|Docs| DocsNode["Docs Criteria:<br/>Affected Document, Gap Summary, Target Audience"]
     Triage -->|Security| SecNode["Security Criteria:<br/>Vulnerability Type, Confidentiality Flag, Safe Handling"]
 ```
+
+A misclassified consultation can be **manually reclassified** once triage has
+completed. Reclassification requires an explicit justification, replaces the
+category, priority, and criteria, and appends a `consultation.reclassified` audit
+record carrying the previous and new category and criteria snapshot. Neither
+triage nor reclassification is automatic, and neither creates a Proposal,
+Approval, WorkItem, or BoardCard.
 
 ### 1. Bug
 - **Expected vs. Observed Behavior:** Clear contrast between what the system should do and what it did.
@@ -208,13 +218,13 @@ flowchart TD
 - **Expected Value:** Quantifiable efficiency gain, developer productivity improvement, or user benefit.
 - **Functional Requirements:** Granular behavioral specifications.
 - **Acceptance Criteria:** Objective, testable assertions required for completion.
-- **Architectural Impact:** External dependencies, breaking API changes, or schema alterations.
+- **Scope:** The boundary of the change (what is and is not included).
 
 ### 3. Chore
 - **Maintenance Need:** Dependency upgrades, deprecation removals, code refactoring, or CI optimizations.
 - **Technical Debt Classification:** Architectural, testing, documentation, or operational debt.
 - **Justification & Inaction Risk:** Consequences if deferred (security vulnerability, build slowdown, fragility).
-- **Verifiable Outcome:** Concrete metrics (e.g., zero build warnings, updated dependencies).
+- **Expected Technical Effect:** The concrete, verifiable outcome (e.g., zero build warnings, updated dependencies).
 
 ### 4. Docs
 - **Affected Documentation:** Absolute path or URL of existing documents or location for new guides.
@@ -490,13 +500,33 @@ flowchart LR
          "1. Send POST /v1/orders with empty items array.",
          "2. Inspect HTTP status code."
        ],
-       "environment": "Python 3.11 / FastAPI 0.115",
-       "severity": "high",
-       "is_regression": false
+        "environment": "Python 3.11 / FastAPI 0.115",
+        "severity": "high",
+        "is_regression": false,
+        "impact": "Every order with an empty cart fails for all users."
+      }
+    }
+    ```
+3. **Manual Reclassification (optional):**
+   ```json
+   POST /v1/workspaces/.../consultations/{id}/reclassify
+   {
+     "justification": "Initial bug triage conflated two distinct defects.",
+     "triage": {
+       "category": "feature",
+       "priority": "high",
+       "triage_notes": "Net-new behavior, not a regression of existing code.",
+       "feature_criteria": {
+         "problem_statement": "Empty carts are not rejected before order construction.",
+         "expected_value": "Deterministic validation feedback for every client.",
+         "functional_requirements": ["Reject empty carts before construction."],
+         "acceptance_criteria": ["An empty cart returns 400 VALIDATION_ERROR."],
+         "scope": "Order creation validation and its unit tests."
+       }
      }
    }
    ```
-3. **Structured Proposal (Version 1):**
+4. **Structured Proposal (Version 1):**
    ```json
    POST /v1/workspaces/.../proposals
    {
@@ -515,7 +545,7 @@ flowchart LR
      "estimated_hours": 3.0
    }
    ```
-4. **Approval and Atomic Card Generation:**
+5. **Approval and Atomic Card Generation:**
    ```json
    POST /v1/workspaces/.../proposals/{id}/decide
    Headers:

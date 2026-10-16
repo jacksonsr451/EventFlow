@@ -146,6 +146,47 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/consultations/triage-templates:
+    get:
+      operationId: listConsultationTriageTemplates
+      tags: [Triage]
+      summary: List reusable triage templates for the differentiated categories
+      description: >-
+        Returns backend-owned metadata describing the structured criteria each
+        differentiated category (bug, feature, chore) requires. Templates are
+        guidance only: the backend discriminated union remains authoritative and
+        no template infers a category automatically.
+      security:
+        - bearerAuth: []
+      x-required-roles: [triager, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The triage templates.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/TriageTemplates'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
   /v1/workspaces/{workspace_id}/consultations/drafts:
     post:
       operationId: createConsultationDraft
@@ -227,6 +268,65 @@ paths:
       responses:
         '200':
           description: Consultation triaged successfully.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Consultation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/consultations/{consultation_id}/reclassify:
+    post:
+      operationId: reclassifyConsultation
+      tags: [Triage]
+      summary: Manually reclassify an already-triaged consultation
+      description: >-
+        Replaces the category, priority, and criteria of a consultation that has
+        already completed manual triage. Requires an explicit justification and
+        is recorded in the append-only audit trail with the previous and new
+        category and criteria snapshot. It never auto-classifies and never
+        creates a Proposal, Approval, WorkItem, or BoardCard.
+      security:
+        - bearerAuth: []
+      x-required-roles: [triager, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConsultationId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/ReclassifyConsultationRequest'
+      responses:
+        '200':
+          description: Consultation reclassified successfully.
           headers:
             ETag:
               $ref: '#/components/headers/ETag'
