@@ -14,6 +14,12 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from eventflow_work_management.api.auth_routes import router as authentication_router
+from eventflow_work_management.api.attachment_routes import (
+    router as attachment_router,
+)
+from eventflow_work_management.api.consultation_routes import (
+    router as consultation_router,
+)
 from eventflow_work_management.api.errors import (
     authentication_dependency_error_handler,
     authentication_error_handler,
@@ -24,6 +30,10 @@ from eventflow_work_management.api.errors import (
 from eventflow_work_management.api.workspace_routes import router as workspace_router
 from eventflow_work_management.config import database_url
 from eventflow_work_management.db.engine import create_engine_from_url, session_factory
+from eventflow_work_management.security.attachment_scanner import (
+    MalwareScanner,
+    UnconfiguredMalwareScanner,
+)
 from eventflow_work_management.security.config import AuthSettings
 from eventflow_work_management.security.crypto import TokenCipher
 from eventflow_work_management.security.errors import (
@@ -44,6 +54,7 @@ def create_app(
     engine: Engine | None = None,
     session_factory_override: sessionmaker | None = None,
     oidc_client: OIDCClient | None = None,
+    malware_scanner: MalwareScanner | None = None,
 ) -> FastAPI:
     """Construct the API and dependency graph; no authentication bypass exists."""
     auth_settings = settings or AuthSettings.from_env()
@@ -79,6 +90,7 @@ def create_app(
     app.state.authentication_service = authentication_service
     app.state.oidc_client = oidc
     app.state.database_engine = owned_engine
+    app.state.malware_scanner = malware_scanner or UnconfiguredMalwareScanner()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(auth_settings.allowed_origins),
@@ -182,5 +194,7 @@ def create_app(
 
     app.include_router(authentication_router)
     app.include_router(workspace_router)
+    app.include_router(consultation_router)
+    app.include_router(attachment_router)
 
     return app

@@ -26,7 +26,7 @@ $defs:
 
   ConsultationStatus:
     type: string
-    enum: [open, triaging, proposed, duplicate, rejected, closed, reopened]
+    enum: [draft, open, triaging, proposed, duplicate, rejected, closed, reopened]
 
   ProposalStatus:
     type: string
@@ -39,6 +39,21 @@ $defs:
   WorkItemStatus:
     type: string
     enum: [ready, in_progress, in_review, blocked, done, cancelled]
+
+  AttachmentStatus:
+    type: string
+    description: >-
+      Fail-closed attachment lifecycle. An upload starts quarantined and only
+      becomes available after an approved scanner returns a clean verdict.
+    enum: [quarantined, available, rejected]
+
+  AttachmentScanVerdict:
+    type: string
+    enum: [clean, infected, unknown]
+
+  EvidenceKind:
+    type: string
+    enum: [text, link, attachment]
 
   Role:
     type: string
@@ -577,12 +592,260 @@ $defs:
       description:
         type: string
         minLength: 5
+      category:
+        anyOf:
+          - $ref: '#/$defs/TriageCategory'
+          - type: 'null'
+        description: >-
+          Optional reporter-supplied type hint captured at intake. It is a
+          provisional classification, not a triage decision; an authorized
+          triage operation may confirm or override it.
       editor_context:
         $ref: '#/$defs/EditorContext'
       external_references:
         type: array
         items:
           type: string
+
+  UpdateConsultationDraftRequest:
+    type: object
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/consultations/{consultation_id}.
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      project_id:
+        $ref: '#/$defs/UUID'
+      origin:
+        $ref: '#/$defs/Origin'
+      title:
+        type: string
+        minLength: 3
+        maxLength: 200
+      description:
+        type: string
+        minLength: 5
+      category:
+        anyOf:
+          - $ref: '#/$defs/TriageCategory'
+          - type: 'null'
+      editor_context:
+        anyOf:
+          - $ref: '#/$defs/EditorContext'
+          - type: 'null'
+      external_references:
+        type: array
+        items:
+          type: string
+
+  ConsultationAttachment:
+    type: object
+    description: >-
+      Metadata for one uploaded consultation attachment. Object bytes are never
+      inlined in a response; content is served separately as an opaque download.
+    additionalProperties: false
+    required: [attachment_id, workspace_id, consultation_id, file_name, content_type, size_bytes, checksum_sha256, status, scan_verdict, uploaded_by, created_at]
+    properties:
+      attachment_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      consultation_id:
+        $ref: '#/$defs/UUID'
+      file_name:
+        type: string
+        minLength: 1
+        maxLength: 255
+      content_type:
+        type: string
+        minLength: 1
+        maxLength: 255
+        description: The detected content type, which must match the declared type.
+      size_bytes:
+        type: integer
+        minimum: 0
+        maximum: 5242880
+      checksum_sha256:
+        type: string
+        pattern: ^[0-9a-f]{64}$
+      status:
+        $ref: '#/$defs/AttachmentStatus'
+      scan_verdict:
+        $ref: '#/$defs/AttachmentScanVerdict'
+      rejection_reason:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 120
+          - type: 'null'
+      uploaded_by:
+        $ref: '#/$defs/UUID'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  CreateAttachmentRequest:
+    type: object
+    description: >-
+      Request DTO for POST .../attachments. Bytes are base64 encoded so the upload
+      reuses the authenticated JSON transport; the server enforces the decoded
+      size limit and the content-type allowlist.
+    additionalProperties: false
+    required: [file_name, content_type, content_base64]
+    properties:
+      file_name:
+        type: string
+        minLength: 1
+        maxLength: 255
+      content_type:
+        type: string
+        minLength: 1
+        maxLength: 255
+      content_base64:
+        type: string
+        minLength: 1
+        maxLength: 8388608
+
+  ConsultationAttachmentList:
+    type: object
+    additionalProperties: false
+    required: [items]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ConsultationAttachment'
+
+  ConsultationEvidence:
+    type: object
+    description: One structured piece of evidence attached to a consultation.
+    additionalProperties: false
+    required: [evidence_id, workspace_id, consultation_id, kind, created_by, created_at]
+    properties:
+      evidence_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      consultation_id:
+        $ref: '#/$defs/UUID'
+      kind:
+        $ref: '#/$defs/EvidenceKind'
+      description:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 500
+          - type: 'null'
+      content:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 4096
+          - type: 'null'
+      attachment_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      created_by:
+        $ref: '#/$defs/UUID'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  CreateEvidenceRequest:
+    type: object
+    description: Request DTO for POST .../evidence.
+    additionalProperties: false
+    required: [kind]
+    properties:
+      kind:
+        $ref: '#/$defs/EvidenceKind'
+      description:
+        type: string
+        minLength: 1
+        maxLength: 500
+      content:
+        type: string
+        minLength: 1
+        maxLength: 4096
+      attachment_id:
+        $ref: '#/$defs/UUID'
+    allOf:
+      - if:
+          properties:
+            kind:
+              const: attachment
+          required: [kind]
+        then:
+          required: [attachment_id]
+          not:
+            required: [content]
+      - if:
+          properties:
+            kind:
+              enum: [text, link]
+          required: [kind]
+        then:
+          required: [content]
+          not:
+            required: [attachment_id]
+
+  ConsultationEvidenceList:
+    type: object
+    additionalProperties: false
+    required: [items]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ConsultationEvidence'
+
+  ConsultationHistoryEntry:
+    type: object
+    description: One append-only lifecycle event in a consultation timeline.
+    additionalProperties: false
+    required: [audit_id, workspace_id, action, entity_type, entity_id, occurred_at, snapshot_hash]
+    properties:
+      audit_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      actor_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      action:
+        type: string
+        minLength: 3
+        maxLength: 120
+      entity_type:
+        type: string
+        minLength: 3
+        maxLength: 80
+      entity_id:
+        $ref: '#/$defs/UUID'
+      occurred_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      snapshot:
+        anyOf:
+          - type: object
+          - type: 'null'
+      snapshot_hash:
+        type: string
+        pattern: ^[0-9a-f]{64}$
+      correlation_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+
+  ConsultationHistoryPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ConsultationHistoryEntry'
+      page_info:
+        $ref: '#/$defs/PageInfo'
 
   TriageConsultationRequest:
     type: object

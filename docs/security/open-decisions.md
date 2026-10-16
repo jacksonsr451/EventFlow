@@ -43,6 +43,12 @@ unresolved item below names its owner and closure criteria.
   routed?
 - **Owner:** [Issue #12](https://github.com/jacksonsr451/EventFlow/issues/12).
 - **Closure criteria:** scanner selected and quarantine flow defined (`AT-03`).
+- **Partial resolution:** [Issue #4](https://github.com/jacksonsr451/EventFlow/issues/4)
+  defines the quarantine flow as a fail-closed boundary: uploads pass through an
+  injected scanner, an `unknown` verdict is quarantined and never becomes
+  available, an `infected` verdict is rejected without storing bytes, and every
+  outcome is audited. Selecting and configuring the concrete engine remains with
+  Issue #12; until then no scanner is configured and every upload is quarantined.
 
 ## OD-05 — Attachment allowlist and limits
 
@@ -50,6 +56,12 @@ unresolved item below names its owner and closure criteria.
   limits?
 - **Owner:** [Issue #12](https://github.com/jacksonsr451/EventFlow/issues/12).
 - **Closure criteria:** allowlist and limits published (`AT-01`, `AT-02`).
+- **Resolution:** [Issue #4](https://github.com/jacksonsr451/EventFlow/issues/4)
+  publishes the allowlist `image/png`, `image/jpeg`, `image/gif`,
+  `application/pdf`, `text/plain` (SVG and HTML are rejected), a 5 MiB per-file
+  limit, and a 25-attachment per-consultation quota, enforced on decoded bytes
+  after magic-byte sniffing. Any later provider-specific change remains with
+  Issue #12.
 
 ## OD-06 — AI provider and data boundary
 

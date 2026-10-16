@@ -94,15 +94,15 @@ Every control listed here is referenced by at least one threat. "State" uses the
 | SC-05 | untrusted-content.md | Specified | Stored script content does not execute in the application origin | Issue #14 tests | Issues #13, #14 |
 | SC-06 | untrusted-content.md | Specified | Model output is validated before use; input is separated from instructions | Issue #45 tests | Issue #45 |
 | SC-07 | untrusted-content.md | Specified | An RBAC check gates every authoritative effect | Issue #9 tests | Issue #9 |
-| AT-01 | untrusted-content.md | Specified (Pending Decision) | A file whose content contradicts its declared type is rejected | Issue #12 tests | Issue #12 |
-| AT-02 | untrusted-content.md | Specified (Pending Decision) | An upload above the size limit is rejected with 413 | Issue #12 tests | Issue #12 |
-| AT-03 | untrusted-content.md | Specified | Malware is quarantined and rejected; attachment.rejected is emitted | Issue #12 tests | Issue #12 |
-| AT-04 | untrusted-content.md | Specified | Objects live under a per-tenant prefix with no public path | tests/security/test_security_contracts.py | Issue #47 |
-| AT-05 | untrusted-content.md | Specified | A download without membership is denied; links are short-lived | Issue #9 tests | Issue #9 |
-| AT-06 | untrusted-content.md | Specified | HTML and SVG attachments are not rendered inline | Issue #14 tests | Issues #14, #22 |
-| AT-07 | untrusted-content.md | Specified | A filename with traversal never influences the storage path | Issue #12 tests | Issue #12 |
+| AT-01 | untrusted-content.md | Implemented | A file whose content contradicts its declared type is rejected | services/work-management/tests/test_consultation_attachment_integration.py | Issue #4 |
+| AT-02 | untrusted-content.md | Implemented | An upload above the size limit or the per-consultation quota is rejected | services/work-management/tests/test_consultation_attachment_integration.py | Issue #4 |
+| AT-03 | untrusted-content.md | Implemented | Malware is quarantined and rejected; attachment.rejected is emitted | services/work-management/tests/test_consultation_attachment_integration.py | Issues #4, #12 |
+| AT-04 | untrusted-content.md | Partially Implemented | Objects are stored tenant-scoped with no public path; encryption at rest is pending | services/work-management/tests/test_consultation_attachment_integration.py | Issues #4, #12 |
+| AT-05 | untrusted-content.md | Implemented | A download without membership is denied; quarantined content is not downloadable | services/work-management/tests/test_consultation_attachment_integration.py | Issues #4, #9 |
+| AT-06 | untrusted-content.md | Implemented | HTML and SVG attachments are rejected by the allowlist and never rendered inline | services/work-management/tests/test_consultation_attachment_integration.py | Issues #4, #14, #22 |
+| AT-07 | untrusted-content.md | Implemented | A filename with traversal never influences the storage path | services/work-management/tests/test_consultation_attachment_integration.py | Issue #4 |
 | AT-08 | untrusted-content.md | Specified | Stored attachments are encrypted at rest | Issue #12 tests | Issue #12 |
-| AT-09 | untrusted-content.md | Specified | Deleting an attachment removes object, metadata, and derived data | tests/security/test_security_docs.py | Issue #12 |
+| AT-09 | untrusted-content.md | Implemented | Deleting an attachment removes object, metadata, and derived data | services/work-management/tests/test_consultation_attachment_integration.py | Issues #4, #12 |
 | WH-01 | webhooks.md | Specified | A delivery with an invalid or missing signature is rejected before any effect | Issue #27 tests | Issues #27, #28 |
 | WH-02 | webhooks.md | Specified | Signature comparison does not leak timing | Issue #27 tests | Issues #27, #28 |
 | WH-03 | webhooks.md | Specified | Verification uses raw bytes; a re-serialized payload fails | Issue #27 tests | Issues #27, #28 |

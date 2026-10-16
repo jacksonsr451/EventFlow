@@ -40,7 +40,16 @@ class Action(str, Enum):
 
     CONSULTATION_READ = "consultation:read"
     CONSULTATION_CREATE = "consultation:create"
+    CONSULTATION_UPDATE = "consultation:update"
+    CONSULTATION_SUBMIT = "consultation:submit"
     CONSULTATION_TRIAGE = "consultation:triage"
+
+    ATTACHMENT_READ = "attachment:read"
+    ATTACHMENT_UPLOAD = "attachment:upload"
+    ATTACHMENT_DELETE = "attachment:delete"
+    EVIDENCE_READ = "evidence:read"
+    EVIDENCE_CREATE = "evidence:create"
+    HISTORY_READ = "history:read"
 
     PROPOSAL_READ = "proposal:read"
     PROPOSAL_CREATE = "proposal:create"
@@ -59,6 +68,9 @@ _READ_ACTIONS: frozenset[Action] = frozenset(
         Action.PROJECT_READ,
         Action.MEMBERSHIP_READ,
         Action.CONSULTATION_READ,
+        Action.ATTACHMENT_READ,
+        Action.EVIDENCE_READ,
+        Action.HISTORY_READ,
         Action.PROPOSAL_READ,
         Action.WORK_ITEM_READ,
         Action.BOARD_READ,
@@ -77,7 +89,12 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.MEMBERSHIP_REVOKE,
             Action.MEMBERSHIP_TRANSFER_OWNERSHIP,
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.CONSULTATION_TRIAGE,
+            Action.ATTACHMENT_UPLOAD,
+            Action.ATTACHMENT_DELETE,
+            Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.APPROVAL_DECIDE,
@@ -94,7 +111,12 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.MEMBERSHIP_UPDATE_ROLE,
             Action.MEMBERSHIP_REVOKE,
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.CONSULTATION_TRIAGE,
+            Action.ATTACHMENT_UPLOAD,
+            Action.ATTACHMENT_DELETE,
+            Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.APPROVAL_DECIDE,
@@ -105,7 +127,12 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
     "triager": frozenset(
         {
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
             Action.CONSULTATION_TRIAGE,
+            Action.ATTACHMENT_UPLOAD,
+            Action.ATTACHMENT_DELETE,
+            Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.WORK_ITEM_UPDATE,
@@ -114,6 +141,11 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
     "approver": frozenset(
         {
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
+            Action.ATTACHMENT_UPLOAD,
+            Action.ATTACHMENT_DELETE,
+            Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.APPROVAL_DECIDE,
@@ -122,6 +154,11 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
     "contributor": frozenset(
         {
             Action.CONSULTATION_CREATE,
+            Action.CONSULTATION_UPDATE,
+            Action.CONSULTATION_SUBMIT,
+            Action.ATTACHMENT_UPLOAD,
+            Action.ATTACHMENT_DELETE,
+            Action.EVIDENCE_CREATE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.WORK_ITEM_UPDATE,

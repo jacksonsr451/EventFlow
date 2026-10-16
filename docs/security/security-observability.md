@@ -8,8 +8,12 @@ constrains [Issue #47](https://github.com/jacksonsr451/EventFlow/issues/47) and
 the observability work in
 [Issue #46](https://github.com/jacksonsr451/EventFlow/issues/46).
 
-Status: Specified with Issue #10 authentication events emitted to the append-only
-authentication audit store. Centralized SIEM/alerting and other Issue #47
+Status: Partially implemented with Issue #10 authentication events emitted to the
+append-only authentication audit store, and Issue #4 attachment and evidence
+lifecycle actions (`attachment.uploaded`, `attachment.quarantined`,
+`attachment.rejected`, `attachment.deleted`, `evidence.added`) emitted as
+workspace-scoped append-only audit records that also project into the
+consultation history. Centralized SIEM/alerting and other Issue #47
 observability controls remain specified-only. The machine-readable taxonomy is
 [`contracts/schemas/security_events.yaml`](../../contracts/schemas/security_events.yaml).
 

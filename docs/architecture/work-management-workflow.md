@@ -113,7 +113,32 @@ classDiagram
         +DateTime updated_at
     }
 
+    class ConsultationAttachment {
+        +UUID attachment_id
+        +UUID consultation_id
+        +UUID uploaded_by
+        +String file_name
+        +String content_type
+        +Integer size_bytes
+        +String checksum_sha256
+        +AttachmentStatus status
+        +AttachmentScanVerdict scan_verdict
+    }
+
+    class ConsultationEvidence {
+        +UUID evidence_id
+        +UUID consultation_id
+        +UUID created_by
+        +EvidenceKind kind
+        +String description
+        +String content
+        +UUID attachment_id
+    }
+
     Consultation "1" --> "0..*" Proposal : derives
+    Consultation "1" --> "0..*" ConsultationAttachment : attaches
+    Consultation "1" --> "0..*" ConsultationEvidence : evidenced by
+    ConsultationEvidence "0..*" --> "0..1" ConsultationAttachment : cites
     Proposal "1" --> "0..*" Approval : evaluates
     Approval "1" --> "0..1" WorkItem : authorizes
     WorkItem "1" --> "1..*" BoardCard : projects into
@@ -211,7 +236,9 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
+    [*] --> DRAFT: Create Draft (Web/VSCode/Desktop)
     [*] --> OPEN: Submit (Web/VSCode/Desktop)
+    DRAFT --> OPEN: Submit Draft
     OPEN --> TRIAGING: Start Triage
     TRIAGING --> PROPOSED: Proposal Drafted
     TRIAGING --> REJECTED: Invalid / Out of Scope
@@ -257,6 +284,38 @@ stateDiagram-v2
     CANCELLED --> [*]
 ```
 
+### 3.4 Consultation Attachments, Evidence, and History
+
+Attachments and evidence are supporting records that enrich a Consultation
+without changing its identity or bypassing triage. They are not part of the
+Consultation → Proposal → Approval → WorkItem → BoardCard chain and never create
+a Proposal, Approval, WorkItem, or BoardCard.
+
+- **Attachment lifecycle.** An upload is validated (filename, size, declared vs.
+  sniffed content type against a published allowlist), then scanned through an
+  injected, fail-closed scanner. A `clean` verdict becomes `available`; an
+  `unknown` verdict is `quarantined` and never downloadable; an `infected`
+  verdict is `rejected` and its bytes are not stored. Every outcome is recorded
+  in the append-only audit trail. Deletion removes the object and its metadata
+  and is restricted to the uploader or a workspace administrator.
+- **Evidence.** Evidence is `text`, `link`, or a reference to an `available`
+  attachment in the same consultation; a quarantined or rejected attachment can
+  never be cited. Text and link evidence require inline `content`.
+- **History.** The consultation history endpoint is a read-only,
+  cursor-paginated projection of the append-only audit records for that
+  consultation, so intake, draft edits, triage, uploads, evidence, and deletion
+  appear as one ordered timeline.
+
+```mermaid
+stateDiagram-v2
+    [*] --> AVAILABLE: Clean scan
+    [*] --> QUARANTINED: Unknown scan (fail closed)
+    [*] --> REJECTED: Infected scan (bytes not stored)
+    AVAILABLE --> [*]: Deleted by uploader or admin
+    QUARANTINED --> [*]: Deleted by uploader or admin
+    REJECTED --> [*]: Deleted by uploader or admin
+```
+
 ---
 
 ## 4. Comprehensive Transition Matrix
@@ -272,6 +331,9 @@ follows: *Any Authenticated / Author / Proposer / Assignee* → `contributor`;
 
 | Entity | From State | To State | Authorized Role | Pre-conditions | Invariants Enforced | Side Effects & Domain Events | Error Codes |
 |---|---|---|---|---|---|---|---|
+| **Consultation** | `None` | `DRAFT` | `Author` | Valid title and description; optional reporter category; consent granted if editor context present | Status initialized to `DRAFT`; not eligible for triage | `consultation.draft_created` event published | `400 Bad Request` |
+| **Consultation** | `DRAFT` | `DRAFT` | `Author`, `Admin` | Draft is in `DRAFT` state; `If-Match` valid when supplied | Editable fields only; status unchanged | `consultation.draft_updated` event published | `403 Forbidden`, `409 Conflict`, `412 Precondition Failed` |
+| **Consultation** | `DRAFT` | `OPEN` | `Author`, `Admin` | Draft is in `DRAFT` state; `If-Match` valid when supplied | Status becomes `OPEN`; eligible for triage | `consultation.submitted` event published | `403 Forbidden`, `409 Conflict`, `412 Precondition Failed` |
 | **Consultation** | `None` | `OPEN` | `Any Authenticated` | Valid title and description; consent granted if editor context present | Status initialized to `OPEN` | `consultation.created` event published | `400 Bad Request` |
 | **Consultation** | `OPEN` | `TRIAGING` | `Triager`, `Maintainer` | Consultation is in `OPEN` or `REOPENED` | Category and priority must be assigned | `consultation.triaged` event published | `409 Conflict` |
 | **Consultation** | `TRIAGING` | `PROPOSED` | `Author`, `Maintainer` | A valid Proposal references this `consultation_id` | `active_proposal_id` linked | Consultation status locked to `PROPOSED` | `400 Bad Request`, `409 Conflict` |

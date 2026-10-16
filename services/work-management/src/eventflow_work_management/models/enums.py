@@ -10,6 +10,7 @@ ORIGIN_VALUES = ("web", "vscode", "desktop", "external")
 TRIAGE_CATEGORY_VALUES = ("bug", "feature", "chore", "docs", "security")
 PRIORITY_VALUES = ("critical", "high", "medium", "low")
 CONSULTATION_STATUS_VALUES = (
+    "draft",
     "open",
     "triaging",
     "proposed",
@@ -37,6 +38,13 @@ WORK_ITEM_STATUS_VALUES = (
 )
 REMOTE_PROVIDER_VALUES = ("github", "gitlab")
 REMOTE_RESOURCE_TYPE_VALUES = ("issue", "pull_request", "merge_request")
+
+# Attachment lifecycle (Issue #4). Fail-closed: an upload starts QUARANTINED and
+# only becomes AVAILABLE after an approved malware scanner returns a clean
+# verdict. With no scanner configured every upload stays QUARANTINED.
+ATTACHMENT_STATUS_VALUES = ("quarantined", "available", "rejected")
+ATTACHMENT_SCAN_VERDICT_VALUES = ("clean", "infected", "unknown")
+EVIDENCE_KIND_VALUES = ("text", "link", "attachment")
 
 # Work Management authorization vocabulary (Issue #9). The role order is
 # intentional: it is roughly ascending privilege, with ``owner`` last so

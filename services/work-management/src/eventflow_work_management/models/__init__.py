@@ -7,6 +7,10 @@ tests rely on that side effect.
 from __future__ import annotations
 
 from eventflow_work_management.models.approval import Approval
+from eventflow_work_management.models.attachment import (
+    ConsultationAttachment,
+    ConsultationAttachmentBlob,
+)
 from eventflow_work_management.models.authentication import (
     AuthenticationSecurityEvent,
     AuthenticationSession,
@@ -16,6 +20,7 @@ from eventflow_work_management.models.authentication import (
 from eventflow_work_management.models.audit import AuditRecord
 from eventflow_work_management.models.board import Board, BoardCard
 from eventflow_work_management.models.consultation import Consultation
+from eventflow_work_management.models.evidence import ConsultationEvidence
 from eventflow_work_management.models.idempotency import IdempotencyRecord
 from eventflow_work_management.models.integration import RemoteIntegrationReference
 from eventflow_work_management.models.membership import (
@@ -34,6 +39,9 @@ __all__ = [
     "Board",
     "BoardCard",
     "Consultation",
+    "ConsultationAttachment",
+    "ConsultationAttachmentBlob",
+    "ConsultationEvidence",
     "IdempotencyRecord",
     "ExternalIdentity",
     "OIDCLoginTransaction",

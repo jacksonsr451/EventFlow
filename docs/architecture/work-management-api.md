@@ -64,8 +64,9 @@ section 3.1) and for contract tests.
 
 | DTO | Used by |
 |---|---|
-| `CreateConsultationRequest` | `POST /v1/workspaces/{workspace_id}/consultations` |
-| `Consultation` | detail GET and create/list/triage responses |
+| `CreateConsultationRequest` | `POST /v1/workspaces/{workspace_id}/consultations` and `POST .../consultations/drafts` |
+| `Consultation` | detail GET and create/create-draft/update-draft/submit-draft/list/triage responses |
+| `UpdateConsultationDraftRequest` | `PATCH .../consultations/{consultation_id}` |
 | `TriageConsultationRequest` | `POST .../consultations/{consultation_id}/triage` |
 | `CreateProposalRequest` | `POST /v1/workspaces/{workspace_id}/proposals` |
 | `Proposal` | detail GET and create/submit responses |
@@ -78,6 +79,9 @@ section 3.1) and for contract tests.
 | `CreateProjectRequest`, `UpdateProjectRequest` | project administration (Issue #9) |
 | `WorkspaceMember`, `ChangeMemberRoleRequest` | membership administration (Issue #9) |
 | `WorkspaceInvitation`, `CreatedInvitation`, `CreateInvitationRequest`, `AcceptInvitationRequest` | invitation administration (Issue #9) |
+| `CreateAttachmentRequest`, `ConsultationAttachment`, `ConsultationAttachmentList` | consultation attachments (Issue #4) |
+| `CreateEvidenceRequest`, `ConsultationEvidence`, `ConsultationEvidenceList` | consultation evidence (Issue #4) |
+| `ConsultationHistoryEntry`, `ConsultationHistoryPage` | consultation history (Issue #4) |
 
 Entity DTOs (`Consultation`, `Proposal`, `Approval`, `WorkItem`, `BoardCard`)
 remain the canonical shapes shared by all three clients.
@@ -164,7 +168,12 @@ Amendment A-02, every unsafe operation a client may retry accepts an
 | Operation | Header | Required |
 |---|---|---|
 | `POST .../consultations` | `Idempotency-Key` | No (required for offline clients) |
+| `POST .../consultations/drafts` | `Idempotency-Key` | No (required for offline clients) |
+| `PATCH .../consultations/{consultation_id}` | `Idempotency-Key` | No |
+| `POST .../consultations/{consultation_id}/submit` | `Idempotency-Key` | No |
 | `POST .../consultations/{consultation_id}/triage` | `Idempotency-Key` | No |
+| `POST .../consultations/{consultation_id}/attachments` | `Idempotency-Key` | No |
+| `POST .../consultations/{consultation_id}/evidence` | `Idempotency-Key` | No |
 | `POST .../proposals` | `Idempotency-Key` | No |
 | `POST .../proposals/{proposal_id}/submit` | `Idempotency-Key` | No |
 | `POST .../proposals/{proposal_id}/decide` | `Idempotency-Key` | Yes |
@@ -261,6 +270,48 @@ ownership rules (such as submitting only one's own proposal unless an elevated
 role applies) are separate from the role list and must be checked by the
 backend. A cross-workspace resource is reported as `404`; a visible resource
 with insufficient action permission is `403`.
+
+### 8.2 Consultation attachments, evidence, and history (Issue #4)
+
+Issue #4 adds the evidence pipeline that sits beside consultation intake. All
+three resource families are workspace-scoped and use the same authorization,
+tenant-isolation, and problem+json rules as the rest of the API; `workspace_id`
+and `consultation_id` in the path are locators, never authority.
+
+| Operation | Method and path | Required role (`x-required-roles`) |
+|---|---|---|
+| Upload attachment | `POST .../consultations/{consultation_id}/attachments` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+| List attachments | `GET .../consultations/{consultation_id}/attachments` | any member (incl. `viewer`) |
+| Read attachment | `GET .../consultations/{consultation_id}/attachments/{attachment_id}` | any member (incl. `viewer`) |
+| Download content | `GET .../consultations/{consultation_id}/attachments/{attachment_id}/content` | any member (incl. `viewer`) |
+| Delete attachment | `DELETE .../consultations/{consultation_id}/attachments/{attachment_id}` | uploader or `owner`/`admin` |
+| Create evidence | `POST .../consultations/{consultation_id}/evidence` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+| List evidence | `GET .../consultations/{consultation_id}/evidence` | any member (incl. `viewer`) |
+| Read history | `GET .../consultations/{consultation_id}/history` | any member (incl. `viewer`) |
+
+- **Upload transport.** Bytes travel as base64 in the JSON body
+  (`content_base64`) so the upload reuses the authenticated JSON transport; the
+  server enforces the size limit and content-type allowlist on the decoded bytes,
+  never the declared type alone. Upload returns `201` with the created resource
+  whose `status` is `available`, `quarantined`, or `rejected`; a client error
+  (bad filename, unsupported or mismatched type, oversized or malformed content)
+  is a `400`/`422` problem and stores nothing.
+- **Fail-closed scanning.** With no scanning backend configured every upload is
+  quarantined (`scan_verdict: unknown`); quarantined and rejected objects are
+  never downloadable (`409 ATTACHMENT_QUARANTINED`) and can never be cited as
+  evidence.
+- **Quota.** Exceeding the per-consultation attachment quota returns
+  `409 ATTACHMENT_LIMIT_REACHED`.
+- **Evidence shape.** Evidence is `text`, `link`, or `attachment`; an
+  `attachment` entry requires an `attachment_id` that points at an `available`
+  attachment in the same consultation, and text/link entries must not carry one.
+- **History.** History is a read-only, cursor-paginated projection of the
+  append-only audit trail for one consultation. It uses the same page envelope
+  and `limit`/`cursor` rules as other list operations but is not a filterable
+  entity list; attachment and evidence lifecycle actions appear in the timeline.
+- **Idempotency.** Attachment upload and evidence creation accept an optional
+  `Idempotency-Key` (section 7); an equivalent replay returns the original
+  resource and a different fingerprint returns `409`.
 
 ## 9. Internal events
 
