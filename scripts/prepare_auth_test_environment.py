@@ -117,9 +117,7 @@ def build_local_configuration(
     project_name: str | None = None,
 ) -> dict[str, str]:
     """Build fresh local settings in memory without reading or writing runtime files."""
-    keycloak_port = (
-        DEFAULT_KEYCLOAK_PORT if keycloak_port is None else keycloak_port
-    )
+    keycloak_port = DEFAULT_KEYCLOAK_PORT if keycloak_port is None else keycloak_port
     postgres_port = DEFAULT_POSTGRES_PORT if postgres_port is None else postgres_port
     project_name = project_name or DEFAULT_PROJECT
     if not 1 <= keycloak_port <= 65535 or not 1 <= postgres_port <= 65535:
@@ -148,9 +146,13 @@ def ensure_local_configuration(
     """Create the shared env file only if absent; preserve existing bytes/credentials."""
     env_path = ENVIRONMENT_FILE
     if not REALM_SOURCE.is_file():
-        raise BootstrapError("The version-controlled development realm file is missing.")
+        raise BootstrapError(
+            "The version-controlled development realm file is missing."
+        )
     if not ENVIRONMENT_TEMPLATE.is_file():
-        raise BootstrapError("The version-controlled authentication env template is missing.")
+        raise BootstrapError(
+            "The version-controlled authentication env template is missing."
+        )
     if env_path.exists():
         existing_values = _parse_env(env_path)
         requested_settings = {
@@ -173,10 +175,14 @@ def ensure_local_configuration(
         expected_realm = f"./{REALM_SOURCE.relative_to(ROOT).as_posix()}"
         values["KEYCLOAK_REALM_IMPORT_FILE"] = expected_realm
         values["KEYCLOAK_PORT"] = str(
-            keycloak_port if keycloak_port is not None else values.get("KEYCLOAK_PORT", DEFAULT_KEYCLOAK_PORT)
+            keycloak_port
+            if keycloak_port is not None
+            else values.get("KEYCLOAK_PORT", DEFAULT_KEYCLOAK_PORT)
         )
         values["POSTGRES_PORT"] = str(
-            postgres_port if postgres_port is not None else values.get("POSTGRES_PORT", DEFAULT_POSTGRES_PORT)
+            postgres_port
+            if postgres_port is not None
+            else values.get("POSTGRES_PORT", DEFAULT_POSTGRES_PORT)
         )
         values["EVENTFLOW_AUTH_COMPOSE_PROJECT"] = (
             project_name
@@ -232,7 +238,9 @@ def _validate_saved_configuration(values: dict[str, str]) -> None:
     if not required.issubset(values) or any(not values.get(name) for name in required):
         raise BootstrapError("The saved local auth configuration is incomplete.")
     if not REALM_SOURCE.is_file():
-        raise BootstrapError("The version-controlled development realm file is missing.")
+        raise BootstrapError(
+            "The version-controlled development realm file is missing."
+        )
 
 
 def _request_json(
@@ -381,7 +389,9 @@ def verify_keycloak(values: dict[str, str]) -> None:
             )
 
     username = values["EVENTFLOW_TEST_KEYCLOAK_USERNAME"]
-    users_url = f"{admin_root}/users?{urlencode({'username': username, 'exact': 'true'})}"
+    users_url = (
+        f"{admin_root}/users?{urlencode({'username': username, 'exact': 'true'})}"
+    )
     users = _request_json(users_url, token=admin_token)
     user = next((item for item in users if item.get("username") == username), None)
     if user is None:
@@ -409,7 +419,9 @@ def verify_keycloak(values: dict[str, str]) -> None:
         users = _request_json(users_url, token=admin_token)
         user = next((item for item in users if item.get("username") == username), None)
     if user is None or user.get("enabled") is not True:
-        raise BootstrapError("The generated Keycloak test identity is missing or disabled.")
+        raise BootstrapError(
+            "The generated Keycloak test identity is missing or disabled."
+        )
 
 
 def _compose(
@@ -482,7 +494,7 @@ def main() -> int:
             if args.volumes and not start_postgres:
                 raise BootstrapError(
                     "Refusing to remove database volumes for a pre-existing shared environment."
-            )
+                )
             if start_postgres:
                 volume_args = ["--volumes"] if args.volumes else []
                 _compose(
