@@ -59,6 +59,39 @@ class BoardCardRepository(Repository):
         category: str,
         assignee_id: UUID | None = None,
     ) -> BoardCard:
+        """Create and commit one card (standalone unit of work)."""
+        card = self.build_card(
+            workspace_id=workspace_id,
+            board_id=board_id,
+            work_item_id=work_item_id,
+            column_id=column_id,
+            rank=rank,
+            title=title,
+            priority=priority,
+            category=category,
+            assignee_id=assignee_id,
+        )
+        self._session.commit()
+        return card
+
+    def build_card(
+        self,
+        *,
+        workspace_id: UUID,
+        board_id: UUID,
+        work_item_id: UUID,
+        column_id: str,
+        rank: str,
+        title: str,
+        priority: str,
+        category: str,
+        assignee_id: UUID | None = None,
+    ) -> BoardCard:
+        """Add and flush a card inside the caller's transaction.
+
+        It never commits, so the card can be created atomically with the
+        approval and WorkItem that authorize it.
+        """
         board = self._session.get(Board, board_id)
         if board is None or board.workspace_id != workspace_id:
             raise EntityNotFound("board not found in workspace")
@@ -76,7 +109,7 @@ class BoardCardRepository(Repository):
             assignee_id=assignee_id,
         )
         self._session.add(card)
-        self._session.commit()
+        self._session.flush()
         return card
 
     def get(self, *, workspace_id: UUID, card_id: UUID) -> BoardCard | None:
