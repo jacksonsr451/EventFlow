@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from eventflow_work_management.api.approval_routes import router as approval_router
 from eventflow_work_management.api.auth_routes import router as authentication_router
 from eventflow_work_management.api.attachment_routes import (
     router as attachment_router,
@@ -197,6 +198,7 @@ def create_app(
     app.include_router(workspace_router)
     app.include_router(consultation_router)
     app.include_router(proposal_router)
+    app.include_router(approval_router)
     app.include_router(attachment_router)
 
     return app

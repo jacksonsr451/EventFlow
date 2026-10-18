@@ -34,6 +34,47 @@ class WorkItemRepository(Repository):
         assignee_id: UUID | None = None,
         external_issue_links: list | None = None,
     ) -> WorkItem:
+        """Create and commit one WorkItem (standalone unit of work)."""
+        work_item = self.build_from_approved_proposal(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            proposal_id=proposal_id,
+            proposal_version=proposal_version,
+            approval_id=approval_id,
+            title=title,
+            description=description,
+            acceptance_criteria=acceptance_criteria,
+            category=category,
+            priority=priority,
+            status=status,
+            assignee_id=assignee_id,
+            external_issue_links=external_issue_links,
+        )
+        self._session.commit()
+        return work_item
+
+    def build_from_approved_proposal(
+        self,
+        *,
+        workspace_id: UUID,
+        project_id: UUID,
+        proposal_id: UUID,
+        proposal_version: int,
+        approval_id: UUID,
+        title: str,
+        description: str,
+        acceptance_criteria: list,
+        category: str,
+        priority: str,
+        status: str = "ready",
+        assignee_id: UUID | None = None,
+        external_issue_links: list | None = None,
+    ) -> WorkItem:
+        """Add and flush a WorkItem inside the caller's transaction.
+
+        It never commits, so an approval can create the WorkItem and its
+        BoardCard atomically in a single transaction.
+        """
         work_item = WorkItem(
             id=uuid4(),
             workspace_id=workspace_id,
@@ -51,7 +92,7 @@ class WorkItemRepository(Repository):
             external_issue_links=external_issue_links or [],
         )
         self._session.add(work_item)
-        self._session.commit()
+        self._session.flush()
         return work_item
 
     def get(self, *, workspace_id: UUID, work_item_id: UUID) -> WorkItem | None:
