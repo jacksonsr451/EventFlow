@@ -318,6 +318,21 @@ $defs:
         $ref: '#/$defs/ConsultationStatus'
       priority:
         $ref: '#/$defs/Priority'
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+        description: Optional business-impact classification used by the single priority matrix.
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+        description: Optional business-urgency classification used by the single priority matrix.
+      priority_override_reason:
+        type: [string, 'null']
+        minLength: 10
+        maxLength: 300
+        description: Required when the classified priority differs from the matrix result.
       editor_context:
         anyOf:
           - $ref: '#/$defs/EditorContext'
@@ -1168,6 +1183,18 @@ $defs:
         const: bug
       priority:
         $ref: '#/$defs/Priority'
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+      priority_override_reason:
+        type: [string, 'null']
+        minLength: 10
+        maxLength: 300
       triage_notes:
         type: string
         minLength: 5
@@ -1184,6 +1211,18 @@ $defs:
         const: feature
       priority:
         $ref: '#/$defs/Priority'
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+      priority_override_reason:
+        type: [string, 'null']
+        minLength: 10
+        maxLength: 300
       triage_notes:
         type: string
         minLength: 5
@@ -1200,6 +1239,18 @@ $defs:
         const: chore
       priority:
         $ref: '#/$defs/Priority'
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+      priority_override_reason:
+        type: [string, 'null']
+        minLength: 10
+        maxLength: 300
       triage_notes:
         type: string
         minLength: 5
@@ -1216,6 +1267,18 @@ $defs:
         const: docs
       priority:
         $ref: '#/$defs/Priority'
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+      priority_override_reason:
+        type: [string, 'null']
+        minLength: 10
+        maxLength: 300
       triage_notes:
         type: string
         minLength: 5
@@ -1232,6 +1295,18 @@ $defs:
         const: security
       priority:
         $ref: '#/$defs/Priority'
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+      priority_override_reason:
+        type: [string, 'null']
+        minLength: 10
+        maxLength: 300
       triage_notes:
         type: string
         minLength: 5
@@ -2298,3 +2373,499 @@ $defs:
           $ref: '#/$defs/ProjectRepository'
       page_info:
         $ref: '#/$defs/PageInfo'
+
+  BusinessImpact:
+    type: string
+    enum: [critical, high, moderate, low]
+
+  BusinessUrgency:
+    type: string
+    enum: [immediate, elevated, normal, low]
+
+  SlaPolicyStatus:
+    type: string
+    enum: [draft, active, retired]
+
+  SlaInstanceStatus:
+    type: string
+    enum: [pending, running, paused, fulfilled, breached, cancelled]
+
+  SlaEventType:
+    type: string
+    enum:
+      - started
+      - paused
+      - resumed
+      - warning_response
+      - warning_resolution
+      - breach_response
+      - breach_resolution
+      - fulfilled
+      - cancelled
+
+  NotificationEventType:
+    type: string
+    enum:
+      - dependency.created
+      - dependency.removed
+      - sla.warning
+      - sla.breached
+      - sla.fulfilled
+      - work_item.priority_overridden
+      - work_item.blocked
+
+  SlaPolicy:
+    type: object
+    description: One immutable version of a scoped SLA policy.
+    additionalProperties: false
+    required: [policy_id, workspace_id, name, version, status, timezone, business_hours, holidays, pause_statuses, warning_threshold_percent, created_by, created_at, updated_at]
+    properties:
+      policy_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+        description: Null means the policy is the workspace default.
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      version:
+        type: integer
+        minimum: 1
+      status:
+        $ref: '#/$defs/SlaPolicyStatus'
+      response_minutes:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      resolution_minutes:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      timezone:
+        type: string
+        minLength: 1
+        maxLength: 64
+      business_hours:
+        type: object
+        additionalProperties: true
+      holidays:
+        type: array
+        items:
+          type: string
+          format: date
+      pause_statuses:
+        type: array
+        items:
+          $ref: '#/$defs/WorkItemStatus'
+      warning_threshold_percent:
+        type: integer
+        minimum: 1
+        maximum: 99
+      created_by:
+        $ref: '#/$defs/UUID'
+      activated_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      retired_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  SlaPolicyPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/SlaPolicy'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  SlaEvent:
+    type: object
+    additionalProperties: false
+    required: [event_id, event_type, due_at, occurred_at, payload]
+    properties:
+      event_id:
+        $ref: '#/$defs/UUID'
+      event_type:
+        $ref: '#/$defs/SlaEventType'
+      due_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      occurred_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      payload:
+        type: object
+        additionalProperties: true
+
+  SlaPauseInterval:
+    type: object
+    additionalProperties: false
+    required: [pause_id, reason, started_at, ended_at, seconds]
+    properties:
+      pause_id:
+        $ref: '#/$defs/UUID'
+      reason:
+        type: string
+      started_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      ended_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      seconds:
+        type: integer
+        minimum: 0
+
+  SlaInstance:
+    type: object
+    description: A durable SLA clock pinned to one policy version snapshot.
+    additionalProperties: false
+    required: [sla_instance_id, work_item_id, project_id, policy_id, policy_version, policy_snapshot, status, started_at, paused_seconds, updated_at]
+    properties:
+      sla_instance_id:
+        $ref: '#/$defs/UUID'
+      work_item_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      policy_id:
+        $ref: '#/$defs/UUID'
+      policy_version:
+        type: integer
+        minimum: 1
+      policy_snapshot:
+        type: object
+        additionalProperties: true
+      status:
+        $ref: '#/$defs/SlaInstanceStatus'
+      started_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      response_due_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      resolution_due_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      first_response_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      resolved_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      paused_seconds:
+        type: integer
+        minimum: 0
+      warning_response_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      warning_resolution_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      breach_response_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      breach_resolution_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      next_evaluation_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  WorkItemSla:
+    type: object
+    description: The SLA view of one WorkItem. The instance is null when no policy applies.
+    additionalProperties: false
+    required: [work_item_id, instance, events, pauses]
+    properties:
+      work_item_id:
+        $ref: '#/$defs/UUID'
+      instance:
+        anyOf:
+          - $ref: '#/$defs/SlaInstance'
+          - type: 'null'
+      events:
+        type: array
+        items:
+          $ref: '#/$defs/SlaEvent'
+      pauses:
+        type: array
+        items:
+          $ref: '#/$defs/SlaPauseInterval'
+
+  CreateSlaPolicyRequest:
+    type: object
+    additionalProperties: false
+    required: [name]
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      project_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      response_minutes:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      resolution_minutes:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      timezone:
+        type: string
+        minLength: 1
+        maxLength: 64
+        default: UTC
+      business_hours:
+        type: object
+        additionalProperties: true
+      holidays:
+        type: array
+        items:
+          type: string
+          format: date
+      pause_statuses:
+        type: array
+        items:
+          $ref: '#/$defs/WorkItemStatus'
+      warning_threshold_percent:
+        type: integer
+        minimum: 1
+        maximum: 99
+        default: 75
+      activate:
+        type: boolean
+        default: false
+
+  CreateSlaPolicyVersionRequest:
+    type: object
+    additionalProperties: false
+    properties:
+      response_minutes:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      resolution_minutes:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      timezone:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 64
+          - type: 'null'
+      business_hours:
+        type: object
+        additionalProperties: true
+      holidays:
+        type: array
+        items:
+          type: string
+          format: date
+      pause_statuses:
+        type: array
+        items:
+          $ref: '#/$defs/WorkItemStatus'
+      warning_threshold_percent:
+        anyOf:
+          - type: integer
+            minimum: 1
+            maximum: 99
+          - type: 'null'
+      activate:
+        type: boolean
+        default: false
+
+  OverridePriorityRequest:
+    type: object
+    additionalProperties: false
+    required: [priority, reason]
+    properties:
+      priority:
+        $ref: '#/$defs/Priority'
+      reason:
+        type: string
+        minLength: 10
+        maxLength: 300
+
+  PriorityOverrideResponse:
+    type: object
+    additionalProperties: false
+    required: [work_item_id, priority, calculated_priority, priority_override_reason, priority_overridden_by]
+    properties:
+      work_item_id:
+        $ref: '#/$defs/UUID'
+      priority:
+        $ref: '#/$defs/Priority'
+      calculated_priority:
+        $ref: '#/$defs/Priority'
+      priority_override_reason:
+        type: string
+        minLength: 10
+        maxLength: 300
+      priority_overridden_by:
+        $ref: '#/$defs/UUID'
+
+  WorkItemDependency:
+    type: object
+    additionalProperties: false
+    required: [dependency_id, blocking_work_item_id, blocked_work_item_id, created_by, created_at]
+    properties:
+      dependency_id:
+        $ref: '#/$defs/UUID'
+      blocking_work_item_id:
+        $ref: '#/$defs/UUID'
+      blocked_work_item_id:
+        $ref: '#/$defs/UUID'
+      created_by:
+        $ref: '#/$defs/UUID'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  DependencyList:
+    type: object
+    additionalProperties: false
+    required: [work_item_id, blockers, dependents, unresolved_blocker_ids]
+    properties:
+      work_item_id:
+        $ref: '#/$defs/UUID'
+      blockers:
+        type: array
+        items:
+          $ref: '#/$defs/WorkItemDependency'
+      dependents:
+        type: array
+        items:
+          $ref: '#/$defs/WorkItemDependency'
+      unresolved_blocker_ids:
+        type: array
+        items:
+          $ref: '#/$defs/UUID'
+
+  CreateDependencyRequest:
+    type: object
+    additionalProperties: false
+    required: [blocking_work_item_id]
+    properties:
+      blocking_work_item_id:
+        $ref: '#/$defs/UUID'
+
+  Notification:
+    type: object
+    additionalProperties: false
+    required: [notification_id, event_type, entity_type, entity_id, title, body, payload, read_at, created_at]
+    properties:
+      notification_id:
+        $ref: '#/$defs/UUID'
+      event_type:
+        $ref: '#/$defs/NotificationEventType'
+      entity_type:
+        type: string
+      entity_id:
+        $ref: '#/$defs/UUID'
+      title:
+        type: string
+      body:
+        type: string
+      payload:
+        type: object
+        additionalProperties: true
+      read_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  NotificationPage:
+    type: object
+    additionalProperties: false
+    required: [items, unread_count, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/Notification'
+      unread_count:
+        type: integer
+        minimum: 0
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  NotificationPreference:
+    type: object
+    additionalProperties: false
+    required: [event_type, in_app, email, version, updated_at]
+    properties:
+      event_type:
+        $ref: '#/$defs/NotificationEventType'
+      in_app:
+        type: boolean
+      email:
+        type: boolean
+      version:
+        type: integer
+        minimum: 1
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  NotificationPreferenceList:
+    type: object
+    additionalProperties: false
+    required: [items]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/NotificationPreference'
+
+  MarkNotificationRequest:
+    type: object
+    additionalProperties: false
+    required: [read]
+    properties:
+      read:
+        type: boolean
+
+  UpdatePreferenceRequest:
+    type: object
+    additionalProperties: false
+    required: [in_app, email]
+    properties:
+      in_app:
+        type: boolean
+      email:
+        type: boolean

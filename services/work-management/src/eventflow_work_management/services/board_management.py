@@ -57,11 +57,14 @@ from eventflow_work_management.services.board_ranking import (
     RankSpaceExhausted,
     rank_for_position,
 )
+from eventflow_work_management.services.dependencies import DependencyService
+from eventflow_work_management.services.notifications import NotificationService
 from eventflow_work_management.services.pagination import (
     CursorError,
     decode_cursor,
     encode_cursor,
 )
+from eventflow_work_management.services.sla import SlaService
 from eventflow_work_management.services.work_item_transitions import (
     is_valid_transition,
 )
@@ -1035,6 +1038,16 @@ class BoardCardService(_BaseService):
                     f"{target.mapped_status}.",
                     code="INVALID_TRANSITION",
                 )
+            if target.mapped_status == "done":
+                blockers = DependencyService(self._session).unresolved_blockers(
+                    workspace_id=context.workspace_id, work_item_id=work_item.id
+                )
+                if blockers:
+                    raise _conflict(
+                        "The WorkItem cannot be completed while blocking "
+                        "dependencies remain unresolved.",
+                        code="DEPENDENCIES_UNRESOLVED",
+                    )
             if (
                 target.wip_limit is not None
                 and card.column_id != target_column_id
@@ -1071,6 +1084,27 @@ class BoardCardService(_BaseService):
             if work_item.status != target.mapped_status:
                 self._work_items.set_status(work_item, status=target.mapped_status)
                 work_item.updated_at = occurred_at
+                SlaService(self._session).ensure_instance(
+                    work_item, now=occurred_at
+                )
+                SlaService(self._session).sync_with_status(
+                    work_item, now=occurred_at
+                )
+                if target.mapped_status == "blocked":
+                    NotificationService(self._session).emit(
+                        workspace_id=context.workspace_id,
+                        recipient_id=work_item.assignee_id,
+                        event_type="work_item.blocked",
+                        entity_type="work_item",
+                        entity_id=work_item.id,
+                        title=f"Work item blocked: {work_item.title}",
+                        body="This work item is now blocked.",
+                        payload={"work_item_id": str(work_item.id)},
+                        dedup_key=(
+                            f"work_item.blocked:{work_item.id}:"
+                            f"{occurred_at.isoformat()}"
+                        ),
+                    )
             movement = self._movements.append(
                 workspace_id=context.workspace_id,
                 project_id=board.project_id,

@@ -21,6 +21,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from eventflow_work_management.db.base import Base, TimestampMixin, check_in
 from eventflow_work_management.models.enums import (
+    BUSINESS_IMPACT_VALUES,
+    BUSINESS_URGENCY_VALUES,
     CONSULTATION_STATUS_VALUES,
     ORIGIN_VALUES,
     PRIORITY_VALUES,
@@ -60,6 +62,11 @@ class Consultation(TimestampMixin, Base):
     )
     triage_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     triage_criteria: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    business_impact: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    business_urgency: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    priority_override_reason: Mapped[str | None] = mapped_column(
+        String(300), nullable=True
+    )
     triaged_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     triaged_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -84,6 +91,21 @@ class Consultation(TimestampMixin, Base):
             check_in("status", CONSULTATION_STATUS_VALUES), name="status_values"
         ),
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
+        CheckConstraint(
+            "business_impact IS NULL OR "
+            f"{check_in('business_impact', BUSINESS_IMPACT_VALUES)}",
+            name="business_impact_values",
+        ),
+        CheckConstraint(
+            "business_urgency IS NULL OR "
+            f"{check_in('business_urgency', BUSINESS_URGENCY_VALUES)}",
+            name="business_urgency_values",
+        ),
+        CheckConstraint(
+            "priority_override_reason IS NULL OR "
+            "char_length(priority_override_reason) BETWEEN 10 AND 300",
+            name="priority_override_reason_length",
+        ),
         CheckConstraint(
             f"category IS NULL OR {check_in('category', TRIAGE_CATEGORY_VALUES)}",
             name="category_values",

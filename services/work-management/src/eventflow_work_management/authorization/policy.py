@@ -72,6 +72,15 @@ class Action(str, Enum):
     PROJECT_REPOSITORY_UPDATE = "project_repository:update"
     PROJECT_REPOSITORY_UNLINK = "project_repository:unlink"
 
+    PRIORITY_OVERRIDE = "work_item:override_priority"
+    SLA_POLICY_READ = "sla_policy:read"
+    SLA_POLICY_MANAGE = "sla_policy:manage"
+    SLA_READ = "sla:read"
+    DEPENDENCY_READ = "dependency:read"
+    DEPENDENCY_MANAGE = "dependency:manage"
+    NOTIFICATION_READ = "notification:read"
+    NOTIFICATION_PREFERENCE_MANAGE = "notification:manage_preferences"
+
 
 _READ_ACTIONS: frozenset[Action] = frozenset(
     {
@@ -87,6 +96,10 @@ _READ_ACTIONS: frozenset[Action] = frozenset(
         Action.WORK_ITEM_READ,
         Action.BOARD_READ,
         Action.PROJECT_REPOSITORY_READ,
+        Action.SLA_POLICY_READ,
+        Action.SLA_READ,
+        Action.DEPENDENCY_READ,
+        Action.NOTIFICATION_READ,
     }
 )
 
@@ -120,6 +133,10 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROJECT_REPOSITORY_CREATE,
             Action.PROJECT_REPOSITORY_UPDATE,
             Action.PROJECT_REPOSITORY_UNLINK,
+            Action.SLA_POLICY_MANAGE,
+            Action.PRIORITY_OVERRIDE,
+            Action.DEPENDENCY_MANAGE,
+            Action.NOTIFICATION_PREFERENCE_MANAGE,
         }
     ),
     "admin": frozenset(
@@ -149,6 +166,10 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROJECT_REPOSITORY_CREATE,
             Action.PROJECT_REPOSITORY_UPDATE,
             Action.PROJECT_REPOSITORY_UNLINK,
+            Action.SLA_POLICY_MANAGE,
+            Action.PRIORITY_OVERRIDE,
+            Action.DEPENDENCY_MANAGE,
+            Action.NOTIFICATION_PREFERENCE_MANAGE,
         }
     ),
     "triager": frozenset(
@@ -167,6 +188,9 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROPOSAL_UPDATE,
             Action.PROPOSAL_DUPLICATE,
             Action.WORK_ITEM_UPDATE,
+            Action.PRIORITY_OVERRIDE,
+            Action.DEPENDENCY_MANAGE,
+            Action.NOTIFICATION_PREFERENCE_MANAGE,
         }
     ),
     "approver": frozenset(
@@ -184,6 +208,7 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROPOSAL_UPDATE,
             Action.PROPOSAL_DUPLICATE,
             Action.APPROVAL_DECIDE,
+            Action.NOTIFICATION_PREFERENCE_MANAGE,
         }
     ),
     "contributor": frozenset(
@@ -202,9 +227,11 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROPOSAL_DUPLICATE,
             Action.WORK_ITEM_UPDATE,
             Action.BOARD_MANAGE,
+            Action.DEPENDENCY_MANAGE,
+            Action.NOTIFICATION_PREFERENCE_MANAGE,
         }
     ),
-    "viewer": frozenset(),
+    "viewer": frozenset({Action.NOTIFICATION_PREFERENCE_MANAGE}),
 }
 
 _ROLE_PERMISSIONS: dict[str, frozenset[Action]] = {

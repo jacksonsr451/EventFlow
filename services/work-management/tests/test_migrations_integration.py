@@ -40,6 +40,14 @@ EXPECTED_TABLES = {
     "entity_comments",
     "entity_attachments",
     "entity_attachment_blobs",
+    "sla_policies",
+    "sla_instances",
+    "sla_pause_intervals",
+    "sla_events",
+    "work_item_dependencies",
+    "notifications",
+    "notification_preferences",
+    "notification_deliveries",
 }
 
 EXPECTED_TRIGGERS = {
@@ -125,7 +133,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         tables = _tables(engine)
         assert EXPECTED_TABLES <= tables
         assert "alembic_version" in tables
-        assert _revision(engine) == "0010_project_repositories"
+        assert _revision(engine) == "0011_priority_sla_dependencies"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
         assert EXPECTED_CONSTRAINTS <= _constraints(engine)
@@ -136,7 +144,7 @@ def test_upgrade_is_idempotent():
     with temporary_empty_database(admin_url) as (url, engine):
         run_migrations(url)
         run_migrations(url)
-        assert _revision(engine) == "0010_project_repositories"
+        assert _revision(engine) == "0011_priority_sla_dependencies"
 
 
 def test_downgrade_removes_tables_triggers_and_functions():

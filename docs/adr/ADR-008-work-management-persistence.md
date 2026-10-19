@@ -359,6 +359,64 @@ unchanged and remains a separate concern. Verified by
 `test_project_repository_integration.py`, `test_models_unit.py`,
 `test_rbac_policy_unit.py`, and `test_migrations_integration.py`.
 
+### Amendment A-06 — Business priority, SLA clocks, dependencies and notifications (Issue #30)
+
+**Status:** Accepted.
+
+**Context.** [Issue #30](https://github.com/jacksonsr451/EventFlow/issues/30)
+requires approved WorkItems to carry a business priority derived from impact and
+urgency, durable SLA clocks that respect business calendars, acyclic dependency
+edges, and durable notifications. These concerns must not duplicate priority
+logic across services, mutate historical SLA policy decisions, or lose
+notifications when a transaction commits. Existing WorkItems and Consultations
+already carry a `priority`, so the migration must be additive.
+
+**Decision.**
+
+- The matrix is implemented once in `services/priority.py`. `business_impact`
+  and `business_urgency` are nullable additions to `consultations`; when both are
+  supplied the service derives `priority` and requires a 10-300 character
+  `priority_override_reason` if the submitted priority differs. Bug and security
+  severity remain separate triage criteria and never feed the matrix.
+- `work_items` gains nullable `calculated_priority`, `priority_override_reason`,
+  and `priority_overridden_by`. An override preserves the matrix-derived value;
+  the reason/actor pair is enforced by
+  `ck_work_items_priority_override_actor_consistency`, and the override is
+  audited and notified.
+- SLA policies are immutable version rows in `sla_policies`. Versions are unique
+  on `(workspace_id, project_id, name, version)`, and partial unique indexes
+  allow one active version per name and scope (workspace default or project).
+  Activation retires the prior active version; it never rewrites a running
+  clock.
+- `sla_instances` holds exactly one clock per WorkItem, pinned to the policy
+  version and an immutable JSON snapshot. `started_at` is the WorkItem creation
+  time. `sla_pause_intervals` and `sla_events` are append-only chronology; the
+  unique `(instance_id, event_type, due_at)` key makes warning/breach emission
+  idempotent. Evaluation runs on read and in a `FOR UPDATE SKIP LOCKED` worker.
+- `work_item_dependencies` stores directed edges with a unique
+  `(workspace_id, blocking_work_item_id, blocked_work_item_id)` key, a no-self
+  edge check, and composite FKs to both WorkItems and the project. Cycle
+  detection cannot be a CHECK constraint, so it runs under
+  `pg_advisory_xact_lock(hashtextextended(:key, 0))` in the writing
+  transaction.
+- Notifications are written transactionally with the domain change;
+  `notifications` is unique on `(workspace_id, dedup_key)`.
+  `notification_deliveries` stores one row per channel with bounded retry state,
+  and `notification_preferences` is unique per recipient and event type. In-app
+  delivery is immediate; email has no transport in this scope and is recorded as
+  `unavailable`. Recipients come only from trusted entity data.
+- Migration `0011_priority_sla_dependencies` is additive; existing priority
+  values are retained and the new columns are nullable. No provider credentials,
+  webhooks, installation ids, or external delivery are introduced.
+
+**Consequences.** Fourteen HTTP operations are added (five SLA policy
+operations, WorkItem SLA read, priority override, three dependency operations,
+two notification operations, and two preference operations). The existing
+approval gate is unchanged, and starting an SLA clock never creates downstream
+work. Verified by `services/work-management/tests/test_priority_sla_unit.py`,
+`test_priority_sla_notification_integration.py`, `test_models_unit.py`,
+`test_migrations_integration.py`, and the contract suite.
+
 ## Consequences
 
 ### Positive

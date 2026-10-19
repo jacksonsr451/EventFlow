@@ -501,6 +501,101 @@ no provider credentials, installation ids, tokens, or sync cursors.
   `project_repository.linked|updated|deactivated|reactivated|unlinked` to the
   workspace audit trail with `entity_type = "project_repository"`.
 
+### 8.7 Priority, SLA, dependencies and notifications (Issue #30)
+
+Issue #30 adds the business-facing scheduling concerns on top of the approved
+WorkItem. It does not change the approval gate or create downstream work on its
+own.
+
+#### Business priority
+
+- The priority vocabulary is `critical`, `high`, `medium`, and `low`. It is
+  derived from `business_impact` (`critical`, `high`, `moderate`, `low`) and
+  `business_urgency` (`immediate`, `elevated`, `normal`, `low`) by the single
+  matrix in `services/priority.py`; no other component re-derives it.
+- Bug and security severity stay independent triage criteria and are never fed
+  into the matrix. `priority` remains required on triage. `business_impact` and
+  `business_urgency` are optional but must be supplied together, and a supplied
+  pair that disagrees with `priority` requires a `priority_override_reason` of
+  10-300 characters. Notification text never echoes protected security detail.
+- `PATCH /v1/workspaces/{workspace_id}/work-items/{work_item_id}/priority`
+  applies a reasoned override. The matrix-derived `calculated_priority` is
+  preserved so divergence stays visible, the change is audited, and a
+  `work_item.priority_overridden` notification is emitted. Roles: `triager`,
+  `admin`, `owner`; `If-Match` and `Idempotency-Key` are supported.
+
+#### Versioned SLA policies and durable clocks
+
+- Policy versions are immutable. `POST .../sla-policies` creates version 1 and
+  `POST .../sla-policies/{policy_id}/versions` appends the next version; an
+  update is never applied in place. At most one version is active per policy
+  name and scope (workspace default when `project_id` is null, or project), and
+  activation retires the previously active version.
+- A version snapshots `response_minutes`, `resolution_minutes`, `timezone`,
+  `business_hours`, `holidays`, `pause_statuses`, and
+  `warning_threshold_percent`. Working time is added with the business calendar,
+  and holidays and non-working hours do not consume the budget.
+- Starting a WorkItem creates one durable SLA instance pinned to the policy
+  version and its snapshot. `started_at` is the WorkItem creation time; the
+  instance survives later policy changes. Status is one of `pending`, `running`,
+  `paused`, `fulfilled`, `breached`, or `cancelled`.
+- Chronology is recorded in append-only `sla_events` (`started`, `paused`,
+  `resumed`, `warning_response`, `warning_resolution`, `breach_response`,
+  `breach_resolution`, `fulfilled`, `cancelled`) plus `sla_pause_intervals`.
+  Reading `GET /v1/workspaces/{workspace_id}/work-items/{work_item_id}/sla`
+  also advances evaluation, so a warning or breach is recorded even when the
+  background worker has not run yet. The worker uses
+  `FOR UPDATE SKIP LOCKED` and the operation is idempotent.
+- Roles: policy create/version/activate require `owner` or `admin`; policy and
+  WorkItem-SLA reads are available to every member including `viewer`.
+  `POST` and `activate` accept `Idempotency-Key`; `activate` accepts `If-Match`.
+
+#### WorkItem dependencies
+
+- `POST .../work-items/{work_item_id}/dependencies` records that
+  `blocking_work_item_id` blocks this WorkItem. Duplicate edges replay the
+  existing edge, self-edges are rejected, and a cycle returns
+  `409 DEPENDENCY_CYCLE`; cycle detection runs inside the database transaction
+  under a workspace-scoped advisory lock.
+- `GET .../dependencies` returns the directed `blockers`, `dependents`, and
+  `unresolved_blocker_ids`. Moving a WorkItem to `done` while a blocker is
+  unresolved is rejected with `409 DEPENDENCIES_UNRESOLVED`.
+- Roles: reads are available to every member; create and delete require
+  `owner`, `admin`, `triager`, or `contributor`. `POST`/`DELETE` accept
+  `Idempotency-Key`; `DELETE` returns `204` and repeats idempotently.
+
+#### Durable notifications
+
+- Notifications are written in the same transaction as the domain change, so a
+  committed change never loses its notification and a rolled-back change never
+  emits one. The unique key `(workspace_id, dedup_key)` makes emission
+  idempotent; no network I/O happens inside the transaction.
+- Recipients come only from trusted data (for example the WorkItem
+  `assignee_id`). A missing recipient is a no-op, not an error. In-app delivery
+  is marked `delivered` immediately; email has no transport in this scope and is
+  recorded as `unavailable`, with the dispatcher retrying transient work up to
+  five attempts with base `30` seconds backoff.
+- The authenticated actor reads and marks only their own notifications:
+  `GET /v1/workspaces/{workspace_id}/notifications` (cursor paginated, optional
+  `unread_only`) and `PATCH .../notifications/{notification_id}` with
+  `{"read": true|false}`. Preferences are explicit per event type at
+  `GET .../notification-preferences` and
+  `PUT .../notification-preferences/{event_type}` with `{"in_app": bool,
+  "email": bool}`. All roles, including `viewer`, use these routes.
+
+#### Contract behavior
+
+- Mutating operations carry `Idempotency-Key`; reads and mutations return an
+  `ETag`, and the operations that accept `If-Match` return
+  `412 PRECONDITION_FAILED` for a stale validator. A reused key with a different
+  fingerprint returns `409 IDEMPOTENCY_CONFLICT`.
+- `listSlaPolicies` and `listNotifications` use the shared cursor page envelope
+  with `limit`, `cursor`, and `sort`.
+- Per-flow examples live in `contracts/examples/work-management/`
+  (`create-sla-policy.request.json`, `work-item-sla.response.json`,
+  `override-priority.request.json`, `dependencies.response.json`,
+  `notifications.page.json`).
+
 ## 9. Internal events
 
 Versioned internal events (for example `work_item.created`,
@@ -524,6 +619,7 @@ not invent one.
 | Consultation task proposals (Issue #6) | section 8.4, `Proposal*` DTOs | `services/work-management/tests/test_proposal_api_integration.py`, `services/work-management/tests/test_proposal_unit.py` |
 | Entity comments, attachments, history (Issue #29) | section 8.5, `EntityComment*`/`EntityAttachment*`/`EntityHistoryPage` DTOs | `services/work-management/tests/test_collaboration_integration.py` |
 | Project repository configuration (Issue #44) | section 8.6, `ProjectRepository*` DTOs | `services/work-management/tests/test_project_repository_unit.py`, `test_project_repository_integration.py` |
+| Priority, SLA, dependencies, notifications (Issue #30) | section 8.7, `SlaPolicy*`/`SlaInstance*`/`WorkItemDependency*`/`Notification*` DTOs | `services/work-management/tests/test_priority_sla_unit.py`, `test_priority_sla_notification_integration.py` |
 | Per-flow examples | `contracts/examples/work-management/` | `test_per_flow_examples_validate` |
 
 ## 11. Related documents

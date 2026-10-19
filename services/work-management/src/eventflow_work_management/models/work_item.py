@@ -51,6 +51,13 @@ class WorkItem(TimestampMixin, Base):
     acceptance_criteria: Mapped[list] = mapped_column(JSONB, nullable=False)
     category: Mapped[str] = mapped_column(String(16), nullable=False)
     priority: Mapped[str] = mapped_column(String(16), nullable=False)
+    calculated_priority: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    priority_override_reason: Mapped[str | None] = mapped_column(
+        String(300), nullable=True
+    )
+    priority_overridden_by: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=text("'ready'")
     )
@@ -97,6 +104,20 @@ class WorkItem(TimestampMixin, Base):
             check_in("category", TRIAGE_CATEGORY_VALUES), name="category_values"
         ),
         CheckConstraint(check_in("priority", PRIORITY_VALUES), name="priority_values"),
+        CheckConstraint(
+            "calculated_priority IS NULL OR "
+            f"{check_in('calculated_priority', PRIORITY_VALUES)}",
+            name="calculated_priority_values",
+        ),
+        CheckConstraint(
+            "priority_override_reason IS NULL OR "
+            "char_length(priority_override_reason) BETWEEN 10 AND 300",
+            name="priority_override_reason_length",
+        ),
+        CheckConstraint(
+            "(priority_override_reason IS NULL) = (priority_overridden_by IS NULL)",
+            name="priority_override_actor_consistency",
+        ),
         CheckConstraint(
             check_in("status", WORK_ITEM_STATUS_VALUES), name="status_values"
         ),

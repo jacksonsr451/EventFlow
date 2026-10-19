@@ -26,6 +26,7 @@ from eventflow_work_management.models.board import (
 )
 from eventflow_work_management.models.comment import EntityComment
 from eventflow_work_management.models.consultation import Consultation
+from eventflow_work_management.models.dependency import WorkItemDependency
 from eventflow_work_management.models.entity_attachment import (
     EntityAttachment,
     EntityAttachmentBlob,
@@ -37,12 +38,23 @@ from eventflow_work_management.models.membership import (
     WorkspaceInvitation,
     WorkspaceMembership,
 )
+from eventflow_work_management.models.notification import (
+    Notification,
+    NotificationDelivery,
+    NotificationPreference,
+)
 from eventflow_work_management.models.project_repository import (
     ProjectRepositoryLink,
 )
 from eventflow_work_management.models.proposal import Proposal
 from eventflow_work_management.models.proposal_evidence import ProposalEvidence
 from eventflow_work_management.models.proposal_revision import ProposalRevision
+from eventflow_work_management.models.sla import (
+    SlaEvent,
+    SlaInstance,
+    SlaPauseInterval,
+    SlaPolicy,
+)
 from eventflow_work_management.models.work_item import WorkItem
 from eventflow_work_management.models.workspace import Project, Workspace
 
@@ -64,6 +76,9 @@ __all__ = [
     "EntityComment",
     "IdempotencyRecord",
     "ExternalIdentity",
+    "Notification",
+    "NotificationDelivery",
+    "NotificationPreference",
     "OIDCLoginTransaction",
     "Project",
     "ProjectRepositoryLink",
@@ -71,7 +86,12 @@ __all__ = [
     "ProposalEvidence",
     "ProposalRevision",
     "RemoteIntegrationReference",
+    "SlaEvent",
+    "SlaInstance",
+    "SlaPauseInterval",
+    "SlaPolicy",
     "WorkItem",
+    "WorkItemDependency",
     "Workspace",
     "WorkspaceInvitation",
     "WorkspaceMembership",

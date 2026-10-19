@@ -41,6 +41,14 @@ and does not depend on Order Processing code or tables.
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
 | `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
 | `project_repositories` | Project→remote repository configuration | unique `(workspace_id, project_id, provider, provider_instance_id, remote_repository_id)`; canonical HTTPS URL; status/verification checks; composite project FK |
+| `sla_policies` | Immutable versioned SLA policies | unique `(workspace_id, project_id, name, version)`; partial unique active indexes per scope/name; at least one target; calendar/JSON checks; status timestamp consistency |
+| `sla_instances` | One durable SLA clock per WorkItem | unique `(workspace_id, work_item_id)`; versioned policy snapshot; composite FKs to project, WorkItem and policy; status/pause/cancel/breach checks |
+| `sla_pause_intervals` | Pause history for an SLA clock | composite FK to instance; closed-interval consistency (`ended_at` iff `seconds`); non-negative seconds |
+| `sla_events` | Append-only SLA chronology | unique `(instance_id, event_type, due_at)`; event-type check; composite FK to instance |
+| `work_item_dependencies` | Directed blocker graph | unique `(workspace_id, blocking_work_item_id, blocked_work_item_id)`; no self-edge; composite FKs to project and both WorkItems |
+| `notifications` | Durable per-recipient notifications | unique `(workspace_id, dedup_key)`; event-type and payload checks; workspace and recipient FKs |
+| `notification_preferences` | Per-recipient, per-event channel settings | unique `(workspace_id, recipient_id, event_type)`; version and event-type checks |
+| `notification_deliveries` | Per-channel delivery attempts | unique `(notification_id, channel)`; channel/status checks; delivered timestamp consistency |
 
 ## Invariants Enforced by the Database
 
@@ -130,6 +138,31 @@ Application code validates first; the database is the last line of defense.
   the same remote can be linked to multiple projects. `archived` is terminal,
   `deactivated_at` is non-null exactly while `inactive`, and `archived_at` is
   non-null exactly while `archived`.
+- **SLA policy versioning.** `sla_policies` rows are immutable versions. The
+  unique key `(workspace_id, project_id, name, version)` prevents duplicate
+  versions, and partial unique indexes `uq_sla_policies_active_workspace` and
+  `uq_sla_policies_active_project` allow at most one active version per name and
+  scope. `activated_at` is non-null exactly while active and `retired_at` exactly
+  while retired; at least one response or resolution target is required.
+- **Durable SLA clocks.** `sla_instances` is unique per `(workspace_id,
+  work_item_id)` and references its project, WorkItem and policy version through
+  composite FKs. It stores an immutable `policy_snapshot`; later policy changes
+  cannot mutate a running clock. `paused` requires
+  `active_pause_started_at`, `cancelled` requires `cancelled_at`, and a breach
+  timestamp requires the corresponding due date. `sla_events` are append-only by
+  application convention and unique per `(instance_id, event_type, due_at)`;
+  `sla_pause_intervals` require `ended_at` and `seconds` to be present together.
+- **Dependency graph.** `work_item_dependencies` stores one directed edge per
+  `(workspace_id, blocking_work_item_id, blocked_work_item_id)`, rejects
+  self-edges, and binds both WorkItems and the project through composite FKs.
+  A CHECK constraint cannot express acyclicity, so the service performs cycle
+  detection under `pg_advisory_xact_lock` inside the writing transaction.
+- **Transactional notifications.** Notifications are inserted in the same
+  transaction as the domain change. `uq_notifications_workspace_dedup` makes
+  emission idempotent, and `notification_deliveries` records one row per channel
+  with channel/status vocabularies and `delivered_at` consistent with the
+  `delivered` status. Preference rows are unique per recipient and event type
+  and carry a monotonic `version` for ETags.
 - **Idempotency.** The implemented approval-decision repository and its
   `idempotency_records` row are written in one transaction; a retry with the
   same key and fingerprint returns the stored repository result, and a different
@@ -146,9 +179,10 @@ of the unique-insert race reads the stored result and replays it. This implement
 ADR-007 section 3.6 for `.../decide` and provides the storage primitive that
 Amendment A-02 relies on; A-02 itself is a contract change applied by
 [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
-The approval decision, Kanban board operations, and project repository
-operations use this mechanism at the API boundary; the persistence layer itself
-still provides only the storage primitive.
+The approval decision, Kanban board operations, project repository operations,
+SLA policy/version/activation, priority override, dependency mutations, and
+notification mutations use this mechanism at the API boundary; the persistence
+layer itself still provides only the storage primitive.
 
 ## Tenant Isolation Scope
 
@@ -196,7 +230,8 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 | Entity history projection | append-only `audit_records` | `EntityHistoryService.list_page` (read only) | `test_comment_lifecycle_tombstone_and_history`, `test_entity_attachment_scan_lifecycle_on_proposal` |
 | Deterministic ordering and transitions | integer `rank`/`position` columns, `uq_board_cards_board_column_rank` | `BoardCardService.move`, `BoardColumnService.create`/`update`/`delete` | `test_board_ranking_unit.py`, `test_card_move_rejects_invalid_transition_and_unknown_column`, `test_card_move_enforces_wip_limit` |
 | Project repository identity and lifecycle | `uq_project_repositories_identity`, `fk_project_repositories_workspace_project`, `ck_project_repositories_*` | `ProjectRepositoryLinkRepository.find_identity`, `ProjectRepositoryService.create`/`update`/`unlink` | `test_remote_identity_dedup_is_url_and_instance_aware`, `test_lifecycle_idempotency_tenant_isolation_rbac_and_audit`, `test_concurrent_duplicate_create_converges_on_one_row` |
-| Migration reproducibility | Alembic `0001_initial`…`0010_project_repositories` | `support.run_migrations` | `test_migrations_integration.py` |
+| Priority, SLA, dependencies, notifications | `ck_*business_*`, `uq_sla_policies_*`, `uq_sla_instances_work_item`, `uq_work_item_dependencies_edge`, `uq_notifications_workspace_dedup` | `PriorityService`, `SlaPolicyService`/`SlaService`, `DependencyService`, `NotificationService` | `test_priority_sla_unit.py`, `test_priority_sla_notification_integration.py` |
+| Migration reproducibility | Alembic `0001_initial`…`0011_priority_sla_dependencies` | `support.run_migrations` | `test_migrations_integration.py` |
 
 ## Residual Risks and Deferred Controls
 

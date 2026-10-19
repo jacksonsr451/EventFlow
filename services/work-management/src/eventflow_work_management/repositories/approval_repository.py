@@ -227,6 +227,7 @@ class ApprovalRepository(Repository):
                     category=proposal.category,
                     priority=proposal.priority,
                 )
+                work_item.calculated_priority = proposal.priority
                 board_card = BoardCardRepository(self._session).build_card(
                     workspace_id=workspace_id,
                     board_id=placement.board_id,
@@ -237,6 +238,12 @@ class ApprovalRepository(Repository):
                     priority=proposal.priority,
                     category=proposal.category,
                 )
+                # The SLA clock starts with the approval that creates the
+                # WorkItem; the instance is pinned to the active policy
+                # version, or absent when no policy is configured.
+                from eventflow_work_management.services.sla import SlaService
+
+                SlaService(self._session).ensure_instance(work_item)
                 self._audit.append(
                     workspace_id=workspace_id,
                     action="work_item.created",

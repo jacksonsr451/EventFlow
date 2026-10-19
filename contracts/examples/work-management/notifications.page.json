@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "notification_id": "33333333-3333-4333-8333-333333333333",
+      "event_type": "sla.warning",
+      "entity_type": "work_item",
+      "entity_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "title": "SLA warning",
+      "body": "Work item ET-42 is approaching its resolution deadline.",
+      "payload": {
+        "sla_instance_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "deadline": "resolution"
+      },
+      "read_at": null,
+      "created_at": "2026-10-19T14:00:00Z"
+    }
+  ],
+  "unread_count": 1,
+  "page_info": {
+    "has_more": false,
+    "next_cursor": null
+  }
+}
