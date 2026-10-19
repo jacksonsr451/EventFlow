@@ -10,17 +10,29 @@ themselves when no test database is configured.
 
 from __future__ import annotations
 
+import threading
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from types import SimpleNamespace
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from eventflow_work_management.api.app import create_app
 from eventflow_work_management.db.engine import session_factory
+from eventflow_work_management.repositories.notification_repository import (
+    NotificationRepository,
+)
 from eventflow_work_management.security.config import AuthSettings
 from eventflow_work_management.security.crypto import TokenCipher
-from eventflow_work_management.services.notifications import NotificationDispatcher
+from eventflow_work_management.security.errors import ProblemError
+from eventflow_work_management.services.dependencies import DependencyService
+from eventflow_work_management.services.notifications import (
+    SECURITY_NOTIFICATION_BODY,
+    SECURITY_NOTIFICATION_TITLE,
+    NotificationDispatcher,
+    NotificationService,
+)
 from support import (
     require_database_url,
     session_scope,
@@ -191,6 +203,9 @@ def _create_work_item(
     project_id: str,
     board_id: str,
     triage: dict | None = None,
+    proposal_title: str | None = None,
+    category: str = "feature",
+    priority: str = "medium",
 ) -> dict:
     consultation_id, triaged = _consultation(
         client, owner, workspace_id, project_id, triage=triage or _triage_payload()
@@ -200,13 +215,13 @@ def _create_work_item(
         f"/v1/workspaces/{workspace_id}/proposals",
         json={
             "consultation_id": consultation_id,
-            "title": f"Streaming CSV export {uuid4().hex[:6]}",
+            "title": proposal_title or f"Streaming CSV export {uuid4().hex[:6]}",
             "technical_description": "Implement a streaming CSV export endpoint.",
             "scope": "Dashboard export control and backend endpoint.",
             "justification": "Customers requested CSV export.",
             "acceptance_criteria": ["CSV download works for the current filters"],
-            "category": "feature",
-            "priority": "medium",
+            "category": category,
+            "priority": priority,
         },
         headers=_bearer(owner),
     )
@@ -773,3 +788,540 @@ def test_notification_preferences_read_state_and_delivery_retry():
             assert status[0] == "exhausted"
             assert status[1] == 5
             assert "no email transport" in status[2]
+
+
+def _run_threads(targets) -> None:
+    for thread in targets:
+        thread.start()
+    for thread in targets:
+        thread.join(timeout=30)
+        assert not thread.is_alive(), "concurrency test thread did not finish"
+
+
+def test_notification_emission_concurrent_dedup_converges():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            owner = "notify-race-owner"
+            workspace_id = _workspace(client, owner, "Notify Race Co")
+            recipient_id = _principal_id(client, owner)
+            dedup_key = f"concurrent:{uuid4().hex}"
+            barrier = threading.Barrier(2)
+            local = threading.local()
+            original = NotificationRepository.get_by_dedup
+
+            def gated_get_by_dedup(self, *, workspace_id, dedup_key):
+                existing = original(
+                    self, workspace_id=workspace_id, dedup_key=dedup_key
+                )
+                if not getattr(local, "waited", False):
+                    local.waited = True
+                    barrier.wait(timeout=10)
+                return existing
+
+            results: list[tuple[str, str]] = []
+
+            def emit_once() -> None:
+                try:
+                    with session_scope(engine) as session:
+                        notification = NotificationService(session).emit(
+                            workspace_id=UUID(workspace_id),
+                            recipient_id=UUID(recipient_id),
+                            event_type="work_item.priority_overridden",
+                            entity_type="work_item",
+                            entity_id=uuid4(),
+                            title="Concurrent notification",
+                            body="Two writers must converge to one record.",
+                            payload={"work_item_id": str(uuid4())},
+                            dedup_key=dedup_key,
+                        )
+                        session.commit()
+                        results.append(("ok", str(notification.id)))
+                except Exception as exc:  # pragma: no cover - assertion reports it
+                    results.append(("error", repr(exc)))
+
+            NotificationRepository.get_by_dedup = gated_get_by_dedup
+            try:
+                _run_threads(
+                    [threading.Thread(target=emit_once) for _ in range(2)]
+                )
+            finally:
+                NotificationRepository.get_by_dedup = original
+
+            assert [item[0] for item in results] == ["ok", "ok"], results
+            assert len({item[1] for item in results}) == 1, results
+            with session_scope(engine) as session:
+                count = session.execute(
+                    text(
+                        "SELECT count(*) FROM notifications "
+                        "WHERE workspace_id = :workspace_id AND dedup_key = :dedup"
+                    ),
+                    {"workspace_id": workspace_id, "dedup": dedup_key},
+                ).scalar_one()
+                deliveries = session.execute(
+                    text(
+                        "SELECT count(*) FROM notification_deliveries d "
+                        "JOIN notifications n ON n.id = d.notification_id "
+                        "WHERE n.workspace_id = :workspace_id AND n.dedup_key = :dedup"
+                    ),
+                    {"workspace_id": workspace_id, "dedup": dedup_key},
+                ).scalar_one()
+            assert count == 1
+            assert deliveries == 1
+
+
+def test_security_work_item_notifications_are_redacted():
+    marker = f"CONFIDENTIAL-{uuid4().hex}"
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            owner = "security-notify-owner"
+            workspace_id = _workspace(client, owner, "Security Notify Co")
+            project_id = _project(client, owner, workspace_id)
+            _invite(client, owner, workspace_id, "security-notify-reviewer", "approver")
+            _invite(client, owner, workspace_id, "security-notify-viewer", "viewer")
+            board_id = _board(client, owner, workspace_id, project_id)
+            security_triage = {
+                "category": "security",
+                "priority": "high",
+                "triage_notes": f"{marker} restricted triage notes.",
+                "security_criteria": {
+                    "vulnerability_type": f"{marker} SQL injection",
+                    "severity_rating": "critical",
+                    "confidentiality_level": "restricted",
+                    "access_restricted_to": [marker],
+                    "safe_evidence_handling": True,
+                },
+            }
+            item = _create_work_item(
+                client,
+                engine,
+                owner=owner,
+                reviewer="security-notify-reviewer",
+                workspace_id=workspace_id,
+                project_id=project_id,
+                board_id=board_id,
+                triage=security_triage,
+                proposal_title=f"{marker} vulnerability details",
+                category="security",
+                priority="high",
+            )
+            viewer_id = _principal_id(client, "security-notify-viewer")
+            _assign(engine, item["work_item_id"], viewer_id)
+
+            overridden = client.patch(
+                f"/v1/workspaces/{workspace_id}/work-items/"
+                f"{item['work_item_id']}/priority",
+                json={"priority": "critical", "reason": "Security coordination."},
+                headers={**_bearer(owner), "Idempotency-Key": f"sec-{uuid4().hex}"},
+            )
+            assert overridden.status_code == 200, overridden.text
+
+            with session_scope(engine) as session:
+                row = session.execute(
+                    text(
+                        "SELECT title, body, payload::text FROM notifications "
+                        "WHERE entity_id = :entity_id "
+                        "AND event_type = 'work_item.priority_overridden'"
+                    ),
+                    {"entity_id": item["work_item_id"]},
+                ).one()
+            title, body, payload = row
+            assert title == SECURITY_NOTIFICATION_TITLE
+            assert body == SECURITY_NOTIFICATION_BODY
+            assert marker not in title
+            assert marker not in body
+            assert marker not in payload
+            assert '"redacted": true' in payload
+            assert item["work_item_id"] in payload
+
+            feature_item = _create_work_item(
+                client,
+                engine,
+                owner=owner,
+                reviewer="security-notify-reviewer",
+                workspace_id=workspace_id,
+                project_id=project_id,
+                board_id=board_id,
+                proposal_title=f"{marker} feature title",
+            )
+            owner_id = _principal_id(client, owner)
+            _assign(engine, feature_item["work_item_id"], owner_id)
+            feature_override = client.patch(
+                f"/v1/workspaces/{workspace_id}/work-items/"
+                f"{feature_item['work_item_id']}/priority",
+                json={"priority": "high", "reason": "Feature escalation."},
+                headers={**_bearer(owner), "Idempotency-Key": f"feature-{uuid4().hex}"},
+            )
+            assert feature_override.status_code == 200, feature_override.text
+            with session_scope(engine) as session:
+                feature_row = session.execute(
+                    text(
+                        "SELECT title, body, payload::text FROM notifications "
+                        "WHERE entity_id = :entity_id "
+                        "AND event_type = 'work_item.priority_overridden'"
+                    ),
+                    {"entity_id": feature_item["work_item_id"]},
+                ).one()
+            assert marker in feature_row[0]
+            assert marker not in feature_row[1]
+
+
+def test_concurrent_direct_dependency_writers_reject_cycle():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            owner = "dep-race-owner"
+            workspace_id = _workspace(client, owner, "Dependency Race Co")
+            project_id = _project(client, owner, workspace_id)
+            _invite(client, owner, workspace_id, "dep-race-reviewer", "approver")
+            board_id = _board(client, owner, workspace_id, project_id)
+            first = _create_work_item(
+                client,
+                engine,
+                owner=owner,
+                reviewer="dep-race-reviewer",
+                workspace_id=workspace_id,
+                project_id=project_id,
+                board_id=board_id,
+            )
+            second = _create_work_item(
+                client,
+                engine,
+                owner=owner,
+                reviewer="dep-race-reviewer",
+                workspace_id=workspace_id,
+                project_id=project_id,
+                board_id=board_id,
+            )
+            context = SimpleNamespace(
+                workspace_id=UUID(workspace_id),
+                actor_id=UUID(_principal_id(client, owner)),
+            )
+            barrier = threading.Barrier(2)
+            results: list[str] = []
+
+            def add_edge(blocking_id: str, blocked_id: str) -> None:
+                try:
+                    barrier.wait(timeout=10)
+                    with session_scope(engine) as session:
+                        DependencyService(session).create(
+                            context,
+                            UUID(blocked_id),
+                            blocking_work_item_id=UUID(blocking_id),
+                        )
+                    results.append("ok")
+                except ProblemError as exc:
+                    results.append(exc.code)
+                except Exception as exc:  # pragma: no cover - assertion reports it
+                    results.append(repr(exc))
+
+            _run_threads(
+                [
+                    threading.Thread(
+                        target=add_edge,
+                        args=(first["work_item_id"], second["work_item_id"]),
+                    ),
+                    threading.Thread(
+                        target=add_edge,
+                        args=(second["work_item_id"], first["work_item_id"]),
+                    ),
+                ]
+            )
+            assert sorted(results) == ["DEPENDENCY_CYCLE", "ok"], results
+            with session_scope(engine) as session:
+                count = session.execute(
+                    text(
+                        "SELECT count(*) FROM work_item_dependencies "
+                        "WHERE workspace_id = :workspace_id"
+                    ),
+                    {"workspace_id": workspace_id},
+                ).scalar_one()
+            assert count == 1
+
+
+def test_concurrent_transitive_dependency_writers_reject_cycle():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            owner = "dep-transitive-owner"
+            workspace_id = _workspace(client, owner, "Dependency Transitive Co")
+            project_id = _project(client, owner, workspace_id)
+            _invite(client, owner, workspace_id, "dep-transitive-reviewer", "approver")
+            board_id = _board(client, owner, workspace_id, project_id)
+            items = [
+                _create_work_item(
+                    client,
+                    engine,
+                    owner=owner,
+                    reviewer="dep-transitive-reviewer",
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    board_id=board_id,
+                )
+                for _ in range(3)
+            ]
+            context = SimpleNamespace(
+                workspace_id=UUID(workspace_id),
+                actor_id=UUID(_principal_id(client, owner)),
+            )
+            with session_scope(engine) as session:
+                DependencyService(session).create(
+                    context,
+                    UUID(items[1]["work_item_id"]),
+                    blocking_work_item_id=UUID(items[0]["work_item_id"]),
+                )
+
+            barrier = threading.Barrier(2)
+            results: list[str] = []
+
+            def add_edge(blocking_id: str, blocked_id: str) -> None:
+                try:
+                    barrier.wait(timeout=10)
+                    with session_scope(engine) as session:
+                        DependencyService(session).create(
+                            context,
+                            UUID(blocked_id),
+                            blocking_work_item_id=UUID(blocking_id),
+                        )
+                    results.append("ok")
+                except ProblemError as exc:
+                    results.append(exc.code)
+                except Exception as exc:  # pragma: no cover - assertion reports it
+                    results.append(repr(exc))
+
+            _run_threads(
+                [
+                    threading.Thread(
+                        target=add_edge,
+                        args=(items[1]["work_item_id"], items[2]["work_item_id"]),
+                    ),
+                    threading.Thread(
+                        target=add_edge,
+                        args=(items[2]["work_item_id"], items[0]["work_item_id"]),
+                    ),
+                ]
+            )
+            assert sorted(results) == ["DEPENDENCY_CYCLE", "ok"], results
+            with session_scope(engine) as session:
+                count = session.execute(
+                    text(
+                        "SELECT count(*) FROM work_item_dependencies "
+                        "WHERE workspace_id = :workspace_id"
+                    ),
+                    {"workspace_id": workspace_id},
+                ).scalar_one()
+            assert count == 2
+
+
+def test_sla_policy_authorization_and_project_visibility():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            owner = "sla-rbac-owner"
+            workspace_id = _workspace(client, owner, "SLA RBAC Co")
+            project_id = _project(client, owner, workspace_id)
+            for subject, role in (
+                ("sla-rbac-admin", "admin"),
+                ("sla-rbac-triager", "triager"),
+                ("sla-rbac-approver", "approver"),
+                ("sla-rbac-contributor", "contributor"),
+                ("sla-rbac-viewer", "viewer"),
+            ):
+                _invite(client, owner, workspace_id, subject, role)
+
+            admin_policy = _sla_policy(
+                client, "sla-rbac-admin", workspace_id, name="Admin owned", activate=False
+            )
+            assert admin_policy["status"] == "draft"
+            for subject in (
+                "sla-rbac-triager",
+                "sla-rbac-approver",
+                "sla-rbac-contributor",
+                "sla-rbac-viewer",
+            ):
+                forbidden = client.post(
+                    f"/v1/workspaces/{workspace_id}/sla-policies",
+                    json={
+                        "name": f"Forbidden {subject}",
+                        "response_minutes": 60,
+                        "resolution_minutes": 120,
+                        "timezone": "UTC",
+                        "activate": False,
+                    },
+                    headers={
+                        **_bearer(subject),
+                        "Idempotency-Key": f"sla-forbidden-{uuid4().hex}",
+                    },
+                )
+                assert forbidden.status_code == 403, forbidden.text
+
+            lifecycle = _sla_policy(
+                client, owner, workspace_id, name="Lifecycle", activate=False
+            )
+            policy_id = lifecycle["policy_id"]
+            for subject in (
+                "sla-rbac-triager",
+                "sla-rbac-approver",
+                "sla-rbac-contributor",
+                "sla-rbac-viewer",
+            ):
+                forbidden_version = client.post(
+                    f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}/versions",
+                    json={"response_minutes": 90},
+                    headers={
+                        **_bearer(subject),
+                        "Idempotency-Key": f"sla-version-{uuid4().hex}",
+                    },
+                )
+                assert forbidden_version.status_code == 403, forbidden_version.text
+                forbidden_activate = client.post(
+                    f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}/activate",
+                    headers={
+                        **_bearer(subject),
+                        "Idempotency-Key": f"sla-activate-{uuid4().hex}",
+                    },
+                )
+                assert forbidden_activate.status_code == 403, forbidden_activate.text
+
+            version = client.post(
+                f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}/versions",
+                json={"response_minutes": 90},
+                headers={
+                    **_bearer("sla-rbac-admin"),
+                    "Idempotency-Key": f"sla-version-{uuid4().hex}",
+                },
+            )
+            assert version.status_code == 201, version.text
+            activated = client.post(
+                f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}/activate",
+                headers={
+                    **_bearer("sla-rbac-admin"),
+                    "Idempotency-Key": f"sla-activate-{uuid4().hex}",
+                },
+            )
+            assert activated.status_code == 200, activated.text
+            assert activated.json()["status"] == "active"
+
+            other_owner = "sla-rbac-other-owner"
+            other_workspace = _workspace(client, other_owner, "SLA Other Co")
+            foreign_get = client.get(
+                f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}",
+                headers=_bearer(other_owner),
+            )
+            assert foreign_get.status_code == 404, foreign_get.text
+            foreign_version = client.post(
+                f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}/versions",
+                json={"response_minutes": 60},
+                headers={
+                    **_bearer(other_owner),
+                    "Idempotency-Key": f"sla-foreign-version-{uuid4().hex}",
+                },
+            )
+            assert foreign_version.status_code == 404, foreign_version.text
+            foreign_activate = client.post(
+                f"/v1/workspaces/{workspace_id}/sla-policies/{policy_id}/activate",
+                headers={
+                    **_bearer(other_owner),
+                    "Idempotency-Key": f"sla-foreign-activate-{uuid4().hex}",
+                },
+            )
+            assert foreign_activate.status_code == 404, foreign_activate.text
+
+            foreign_project = client.post(
+                f"/v1/workspaces/{other_workspace}/sla-policies",
+                json={
+                    "name": "Foreign project",
+                    "project_id": project_id,
+                    "response_minutes": 60,
+                    "timezone": "UTC",
+                },
+                headers={
+                    **_bearer(other_owner),
+                    "Idempotency-Key": f"sla-foreign-project-{uuid4().hex}",
+                },
+            )
+            assert foreign_project.status_code == 404, foreign_project.text
+            foreign_list = client.get(
+                f"/v1/workspaces/{other_workspace}/sla-policies",
+                params={"project_id": project_id},
+                headers=_bearer(other_owner),
+            )
+            assert foreign_list.status_code == 200, foreign_list.text
+            assert foreign_list.json()["items"] == []
+
+            scoped = _sla_policy(
+                client,
+                owner,
+                workspace_id,
+                name="Project scoped",
+                project_id=project_id,
+                activate=False,
+            )
+            assert scoped["project_id"] == project_id
+            visible = client.get(
+                f"/v1/workspaces/{workspace_id}/sla-policies/{scoped['policy_id']}",
+                headers=_bearer("sla-rbac-viewer"),
+            )
+            assert visible.status_code == 200, visible.text
+
+
+def test_notification_mark_and_preference_are_naturally_idempotent():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            owner = "idempotent-notify-owner"
+            workspace_id = _workspace(client, owner, "Idempotent Notify Co")
+            project_id = _project(client, owner, workspace_id)
+            _invite(client, owner, workspace_id, "idempotent-notify-reviewer", "approver")
+            board_id = _board(client, owner, workspace_id, project_id)
+            item = _create_work_item(
+                client,
+                engine,
+                owner=owner,
+                reviewer="idempotent-notify-reviewer",
+                workspace_id=workspace_id,
+                project_id=project_id,
+                board_id=board_id,
+            )
+            owner_id = _principal_id(client, owner)
+            _assign(engine, item["work_item_id"], owner_id)
+            overridden = client.patch(
+                f"/v1/workspaces/{workspace_id}/work-items/"
+                f"{item['work_item_id']}/priority",
+                json={"priority": "high", "reason": "Idempotency coverage."},
+                headers={**_bearer(owner), "Idempotency-Key": f"idem-{uuid4().hex}"},
+            )
+            assert overridden.status_code == 200, overridden.text
+            notifications = client.get(
+                f"/v1/workspaces/{workspace_id}/notifications",
+                headers=_bearer(owner),
+            )
+            notification = next(
+                entry
+                for entry in notifications.json()["items"]
+                if entry["event_type"] == "work_item.priority_overridden"
+            )
+            notification_id = notification["notification_id"]
+            first_mark = client.patch(
+                f"/v1/workspaces/{workspace_id}/notifications/{notification_id}",
+                json={"read": True},
+                headers=_bearer(owner),
+            )
+            second_mark = client.patch(
+                f"/v1/workspaces/{workspace_id}/notifications/{notification_id}",
+                json={"read": True},
+                headers=_bearer(owner),
+            )
+            assert first_mark.status_code == second_mark.status_code == 200
+            assert first_mark.json()["read_at"] == second_mark.json()["read_at"]
+            assert first_mark.headers["ETag"] == second_mark.headers["ETag"]
+
+            event_type = "work_item.priority_overridden"
+            first_preference = client.put(
+                f"/v1/workspaces/{workspace_id}/notification-preferences/{event_type}",
+                json={"in_app": True, "email": False},
+                headers=_bearer(owner),
+            )
+            second_preference = client.put(
+                f"/v1/workspaces/{workspace_id}/notification-preferences/{event_type}",
+                json={"in_app": True, "email": False},
+                headers=_bearer(owner),
+            )
+            assert first_preference.status_code == second_preference.status_code == 200
+            assert first_preference.json()["version"] == second_preference.json()["version"]
+            assert first_preference.headers["ETag"] == second_preference.headers["ETag"]

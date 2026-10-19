@@ -58,7 +58,10 @@ from eventflow_work_management.services.board_ranking import (
     rank_for_position,
 )
 from eventflow_work_management.services.dependencies import DependencyService
-from eventflow_work_management.services.notifications import NotificationService
+from eventflow_work_management.services.notifications import (
+    NotificationService,
+    redact_work_item_notification,
+)
 from eventflow_work_management.services.pagination import (
     CursorError,
     decode_cursor,
@@ -1091,15 +1094,21 @@ class BoardCardService(_BaseService):
                     work_item, now=occurred_at
                 )
                 if target.mapped_status == "blocked":
+                    title, body, payload = redact_work_item_notification(
+                        work_item,
+                        title=f"Work item blocked: {work_item.title}",
+                        body="This work item is now blocked.",
+                        payload={"work_item_id": str(work_item.id)},
+                    )
                     NotificationService(self._session).emit(
                         workspace_id=context.workspace_id,
                         recipient_id=work_item.assignee_id,
                         event_type="work_item.blocked",
                         entity_type="work_item",
                         entity_id=work_item.id,
-                        title=f"Work item blocked: {work_item.title}",
-                        body="This work item is now blocked.",
-                        payload={"work_item_id": str(work_item.id)},
+                        title=title,
+                        body=body,
+                        payload=payload,
                         dedup_key=(
                             f"work_item.blocked:{work_item.id}:"
                             f"{occurred_at.isoformat()}"

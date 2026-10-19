@@ -23,7 +23,10 @@ from eventflow_work_management.repositories.work_item_repository import (
 )
 from eventflow_work_management.security.errors import ProblemError
 from eventflow_work_management.services.board_management import work_item_etag
-from eventflow_work_management.services.notifications import NotificationService
+from eventflow_work_management.services.notifications import (
+    NotificationService,
+    redact_work_item_notification,
+)
 
 PRIORITY_OVERRIDE_OPERATION = "work_item.priority_override"
 
@@ -151,12 +154,8 @@ class PriorityService:
                 },
                 correlation_id=correlation_id,
             )
-            self._notifications.emit(
-                workspace_id=context.workspace_id,
-                recipient_id=work_item.assignee_id,
-                event_type="work_item.priority_overridden",
-                entity_type="work_item",
-                entity_id=work_item.id,
+            title, body, payload = redact_work_item_notification(
+                work_item,
                 title=f"Priority changed: {work_item.title}",
                 body=f"The priority changed from {previous} to {priority}.",
                 payload={
@@ -164,6 +163,16 @@ class PriorityService:
                     "previous_priority": previous,
                     "priority": priority,
                 },
+            )
+            self._notifications.emit(
+                workspace_id=context.workspace_id,
+                recipient_id=work_item.assignee_id,
+                event_type="work_item.priority_overridden",
+                entity_type="work_item",
+                entity_id=work_item.id,
+                title=title,
+                body=body,
+                payload=payload,
                 dedup_key=(
                     f"work_item.priority_overridden:{work_item.id}:"
                     f"{work_item.updated_at.isoformat()}"

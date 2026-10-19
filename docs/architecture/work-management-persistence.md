@@ -159,10 +159,14 @@ Application code validates first; the database is the last line of defense.
   detection under `pg_advisory_xact_lock` inside the writing transaction.
 - **Transactional notifications.** Notifications are inserted in the same
   transaction as the domain change. `uq_notifications_workspace_dedup` makes
-  emission idempotent, and `notification_deliveries` records one row per channel
-  with channel/status vocabularies and `delivered_at` consistent with the
-  `delivered` status. Preference rows are unique per recipient and event type
-  and carry a monotonic `version` for ETags.
+  emission idempotent; the insert and delivery rows run in a savepoint so a
+  concurrent duplicate can be rolled back and converge on the committed winner
+  without aborting the surrounding domain transaction. `notification_deliveries`
+  records one row per channel with channel/status vocabularies and
+  `delivered_at` consistent with the `delivered` status. Preference rows are
+  unique per recipient and event type and carry a monotonic `version` for ETags;
+  unchanged preference writes do not advance the version. Security-category
+  WorkItems always produce metadata-only notification copy.
 - **Idempotency.** The implemented approval-decision repository and its
   `idempotency_records` row are written in one transaction; a retry with the
   same key and fingerprint returns the stored repository result, and a different

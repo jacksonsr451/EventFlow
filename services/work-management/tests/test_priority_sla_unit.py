@@ -11,12 +11,14 @@ from eventflow_work_management.services.business_calendar import (
     add_working_minutes,
     parse_business_hours,
     parse_holidays,
+    warning_at,
 )
 from eventflow_work_management.services.priority import (
     calculate_priority,
     higher_priority,
     priority_rank,
 )
+from eventflow_work_management.services.sla import _warning_at
 
 
 def test_priority_matrix_is_exhaustive_and_centralized():
@@ -121,3 +123,68 @@ def test_business_calendar_validation():
             business_hours={},
             holidays=[],
         )
+
+
+def test_sla_warning_uses_elapsed_business_time_across_weekends():
+    start = datetime(2026, 10, 16, 16, 0, tzinfo=UTC)  # Friday 16:00 UTC
+    warning = warning_at(
+        start,
+        120,
+        75,
+        timezone="UTC",
+        business_hours={
+            "friday": [["09:00", "17:00"]],
+            "monday": [["09:00", "17:00"]],
+        },
+        holidays=[],
+    )
+    assert warning == datetime(2026, 10, 19, 9, 30, tzinfo=UTC)
+
+
+def test_sla_warning_skips_excluded_hours_within_a_day():
+    start = datetime(2026, 10, 19, 11, 30, tzinfo=UTC)  # Monday
+    warning = warning_at(
+        start,
+        120,
+        50,
+        timezone="UTC",
+        business_hours={
+            "monday": [["09:00", "12:00"], ["13:00", "17:00"]],
+        },
+        holidays=[],
+    )
+    assert warning == datetime(2026, 10, 19, 13, 30, tzinfo=UTC)
+
+
+def test_sla_warning_respects_timezone_boundaries_and_pause_shift():
+    start = datetime(2026, 10, 19, 2, 0, tzinfo=UTC)  # Sunday 22:00 New York
+    warning = warning_at(
+        start,
+        120,
+        50,
+        timezone="America/New_York",
+        business_hours={"monday": [["09:00", "17:00"]]},
+        holidays=[],
+        paused_seconds=3600,
+    )
+    assert warning == datetime(2026, 10, 19, 15, 0, tzinfo=UTC)
+
+
+def test_sla_scheduler_uses_business_warning_helper():
+    snapshot = {
+        "timezone": "UTC",
+        "business_hours": {
+            "friday": [["09:00", "17:00"]],
+            "monday": [["09:00", "17:00"]],
+        },
+        "holidays": [],
+        "warning_threshold_percent": 75,
+        "response_minutes": 120,
+    }
+    start = datetime(2026, 10, 16, 16, 0, tzinfo=UTC)
+    assert _warning_at(start, 120, snapshot) == datetime(
+        2026, 10, 19, 9, 30, tzinfo=UTC
+    )
+    assert _warning_at(start, 120, snapshot, paused_seconds=3600) == datetime(
+        2026, 10, 19, 10, 30, tzinfo=UTC
+    )

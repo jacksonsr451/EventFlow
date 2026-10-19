@@ -1,14 +1,15 @@
 """Business-calendar arithmetic for SLA targets (Issue #30).
 
-SLA targets are business minutes, not wall-clock minutes. This module owns the
-deterministic translation from a timezone, a weekly business-hours map, and a
-holiday list to an absolute UTC due timestamp. It never uses naive datetimes:
-every input and output is timezone-aware UTC, and local conversion goes through
-``zoneinfo``.
+SLA targets and warning thresholds are business minutes, not wall-clock
+minutes. This module owns the deterministic translation from a timezone, a
+weekly business-hours map, and a holiday list to an absolute UTC due timestamp
+and to the warning timestamp. It never uses naive datetimes: every input and
+output is timezone-aware UTC, and local conversion goes through ``zoneinfo``.
 """
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -146,3 +147,36 @@ def add_working_minutes(
                 current_date + timedelta(days=1), time(0, 0), tzinfo=tz
             )
     raise CalendarError("business calendar did not contain enough working minutes")
+
+
+def warning_at(
+    start: datetime,
+    minutes: int | None,
+    threshold_percent: int,
+    *,
+    timezone: str,
+    business_hours: dict | None,
+    holidays: list | None,
+    paused_seconds: int = 0,
+) -> datetime | None:
+    """Return the warning timestamp for one SLA target.
+
+    The threshold is measured in elapsed business time: the budget multiplied by
+    the configured percentage is rounded up to a whole business minute and added
+    to ``start`` with the same calendar used for the due date. Paused wall time
+    shifts both the due date and the warning by the same amount, so the clock
+    never advances while a WorkItem is paused.
+    """
+    if minutes is None:
+        return None
+    if not 1 <= threshold_percent <= 99:
+        raise CalendarError("warning threshold must be between 1 and 99")
+    warning_minutes = max(1, math.ceil(minutes * threshold_percent / 100))
+    warning = add_working_minutes(
+        start,
+        warning_minutes,
+        timezone=timezone,
+        business_hours=business_hours,
+        holidays=holidays,
+    )
+    return warning + timedelta(seconds=paused_seconds)

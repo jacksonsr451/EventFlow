@@ -162,7 +162,7 @@ class NotificationPreferenceRepository(Repository):
                 email=email,
             )
             self._session.add(preference)
-        else:
+        elif preference.in_app != in_app or preference.email != email:
             preference.in_app = in_app
             preference.email = email
             preference.version += 1

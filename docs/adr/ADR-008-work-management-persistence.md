@@ -402,9 +402,14 @@ already carry a `priority`, so the migration must be additive.
 - Notifications are written transactionally with the domain change;
   `notifications` is unique on `(workspace_id, dedup_key)`.
   `notification_deliveries` stores one row per channel with bounded retry state,
-  and `notification_preferences` is unique per recipient and event type. In-app
-  delivery is immediate; email has no transport in this scope and is recorded as
-  `unavailable`. Recipients come only from trusted entity data.
+  and `notification_preferences` is unique per recipient and event type. The
+  notification insert and its delivery rows use a savepoint so a concurrent
+  duplicate can reuse the committed winner without aborting the domain
+  transaction. In-app delivery is immediate; email has no transport in this
+  scope and is recorded as `unavailable`. Recipients come only from trusted
+  entity data, and security-category WorkItems produce metadata-only redacted
+  notification copy. Mark-read and identical preference writes are naturally
+  idempotent and do not declare `Idempotency-Key`.
 - Migration `0011_priority_sla_dependencies` is additive; existing priority
   values are retained and the new columns are nullable. No provider credentials,
   webhooks, installation ids, or external delivery are introduced.

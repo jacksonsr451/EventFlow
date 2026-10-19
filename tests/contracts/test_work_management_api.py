@@ -88,8 +88,6 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "PATCH /v1/workspaces/{workspace_id}/work-items/{work_item_id}/priority",
     "POST /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies",
     "DELETE /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies/{dependency_id}",
-    "PATCH /v1/workspaces/{workspace_id}/notifications/{notification_id}",
-    "PUT /v1/workspaces/{workspace_id}/notification-preferences/{event_type}",
 }
 
 LIST_OPERATIONS = {

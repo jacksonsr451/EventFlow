@@ -534,7 +534,10 @@ own.
 - A version snapshots `response_minutes`, `resolution_minutes`, `timezone`,
   `business_hours`, `holidays`, `pause_statuses`, and
   `warning_threshold_percent`. Working time is added with the business calendar,
-  and holidays and non-working hours do not consume the budget.
+  and holidays and non-working hours do not consume the budget. Warning
+  thresholds are elapsed business minutes: the budget multiplied by the
+  threshold percentage is rounded up and added with the same calendar, then
+  shifted by accumulated pause time so warnings and due dates move together.
 - Starting a WorkItem creates one durable SLA instance pinned to the policy
   version and its snapshot. `started_at` is the WorkItem creation time; the
   instance survives later policy changes. Status is one of `pending`, `running`,
@@ -569,19 +572,30 @@ own.
 - Notifications are written in the same transaction as the domain change, so a
   committed change never loses its notification and a rolled-back change never
   emits one. The unique key `(workspace_id, dedup_key)` makes emission
-  idempotent; no network I/O happens inside the transaction.
+  idempotent; no network I/O happens inside the transaction. Concurrent
+  duplicate emitters run the insert in a savepoint: the loser rolls back only
+  that savepoint, reuses the committed winner, and never aborts the surrounding
+  domain transaction.
 - Recipients come only from trusted data (for example the WorkItem
   `assignee_id`). A missing recipient is a no-op, not an error. In-app delivery
   is marked `delivered` immediately; email has no transport in this scope and is
   recorded as `unavailable`, with the dispatcher retrying transient work up to
   five attempts with base `30` seconds backoff.
+- Notifications for `security`-category WorkItems are always metadata-only.
+  The WorkItem title, vulnerability type, descriptions, triage notes, evidence,
+  access restrictions, dependency titles, and other related metadata are not
+  copied; only the WorkItem identifier and a redaction marker are retained.
+  This applies regardless of the recipient's role.
 - The authenticated actor reads and marks only their own notifications:
   `GET /v1/workspaces/{workspace_id}/notifications` (cursor paginated, optional
   `unread_only`) and `PATCH .../notifications/{notification_id}` with
   `{"read": true|false}`. Preferences are explicit per event type at
   `GET .../notification-preferences` and
   `PUT .../notification-preferences/{event_type}` with `{"in_app": bool,
-  "email": bool}`. All roles, including `viewer`, use these routes.
+  "email": bool}`. All roles, including `viewer`, use these routes. Marking an
+  already-read notification and re-writing identical preference values leave
+  the representation and ETag unchanged; these naturally idempotent operations
+  do not declare `Idempotency-Key`.
 
 #### Contract behavior
 

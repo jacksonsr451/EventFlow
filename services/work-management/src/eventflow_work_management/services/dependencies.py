@@ -27,7 +27,10 @@ from eventflow_work_management.repositories.work_item_repository import (
     WorkItemRepository,
 )
 from eventflow_work_management.security.errors import ProblemError
-from eventflow_work_management.services.notifications import NotificationService
+from eventflow_work_management.services.notifications import (
+    NotificationService,
+    redact_work_item_notification,
+)
 
 DEPENDENCY_CREATE_OPERATION = "work_item_dependency.create"
 DEPENDENCY_DELETE_OPERATION = "work_item_dependency.delete"
@@ -209,18 +212,25 @@ class DependencyService:
                 },
                 correlation_id=correlation_id,
             )
-            self._notifications.emit(
-                workspace_id=context.workspace_id,
-                recipient_id=blocked.assignee_id,
-                event_type="dependency.created",
-                entity_type="work_item",
-                entity_id=blocked.id,
+            title, body, payload = redact_work_item_notification(
+                blocked,
+                blocking,
                 title=f"Dependency added: {blocked.title}",
                 body=f"A new blocker was linked: {blocking.title}.",
                 payload={
                     "work_item_id": str(blocked.id),
                     "blocking_work_item_id": str(blocking.id),
                 },
+            )
+            self._notifications.emit(
+                workspace_id=context.workspace_id,
+                recipient_id=blocked.assignee_id,
+                event_type="dependency.created",
+                entity_type="work_item",
+                entity_id=blocked.id,
+                title=title,
+                body=body,
+                payload=payload,
                 dedup_key=f"dependency.created:{edge.id}",
             )
             if record is not None:
@@ -319,18 +329,24 @@ class DependencyService:
                 correlation_id=correlation_id,
             )
             if blocked is not None:
-                self._notifications.emit(
-                    workspace_id=context.workspace_id,
-                    recipient_id=blocked.assignee_id,
-                    event_type="dependency.removed",
-                    entity_type="work_item",
-                    entity_id=blocked.id,
+                title, body, payload = redact_work_item_notification(
+                    blocked,
                     title=f"Dependency removed: {blocked.title}",
                     body="A blocker was removed from this work item.",
                     payload={
                         "work_item_id": str(blocked.id),
                         "blocking_work_item_id": str(edge.blocking_work_item_id),
                     },
+                )
+                self._notifications.emit(
+                    workspace_id=context.workspace_id,
+                    recipient_id=blocked.assignee_id,
+                    event_type="dependency.removed",
+                    entity_type="work_item",
+                    entity_id=blocked.id,
+                    title=title,
+                    body=body,
+                    payload=payload,
                     dedup_key=f"dependency.removed:{edge.id}",
                 )
             if record is not None:

@@ -39,8 +39,12 @@ from eventflow_work_management.services.business_calendar import (
     parse_business_hours,
     parse_holidays,
     resolve_timezone,
+    warning_at,
 )
-from eventflow_work_management.services.notifications import NotificationService
+from eventflow_work_management.services.notifications import (
+    NotificationService,
+    redact_work_item_notification,
+)
 
 POLICY_CREATE_OPERATION = "sla_policy.create"
 POLICY_VERSION_OPERATION = "sla_policy.version"
@@ -575,10 +579,10 @@ class SlaService:
                 response_due=response_due,
                 resolution_due=resolution_due,
                 warning_at_response=_warning_at(
-                    started_at, response_due, snapshot
+                    started_at, snapshot.get("response_minutes"), snapshot
                 ),
                 warning_at_resolution=_warning_at(
-                    started_at, resolution_due, snapshot
+                    started_at, snapshot.get("resolution_minutes"), snapshot
                 ),
             ),
         )
@@ -794,10 +798,18 @@ class SlaService:
         snapshot = instance.policy_snapshot or {}
         threshold = int(snapshot.get("warning_threshold_percent", 75))
         response_warning = _warning_at(
-            instance.started_at, instance.response_due_at, snapshot, threshold=threshold
+            instance.started_at,
+            snapshot.get("response_minutes"),
+            snapshot,
+            threshold=threshold,
+            paused_seconds=instance.paused_seconds,
         )
         resolution_warning = _warning_at(
-            instance.started_at, instance.resolution_due_at, snapshot, threshold=threshold
+            instance.started_at,
+            snapshot.get("resolution_minutes"),
+            snapshot,
+            threshold=threshold,
+            paused_seconds=instance.paused_seconds,
         )
         self._maybe_warning(
             instance, work_item, "response", response_warning, now
@@ -928,6 +940,12 @@ class SlaService:
         payload: dict,
         dedup_suffix: str,
     ) -> None:
+        title, body, payload = redact_work_item_notification(
+            work_item,
+            title=title,
+            body=body,
+            payload={**payload, "work_item_id": str(work_item.id)},
+        )
         self._notifications.emit(
             workspace_id=instance.workspace_id,
             recipient_id=work_item.assignee_id,
@@ -936,7 +954,7 @@ class SlaService:
             entity_id=work_item.id,
             title=title,
             body=body,
-            payload={**payload, "work_item_id": str(work_item.id)},
+            payload=payload,
             dedup_key=f"{event_type}:{instance.id}:{dedup_suffix}",
         )
 
@@ -953,7 +971,11 @@ class SlaService:
             if instance.response_due_at is not None:
                 candidates.append(instance.response_due_at)
             warning = _warning_at(
-                instance.started_at, instance.response_due_at, snapshot, threshold=threshold
+                instance.started_at,
+                snapshot.get("response_minutes"),
+                snapshot,
+                threshold=threshold,
+                paused_seconds=instance.paused_seconds,
             )
             if warning is not None:
                 candidates.append(warning)
@@ -962,9 +984,10 @@ class SlaService:
                 candidates.append(instance.resolution_due_at)
             warning = _warning_at(
                 instance.started_at,
-                instance.resolution_due_at,
+                snapshot.get("resolution_minutes"),
                 snapshot,
                 threshold=threshold,
+                paused_seconds=instance.paused_seconds,
             )
             if warning is not None:
                 candidates.append(warning)
@@ -1006,26 +1029,28 @@ def _due_at(started_at: datetime, policy: SlaPolicy, minutes: int | None) -> dat
 
 def _warning_at(
     started_at: datetime,
-    due_at: datetime | None,
-    policy,
+    minutes: int | None,
+    snapshot: dict,
     *,
     threshold: int | None = None,
+    paused_seconds: int = 0,
 ) -> datetime | None:
-    if due_at is None:
+    if minutes is None:
         return None
-    percent = threshold
-    if percent is None:
-        percent = (
-            policy.warning_threshold_percent
-            if isinstance(policy, SlaPolicy)
-            else int(policy.get("warning_threshold_percent", 75))
-        )
-    window = due_at - started_at
-    return started_at + _fraction(window, percent)
-
-
-def _fraction(delta, percent: int):
-    return timedelta(seconds=delta.total_seconds() * percent / 100)
+    percent = (
+        threshold
+        if threshold is not None
+        else int(snapshot.get("warning_threshold_percent", 75))
+    )
+    return warning_at(
+        started_at,
+        minutes,
+        percent,
+        timezone=snapshot.get("timezone", "UTC"),
+        business_hours=snapshot.get("business_hours"),
+        holidays=snapshot.get("holidays"),
+        paused_seconds=paused_seconds,
+    )
 
 
 def _timedelta_seconds(seconds: int):

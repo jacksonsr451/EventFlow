@@ -506,9 +506,11 @@ priority matrix is `services/priority.py`.
 - **Durable clocks.** Starting a WorkItem creates one SLA instance pinned to the
   policy version snapshot, with `started_at` at WorkItem creation. Working time
   excludes holidays and non-working hours, and pauses (default `blocked`) shift
-  the due dates. Statuses are `pending`, `running`, `paused`, `fulfilled`,
-  `breached`, and `cancelled`. Events and pause intervals are append-only;
-  warnings and breaches are recorded during read as well as by the worker.
+  the due dates. Warning thresholds are measured in elapsed business minutes
+  with the same calendar and shift by the same accumulated pause duration.
+  Statuses are `pending`, `running`, `paused`, `fulfilled`, `breached`, and
+  `cancelled`. Events and pause intervals are append-only; warnings and breaches
+  are recorded during read as well as by the worker.
 - **Dependencies.** A directed edge records that one WorkItem blocks another.
   Duplicate edges converge, self-edges are rejected, and cycles are rejected
   (`409 DEPENDENCY_CYCLE`) under a workspace-scoped advisory lock. Moving a
@@ -516,11 +518,14 @@ priority matrix is `services/priority.py`.
   (`409 DEPENDENCIES_UNRESOLVED`).
 - **Notifications.** Emission is transactional with the domain change,
   deduplicated per `(workspace_id, dedup_key)`, and uses trusted recipients
-  only; a missing recipient is a no-op. In-app delivery is immediate; email has
-  no transport in this scope (`unavailable`) and uses bounded retries. Actors
-  read and mark only their own notifications and manage their own per-event
-  channel preferences. Protected security detail is never copied into
-  notification content.
+  only; a missing recipient is a no-op. Concurrent duplicate emitters converge
+  through a savepoint without aborting the domain transaction. In-app delivery
+  is immediate; email has no transport in this scope (`unavailable`) and uses
+  bounded retries. Actors read and mark only their own notifications and manage
+  their own per-event channel preferences. Security-category notifications are
+  always metadata-only: titles, vulnerability descriptions, evidence, related
+  WorkItem titles, and restricted triage metadata are replaced by a generic
+  redaction message and the primary WorkItem identifier.
 
 Deliberately absent: an external notification provider, webhook delivery, and
 cross-workspace recipient discovery.

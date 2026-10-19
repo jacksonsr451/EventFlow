@@ -5,6 +5,15 @@ The service never performs network I/O: it writes a notification row plus its
 delivery rows, and a separate worker drains deliveries. This keeps external
 delivery outside database transactions and makes at-least-once delivery
 explicit. There is no claim of exactly-once external delivery.
+
+Notifications are deduplicated by ``(workspace_id, dedup_key)``. Duplicate
+emission races are expected under concurrency: the insert runs inside a
+savepoint so a PostgreSQL unique violation can be rolled back without aborting
+the caller's domain transaction, after which the committed winner is reused.
+
+Notification copy for security-category WorkItems is always redacted. Security
+triage fields, descriptions, evidence, and related metadata are never copied to
+a durable notification, regardless of the recipient's role.
 """
 
 from __future__ import annotations
@@ -13,6 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from eventflow_work_management.models import (
@@ -31,6 +41,12 @@ MAX_ATTEMPTS = 5
 BASE_BACKOFF_SECONDS = 30
 _MAX_ERROR_LENGTH = 300
 
+SECURITY_NOTIFICATION_TITLE = "Security work item updated"
+SECURITY_NOTIFICATION_BODY = (
+    "A security work item assigned to you changed. Open the authenticated "
+    "workspace to review it."
+)
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -42,6 +58,28 @@ def _not_found() -> ProblemError:
         code="NOT_FOUND",
         detail="The requested resource was not found.",
         title="Not found",
+    )
+
+
+def redact_work_item_notification(
+    *work_items: object,
+    title: str,
+    body: str,
+    payload: dict,
+) -> tuple[str, str, dict]:
+    """Return safe notification copy for the supplied WorkItems.
+
+    Any security-category participant forces a metadata-only notification. The
+    first item is the primary subject and supplies the only retained identifier.
+    """
+    items = [item for item in work_items if item is not None]
+    if not any(getattr(item, "category", None) == "security" for item in items):
+        return title, body, payload
+    primary = items[0]
+    return (
+        SECURITY_NOTIFICATION_TITLE,
+        SECURITY_NOTIFICATION_BODY,
+        {"work_item_id": str(getattr(primary, "id")), "redacted": True},
     )
 
 
@@ -86,39 +124,50 @@ class NotificationService:
         if existing is not None:
             return existing
         occurred = _now()
-        notification = self._notifications.add(
-            workspace_id=workspace_id,
-            recipient_id=recipient_id,
-            event_type=event_type,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            title=title,
-            body=body,
-            payload=payload,
-            dedup_key=dedup_key,
-        )
-        in_app, email = self._preferences.enabled_channels(
-            workspace_id=workspace_id,
-            recipient_id=recipient_id,
-            event_type=event_type,
-        )
-        if in_app:
-            delivery = self._deliveries.add(
-                workspace_id=workspace_id,
-                notification_id=notification.id,
-                channel="in_app",
+        try:
+            with self._session.begin_nested():
+                notification = self._notifications.add(
+                    workspace_id=workspace_id,
+                    recipient_id=recipient_id,
+                    event_type=event_type,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    title=title,
+                    body=body,
+                    payload=payload,
+                    dedup_key=dedup_key,
+                )
+                in_app, email = self._preferences.enabled_channels(
+                    workspace_id=workspace_id,
+                    recipient_id=recipient_id,
+                    event_type=event_type,
+                )
+                if in_app:
+                    delivery = self._deliveries.add(
+                        workspace_id=workspace_id,
+                        notification_id=notification.id,
+                        channel="in_app",
+                    )
+                    delivery.status = "delivered"
+                    delivery.delivered_at = occurred
+                    delivery.attempts = 1
+                if email:
+                    self._deliveries.add(
+                        workspace_id=workspace_id,
+                        notification_id=notification.id,
+                        channel="email",
+                        status="pending",
+                        next_attempt_at=occurred,
+                    )
+        except IntegrityError:
+            # A concurrent emitter won the ``(workspace_id, dedup_key)`` race.
+            # The savepoint rollback keeps the outer domain transaction usable.
+            existing = self._notifications.get_by_dedup(
+                workspace_id=workspace_id, dedup_key=dedup_key
             )
-            delivery.status = "delivered"
-            delivery.delivered_at = occurred
-            delivery.attempts = 1
-        if email:
-            self._deliveries.add(
-                workspace_id=workspace_id,
-                notification_id=notification.id,
-                channel="email",
-                status="pending",
-                next_attempt_at=occurred,
-            )
+            if existing is None:
+                raise
+            return existing
         return notification
 
     def list_page(
@@ -149,7 +198,10 @@ class NotificationService:
         )
         if notification is None or notification.recipient_id != context.actor_id:
             raise _not_found()
-        notification.read_at = _now() if read else None
+        if read and notification.read_at is None:
+            notification.read_at = _now()
+        elif not read and notification.read_at is not None:
+            notification.read_at = None
         self._session.commit()
         return notification
 

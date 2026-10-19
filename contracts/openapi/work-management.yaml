@@ -3944,13 +3944,16 @@ paths:
       operationId: markNotification
       tags: [Notifications]
       summary: Mark one of the actor's notifications read or unread
+      description: |
+        Marking an already-read notification or clearing an already-unread
+        notification leaves its representation and ETag unchanged. This operation
+        is naturally idempotent and does not accept an ``Idempotency-Key``.
       security:
         - bearerAuth: []
       x-required-roles: [contributor, triager, approver, admin, owner, viewer]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/NotificationId'
-        - $ref: '#/components/parameters/IdempotencyKeyOptional'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
@@ -4026,13 +4029,16 @@ paths:
       operationId: updateNotificationPreference
       tags: [Notifications]
       summary: Set the actor's channel preference for one event type
+      description: |
+        Re-writing identical channel values leaves the representation and ETag
+        unchanged. This operation is naturally idempotent and does not accept an
+        ``Idempotency-Key``.
       security:
         - bearerAuth: []
       x-required-roles: [contributor, triager, approver, admin, owner, viewer]
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/NotificationEventType'
-        - $ref: '#/components/parameters/IdempotencyKeyOptional'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
