@@ -321,6 +321,11 @@ def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
         "PATCH /v1/workspaces/{workspace_id}/proposals/{proposal_id}",
         "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/duplicate",
         "POST /v1/workspaces/{workspace_id}/proposals/{proposal_id}/decide",
+        "POST /v1/workspaces/{workspace_id}/boards",
+        "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}",
+        "POST /v1/workspaces/{workspace_id}/boards/{board_id}/columns",
+        "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}",
+        "DELETE /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}",
         "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}",
     ], f"unexpected Idempotency-Key declarations: {operations}"
 

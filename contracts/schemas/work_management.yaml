@@ -558,9 +558,114 @@ $defs:
         items:
           type: string
           minLength: 1
+      version:
+        type: integer
+        minimum: 1
+        description: Optimistic-concurrency version of the board metadata.
+      archived_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+        description: When the board was archived; null while active.
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  BoardColumn:
+    type: object
+    description: >-
+      An independently managed, ordered column definition on a board. Its stable
+      key is the identifier referenced by BoardCard.column_id; mapped_status binds
+      the column to a canonical WorkItem status and wip_limit bounds its occupancy.
+    required: [column_id, workspace_id, project_id, board_id, key, name, position, mapped_status, created_at, updated_at]
+    additionalProperties: false
+    properties:
+      column_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      board_id:
+        $ref: '#/$defs/UUID'
+      key:
+        type: string
+        minLength: 1
+        maxLength: 80
+        pattern: '^[a-z0-9][a-z0-9_-]{0,79}$'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      position:
+        type: integer
+        minimum: 0
+      mapped_status:
+        $ref: '#/$defs/WorkItemStatus'
+      wip_limit:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  CardMovement:
+    type: object
+    description: Append-only record of one board-card move.
+    required: [movement_id, workspace_id, project_id, board_id, card_id, to_column_id, to_rank, to_status, occurred_at, created_at]
+    additionalProperties: false
+    properties:
+      movement_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      board_id:
+        $ref: '#/$defs/UUID'
+      card_id:
+        $ref: '#/$defs/UUID'
+      from_column_id:
+        anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+      to_column_id:
+        type: string
+        minLength: 1
+        maxLength: 80
+      from_rank:
+        anyOf:
+          - type: string
+            minLength: 1
+            pattern: '^[0-9a-zA-Z_-]+$'
+          - type: 'null'
+      to_rank:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: '^[0-9a-zA-Z_-]+$'
+      from_status:
+        anyOf:
+          - $ref: '#/$defs/WorkItemStatus'
+          - type: 'null'
+      to_status:
+        $ref: '#/$defs/WorkItemStatus'
+      actor_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      correlation_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      occurred_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      created_at:
         $ref: '#/$defs/RFC3339DateTime'
 
   AuditRecord:
@@ -1382,6 +1487,112 @@ $defs:
         description: Opaque ordering key matching the persisted BoardCard rank constraint.
         pattern: '^[0-9a-zA-Z_-]+$'
 
+  BoardColumnInput:
+    type: object
+    description: One column definition supplied when creating a board.
+    additionalProperties: false
+    required: [key, name, mapped_status]
+    properties:
+      key:
+        type: string
+        minLength: 1
+        maxLength: 80
+        pattern: '^[a-z0-9][a-z0-9_-]{0,79}$'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      mapped_status:
+        $ref: '#/$defs/WorkItemStatus'
+      wip_limit:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+
+  CreateBoardRequest:
+    type: object
+    description: Request DTO for POST /v1/workspaces/{workspace_id}/boards.
+    additionalProperties: false
+    required: [project_id, name]
+    properties:
+      project_id:
+        $ref: '#/$defs/UUID'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      columns:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          $ref: '#/$defs/BoardColumnInput'
+
+  UpdateBoardRequest:
+    type: object
+    description: Request DTO for PATCH /v1/workspaces/{workspace_id}/boards/{board_id}.
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      archived:
+        type: boolean
+
+  CreateBoardColumnRequest:
+    type: object
+    description: >-
+      Request DTO for POST
+      /v1/workspaces/{workspace_id}/boards/{board_id}/columns.
+    additionalProperties: false
+    required: [key, name, mapped_status]
+    properties:
+      key:
+        type: string
+        minLength: 1
+        maxLength: 80
+        pattern: '^[a-z0-9][a-z0-9_-]{0,79}$'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      mapped_status:
+        $ref: '#/$defs/WorkItemStatus'
+      wip_limit:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      position:
+        type: integer
+        minimum: 0
+
+  UpdateBoardColumnRequest:
+    type: object
+    description: >-
+      Request DTO for PATCH
+      /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}.
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      mapped_status:
+        $ref: '#/$defs/WorkItemStatus'
+      wip_limit:
+        anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+      position:
+        type: integer
+        minimum: 0
+
   PageInfo:
     type: object
     description: Cursor pagination metadata shared by list responses.
@@ -1473,6 +1684,18 @@ $defs:
         type: array
         items:
           $ref: '#/$defs/ProposalRevision'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  CardMovementPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/CardMovement'
       page_info:
         $ref: '#/$defs/PageInfo'
 

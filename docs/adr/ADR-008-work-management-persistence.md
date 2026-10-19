@@ -203,6 +203,57 @@ identifies the Proposal. Verified by
 `services/work-management/tests/test_proposal_api_integration.py`,
 `services/work-management/tests/test_proposal_unit.py`, and the migration tests.
 
+### Amendment A-03 — Configurable Kanban boards and card movement history (Issue #8)
+
+**Status:** Accepted.
+
+**Context.** The original schema stored a board's columns as an ordered JSONB
+key list on `boards`, which cannot carry per-column state (canonical status
+mapping, WIP limit, stable identity) and cannot be managed as an independent
+resource. [Issue #8](https://github.com/jacksonsr451/EventFlow/issues/8) requires
+configurable boards, dedicated column-management endpoints, deterministic card
+ordering, WIP limits and a persistent movement history, while preserving the
+Issue #7 approval-only rule that a card exists only as a projection of an
+approved WorkItem.
+
+**Decision.**
+
+- `boards` gains `version` (`integer NOT NULL DEFAULT 1`, `CHECK >= 1`) for
+  optimistic concurrency and `archived_at` (`timestamptz NULL`) for archival.
+- A new `board_columns` table holds independently managed columns: a stable
+  `key`, `name`, ordered `position`, canonical `mapped_status` (a WorkItem status
+  value) and an optional positive `wip_limit`. It carries
+  `UNIQUE (board_id, key)` and `UNIQUE (workspace_id, id)` plus a workspace-bound
+  composite FK to `boards`. `position` is not unique; the service renumbers it to
+  `0..n-1` inside the transaction.
+- A new append-only `card_movements` table records each accepted move
+  (from/to column, rank, status, actor, correlation id, timestamp), guarded by
+  `BEFORE UPDATE`/`BEFORE DELETE`/`BEFORE TRUNCATE` triggers
+  (`eventflow_card_movements_block_mutation`).
+- **No foreign key** is added from `board_cards.column_id` to `board_columns`:
+  a card's column is a validated logical label, so boards and cards materialized
+  before Issue #8 remain valid. `Board.columns` is kept in sync as the ordered
+  key list for read compatibility.
+- **No BoardCard or WorkItem creation endpoint is added.** Direct card creation
+  is deliberately out of scope; a card continues to be produced only by the
+  approved-Proposal materialization path (workflow step 7). Card creation remains
+  **blocked by architecture** until an authorizing decision exists.
+- Card ordering uses a variable-length lexicographic fractional index (base-62,
+  seeded `U`), producing a deterministic `rank` between any two neighbours; an
+  exhausted key space raises a `RANK_SPACE_EXHAUSTED` conflict rather than
+  silently renumbering. Lifecycle transitions are server-authoritative
+  (`ready→in_progress→in_review→done`, with `blocked`/`cancelled` reachable as
+  specified); WIP limits are enforced per target column.
+
+**Consequences.** The `boards.columns` JSONB list documented in section 3 is now
+a derived mirror of `board_columns`; the authoritative column state is
+relational. Read endpoints fall back to the mirror for boards that predate the
+table. New HTTP operations (`board.create/update`,
+`board_column.create/update/delete`, `board_card.move`) join Amendment A-02's
+retryable-idempotency and optimistic-concurrency scope. Verified by
+`services/work-management/tests/test_board_api_integration.py`,
+`test_board_ranking_unit.py`, `test_models_unit.py` and the migration tests.
+
 ## Consequences
 
 ### Positive

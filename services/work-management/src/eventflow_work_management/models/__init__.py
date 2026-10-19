@@ -18,7 +18,12 @@ from eventflow_work_management.models.authentication import (
     OIDCLoginTransaction,
 )
 from eventflow_work_management.models.audit import AuditRecord
-from eventflow_work_management.models.board import Board, BoardCard
+from eventflow_work_management.models.board import (
+    Board,
+    BoardCard,
+    BoardColumn,
+    CardMovement,
+)
 from eventflow_work_management.models.consultation import Consultation
 from eventflow_work_management.models.evidence import ConsultationEvidence
 from eventflow_work_management.models.idempotency import IdempotencyRecord
@@ -40,6 +45,8 @@ __all__ = [
     "AuditRecord",
     "Board",
     "BoardCard",
+    "BoardColumn",
+    "CardMovement",
     "Consultation",
     "ConsultationAttachment",
     "ConsultationAttachmentBlob",

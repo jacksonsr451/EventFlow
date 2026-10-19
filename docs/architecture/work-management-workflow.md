@@ -394,6 +394,42 @@ own `proposal_id` and its own `version` counter starting at 1.
 - **Audit.** The append-only audit actions are `proposal.created`,
   `proposal.revised`, `proposal.submitted`, and `proposal.duplicated`.
 
+### 3.6 Configurable Boards, Columns, and Card Movement (Issue #8)
+
+A Board is a persistent, configurable Kanban surface. Its columns are
+independently managed resources (`board_columns`), each with a stable `key`, an
+ordered `position`, a canonical `mapped_status` (one of the WorkItem status
+values) and an optional `wip_limit`. Board and column mutations require
+`board:manage` (`contributor` or higher); reads require `board:read`.
+
+- **Column management.** Columns are created, reordered, renamed and deleted
+  through dedicated endpoints. Deleting a column that still holds cards returns
+  `409 COLUMN_NOT_EMPTY`; deleting a board's last column returns
+  `409 LAST_COLUMN`. Positions are renumbered to `0..n-1` inside the
+  transaction, and `Board.columns` is kept in sync as the ordered key list.
+- **Card moves.** A move supplies a `target_column_id` (a column key) and a
+  `target_rank` anchor. The service locks the board, card, target column and
+  WorkItem, validates the lifecycle transition, enforces the destination WIP
+  limit, computes a deterministic rank, updates the card and WorkItem, appends a
+  `card_movements` row, writes an audit record and commits once.
+- **Lifecycle transitions (server-authoritative).** `ready → in_progress`;
+  `in_progress → in_review`; `in_review → done`; a same-status move is a valid
+  visual reorder; `blocked` and `cancelled` are reachable as specified. An
+  invalid edge returns `409 INVALID_TRANSITION`.
+- **WIP limits.** A non-null `wip_limit` rejects a move into a full column with
+  `409 WIP_LIMIT_EXCEEDED`. Because the destination column row is locked for the
+  move, concurrent writers cannot both exceed the limit.
+- **Ordering.** Ranks are a variable-length lexicographic fractional index
+  (base-62, seeded `U`), so a rank can always be placed strictly between two
+  neighbours; an exhausted key space returns `409 RANK_SPACE_EXHAUSTED` rather
+  than renumbering silently.
+- **Movement history.** `GET .../cards/{card_id}/movements` returns a
+  cursor-paginated, append-only projection of accepted moves.
+- **No direct card creation.** Cards remain a projection of approved work. There
+  is deliberately no `POST .../cards` endpoint; direct creation is **blocked by
+  architecture** until an authorizing decision exists (see ADR-008 Amendment
+  A-03).
+
 ---
 
 ## 4. Comprehensive Transition Matrix
