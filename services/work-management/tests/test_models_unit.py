@@ -29,6 +29,7 @@ EXPECTED_TABLES = {
     "audit_records",
     "idempotency_records",
     "remote_integration_references",
+    "project_repositories",
     "workspace_memberships",
     "workspace_invitations",
     "consultation_attachments",
@@ -161,3 +162,59 @@ def test_enum_check_values_match_contract():
     ]["enum"]
     assert tuple(provider) == model_enums.REMOTE_PROVIDER_VALUES
     assert tuple(resource_type) == model_enums.REMOTE_RESOURCE_TYPE_VALUES
+
+    assert (
+        tuple(defs["RemoteProvider"]["enum"]) == model_enums.REMOTE_PROVIDER_VALUES
+    )
+    assert (
+        tuple(defs["ProjectRepositoryStatus"]["enum"])
+        == model_enums.PROJECT_REPOSITORY_STATUS_VALUES
+    )
+    assert (
+        tuple(defs["ProjectRepositoryVerificationStatus"]["enum"])
+        == model_enums.PROJECT_REPOSITORY_VERIFICATION_VALUES
+    )
+
+
+def test_project_repositories_deduplicate_on_remote_identity():
+    table = Base.metadata.tables["project_repositories"]
+    unique_columns = {
+        constraint.name: tuple(column.name for column in constraint.columns)
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+    assert unique_columns["uq_project_repositories_identity"] == (
+        "workspace_id",
+        "project_id",
+        "provider",
+        "provider_instance_id",
+        "remote_repository_id",
+    )
+    assert unique_columns["uq_project_repositories_workspace_id"] == (
+        "workspace_id",
+        "id",
+    )
+
+
+def test_project_repositories_bind_workspace_project_and_status():
+    table = Base.metadata.tables["project_repositories"]
+    foreign_keys = {
+        (constraint.name, tuple(column.name for column in constraint.columns))
+        for constraint in table.foreign_key_constraints
+    }
+    assert (
+        "fk_project_repositories_workspace_project",
+        ("workspace_id", "project_id"),
+    ) in foreign_keys
+    check_names = {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert {
+        "ck_project_repositories_provider_values",
+        "ck_project_repositories_status_values",
+        "ck_project_repositories_verification_values",
+        "ck_project_repositories_deactivated_consistency",
+        "ck_project_repositories_archived_consistency",
+    } <= check_names

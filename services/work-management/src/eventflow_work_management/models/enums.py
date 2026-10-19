@@ -39,6 +39,13 @@ WORK_ITEM_STATUS_VALUES = (
 REMOTE_PROVIDER_VALUES = ("github", "gitlab")
 REMOTE_RESOURCE_TYPE_VALUES = ("issue", "pull_request", "merge_request")
 
+# Project repository associations (Issue #44). A repository is identified by
+# the provider's stable repository id scoped to one provider instance, never by
+# its URL. ``configured`` is the only verification state this issue can reach:
+# no GitHub/GitLab adapter verifies or authenticates the association yet.
+PROJECT_REPOSITORY_STATUS_VALUES = ("active", "inactive", "archived")
+PROJECT_REPOSITORY_VERIFICATION_VALUES = ("configured", "verified")
+
 # Attachment lifecycle (Issue #4). Fail-closed: an upload starts QUARANTINED and
 # only becomes AVAILABLE after an approved malware scanner returns a clean
 # verdict. With no scanner configured every upload stays QUARANTINED.

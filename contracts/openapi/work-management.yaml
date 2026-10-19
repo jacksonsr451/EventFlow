@@ -27,6 +27,7 @@ tags:
   - name: Approvals
   - name: WorkItems
   - name: Boards
+  - name: Project repositories
   - name: Workspaces
   - name: Projects
   - name: Members
@@ -2005,6 +2006,263 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/projects/{project_id}/repositories:
+    get:
+      operationId: listProjectRepositories
+      tags: [Project repositories]
+      summary: List a project's repository associations
+      description: >-
+        Returns the project's configured GitHub/GitLab associations. Archived
+        associations are hidden unless include_archived=true. Identity is the
+        provider instance plus provider repository id; URLs are informational.
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      x-allowed-sort-fields: [created_at, updated_at, display_name]
+      x-default-sort-fields: [created_at, repository_id]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: provider
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/RemoteProvider'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/ProjectRepositoryStatus'
+        - name: include_archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of repository associations for the project.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectRepositoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    post:
+      operationId: createProjectRepository
+      tags: [Project repositories]
+      summary: Associate a remote repository with a project
+      description: >-
+        Links one provider repository to the project. The remote identity is the
+        provider instance plus the provider-assigned repository id; the URL is
+        normalized to a credential-free HTTPS form. Duplicate identities yield
+        409 REPOSITORY_ALREADY_LINKED, or 409 REPOSITORY_ARCHIVED when the prior
+        association was archived. No provider call is made.
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateProjectRepositoryRequest'
+      responses:
+        '201':
+          description: The repository association was created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created repository association.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectRepository'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/repositories/{repository_id}:
+    get:
+      operationId: getProjectRepository
+      tags: [Project repositories]
+      summary: Retrieve one project repository association
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RepositoryId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested repository association.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectRepository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    patch:
+      operationId: updateProjectRepository
+      tags: [Project repositories]
+      summary: Update or deactivate/reactivate a repository association
+      description: >-
+        Updates the display name or default branch and changes status between
+        active and inactive. Setting archived is rejected; use DELETE. A stale
+        If-Match yields 412. Equivalent retries replay the stored result.
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RepositoryId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateProjectRepositoryRequest'
+      responses:
+        '200':
+          description: The updated repository association.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectRepository'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    delete:
+      operationId: unlinkProjectRepository
+      tags: [Project repositories]
+      summary: Archive a project repository association
+      description: >-
+        Archives the association without touching the remote repository. Archive
+        is terminal and historical data is preserved. Repeating the DELETE
+        returns 204. A stale If-Match yields 412.
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/RepositoryId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: The association is archived.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
   /v1/workspaces:
     post:
       operationId: createWorkspace
@@ -3301,6 +3559,12 @@ components:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
     BoardColumnId:
       name: column_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    RepositoryId:
+      name: repository_id
       in: path
       required: true
       schema:

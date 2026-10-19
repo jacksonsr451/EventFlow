@@ -67,6 +67,11 @@ class Action(str, Enum):
     BOARD_READ = "board:read"
     BOARD_MANAGE = "board:manage"
 
+    PROJECT_REPOSITORY_READ = "project_repository:read"
+    PROJECT_REPOSITORY_CREATE = "project_repository:create"
+    PROJECT_REPOSITORY_UPDATE = "project_repository:update"
+    PROJECT_REPOSITORY_UNLINK = "project_repository:unlink"
+
 
 _READ_ACTIONS: frozenset[Action] = frozenset(
     {
@@ -81,6 +86,7 @@ _READ_ACTIONS: frozenset[Action] = frozenset(
         Action.PROPOSAL_READ,
         Action.WORK_ITEM_READ,
         Action.BOARD_READ,
+        Action.PROJECT_REPOSITORY_READ,
     }
 )
 
@@ -111,6 +117,9 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.APPROVAL_DECIDE,
             Action.WORK_ITEM_UPDATE,
             Action.BOARD_MANAGE,
+            Action.PROJECT_REPOSITORY_CREATE,
+            Action.PROJECT_REPOSITORY_UPDATE,
+            Action.PROJECT_REPOSITORY_UNLINK,
         }
     ),
     "admin": frozenset(
@@ -137,6 +146,9 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.APPROVAL_DECIDE,
             Action.WORK_ITEM_UPDATE,
             Action.BOARD_MANAGE,
+            Action.PROJECT_REPOSITORY_CREATE,
+            Action.PROJECT_REPOSITORY_UPDATE,
+            Action.PROJECT_REPOSITORY_UNLINK,
         }
     ),
     "triager": frozenset(

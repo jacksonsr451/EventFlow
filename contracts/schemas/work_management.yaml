@@ -2092,6 +2092,8 @@ $defs:
           - SELF_APPROVAL_DISALLOWED
           - DEPENDENCY_UNAVAILABLE
           - PRECONDITION_FAILED
+          - REPOSITORY_ALREADY_LINKED
+          - REPOSITORY_ARCHIVED
           - INTERNAL_ERROR
       correlation_id:
         $ref: '#/$defs/UUID'
@@ -2110,3 +2112,189 @@ $defs:
             message:
               type: string
               minLength: 1
+
+  RemoteProvider:
+    type: string
+    description: Supported external repository providers.
+    enum: [github, gitlab]
+
+  ProjectRepositoryStatus:
+    type: string
+    description: >-
+      Lifecycle of a project repository association. Archived is terminal and is
+      reached through DELETE; it is never set directly.
+    enum: [active, inactive, archived]
+
+  ProjectRepositoryVerificationStatus:
+    type: string
+    description: >-
+      Whether ownership of the remote repository has been verified. Issue #44
+      performs no provider calls, so newly configured associations are always
+      configured.
+    enum: [configured, verified]
+
+  ProjectRepository:
+    type: object
+    description: >-
+      Stable link between one project and one remote GitHub/GitLab repository.
+      Identity is the provider instance plus the provider-assigned repository id;
+      the URL is normalized metadata and is not used for deduplication.
+    required:
+      - repository_id
+      - workspace_id
+      - project_id
+      - provider
+      - provider_instance_id
+      - remote_repository_id
+      - repository_url
+      - repository_full_path
+      - display_name
+      - status
+      - verification_status
+      - version
+      - created_by
+      - created_at
+      - updated_at
+    additionalProperties: false
+    properties:
+      repository_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      provider:
+        $ref: '#/$defs/RemoteProvider'
+      provider_instance_id:
+        type: string
+        minLength: 1
+        maxLength: 255
+        pattern: '^[a-z0-9]([a-z0-9.-]{0,253}[a-z0-9])?$'
+        description: Provider host name; distinct from any installation id.
+      remote_repository_id:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$'
+        description: Provider-assigned stable repository identifier.
+      repository_url:
+        type: string
+        pattern: '^https://'
+        maxLength: 500
+        description: Canonical credential-free HTTPS repository URL.
+      repository_full_path:
+        type: string
+        pattern: '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+$'
+        maxLength: 255
+      display_name:
+        type: string
+        minLength: 1
+        maxLength: 200
+      default_branch:
+        anyOf:
+          - type: string
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$'
+          - type: 'null'
+      status:
+        $ref: '#/$defs/ProjectRepositoryStatus'
+      verification_status:
+        $ref: '#/$defs/ProjectRepositoryVerificationStatus'
+      version:
+        type: integer
+        minimum: 1
+        description: Optimistic-concurrency version used by If-Match.
+      created_by:
+        $ref: '#/$defs/UUID'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      deactivated_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+        description: Set only while the association is inactive.
+      archived_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+        description: Set when the association is archived; archived is terminal.
+
+  CreateProjectRepositoryRequest:
+    type: object
+    additionalProperties: false
+    required:
+      - provider
+      - provider_instance_id
+      - remote_repository_id
+      - repository_url
+    properties:
+      provider:
+        $ref: '#/$defs/RemoteProvider'
+      provider_instance_id:
+        type: string
+        minLength: 1
+        maxLength: 255
+        pattern: '^[a-z0-9]([a-z0-9.-]{0,253}[a-z0-9])?$'
+      remote_repository_id:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$'
+      repository_url:
+        type: string
+        minLength: 1
+        maxLength: 500
+        description: >-
+          HTTPS repository URL, or an SSH/scp-like form
+          (ssh://git@host/path or git@host:path). Credentials, ports, query
+          strings, and fragments are rejected.
+      repository_full_path:
+        anyOf:
+          - type: string
+            pattern: '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+$'
+            maxLength: 255
+          - type: 'null'
+      display_name:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 200
+          - type: 'null'
+      default_branch:
+        anyOf:
+          - type: string
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$'
+          - type: 'null'
+
+  UpdateProjectRepositoryRequest:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      display_name:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 200
+          - type: 'null'
+      default_branch:
+        anyOf:
+          - type: string
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$'
+          - type: 'null'
+        description: Null clears the configured default branch.
+      status:
+        type: string
+        enum: [active, inactive]
+        description: >-
+          Active or inactive only. Reactivating an inactive association is
+          status active; archiving is DELETE.
+
+  ProjectRepositoryPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ProjectRepository'
+      page_info:
+        $ref: '#/$defs/PageInfo'

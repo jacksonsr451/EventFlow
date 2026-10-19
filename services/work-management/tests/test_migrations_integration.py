@@ -25,6 +25,7 @@ EXPECTED_TABLES = {
     "audit_records",
     "idempotency_records",
     "remote_integration_references",
+    "project_repositories",
     "external_identities",
     "authentication_sessions",
     "oidc_login_transactions",
@@ -103,6 +104,9 @@ EXPECTED_CONSTRAINTS = {
     "uq_boards_workspace_project_id",
     "fk_board_cards_workspace_project_board",
     "fk_board_cards_workspace_project_work_item",
+    "fk_project_repositories_workspace_project",
+    "uq_project_repositories_identity",
+    "uq_project_repositories_workspace_id",
 }
 
 
@@ -121,7 +125,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         tables = _tables(engine)
         assert EXPECTED_TABLES <= tables
         assert "alembic_version" in tables
-        assert _revision(engine) == "0009_entity_collaboration"
+        assert _revision(engine) == "0010_project_repositories"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
         assert EXPECTED_CONSTRAINTS <= _constraints(engine)
@@ -132,7 +136,7 @@ def test_upgrade_is_idempotent():
     with temporary_empty_database(admin_url) as (url, engine):
         run_migrations(url)
         run_migrations(url)
-        assert _revision(engine) == "0009_entity_collaboration"
+        assert _revision(engine) == "0010_project_repositories"
 
 
 def test_downgrade_removes_tables_triggers_and_functions():

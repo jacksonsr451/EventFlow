@@ -40,6 +40,7 @@ and does not depend on Order Processing code or tables.
 | `audit_records` | Append-only audit trail | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; `sha256` snapshot hash |
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
 | `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
+| `project_repositories` | Project→remote repository configuration | unique `(workspace_id, project_id, provider, provider_instance_id, remote_repository_id)`; canonical HTTPS URL; status/verification checks; composite project FK |
 
 ## Invariants Enforced by the Database
 
@@ -121,6 +122,14 @@ Application code validates first; the database is the last line of defense.
   `remote_integration_references` row whose `entity_type` names a Work
   Management entity to reference an entity that exists in the same workspace.
   Unknown entity types are forward-compatible and are not validated here.
+- **Project repository identity.** `project_repositories` deduplicates on the
+  provider-assigned identity `(workspace_id, project_id, provider,
+  provider_instance_id, remote_repository_id)`, not on the URL. A URL is
+  normalized metadata and can change when a repository moves. The same provider
+  repository id on a different `provider_instance_id` is a distinct remote, and
+  the same remote can be linked to multiple projects. `archived` is terminal,
+  `deactivated_at` is non-null exactly while `inactive`, and `archived_at` is
+  non-null exactly while `archived`.
 - **Idempotency.** The implemented approval-decision repository and its
   `idempotency_records` row are written in one transaction; a retry with the
   same key and fingerprint returns the stored repository result, and a different
@@ -137,9 +146,9 @@ of the unique-insert race reads the stored result and replays it. This implement
 ADR-007 section 3.6 for `.../decide` and provides the storage primitive that
 Amendment A-02 relies on; A-02 itself is a contract change applied by
 [Issue #11](https://github.com/jacksonsr451/EventFlow/issues/11).
-Only the approval repository path currently uses this mechanism; HTTP status and
-body replay at the API boundary and other A-02 operation integrations are not
-implemented by the persistence layer.
+The approval decision, Kanban board operations, and project repository
+operations use this mechanism at the API boundary; the persistence layer itself
+still provides only the storage primitive.
 
 ## Tenant Isolation Scope
 
@@ -186,7 +195,8 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 | Collaboration tenant isolation | composite FKs `fk_entity_comments_workspace_project`, `fk_entity_attachments_workspace_project` | `resolve_entity` + workspace-scoped repositories | `test_comment_rbac_and_tenant_isolation`, `test_comments_and_attachments_on_work_items_and_board_cards` |
 | Entity history projection | append-only `audit_records` | `EntityHistoryService.list_page` (read only) | `test_comment_lifecycle_tombstone_and_history`, `test_entity_attachment_scan_lifecycle_on_proposal` |
 | Deterministic ordering and transitions | integer `rank`/`position` columns, `uq_board_cards_board_column_rank` | `BoardCardService.move`, `BoardColumnService.create`/`update`/`delete` | `test_board_ranking_unit.py`, `test_card_move_rejects_invalid_transition_and_unknown_column`, `test_card_move_enforces_wip_limit` |
-| Migration reproducibility | Alembic `0001_initial`…`0009_entity_collaboration` | `support.run_migrations` | `test_migrations_integration.py` |
+| Project repository identity and lifecycle | `uq_project_repositories_identity`, `fk_project_repositories_workspace_project`, `ck_project_repositories_*` | `ProjectRepositoryLinkRepository.find_identity`, `ProjectRepositoryService.create`/`update`/`unlink` | `test_remote_identity_dedup_is_url_and_instance_aware`, `test_lifecycle_idempotency_tenant_isolation_rbac_and_audit`, `test_concurrent_duplicate_create_converges_on_one_row` |
+| Migration reproducibility | Alembic `0001_initial`…`0010_project_repositories` | `support.run_migrations` | `test_migrations_integration.py` |
 
 ## Residual Risks and Deferred Controls
 

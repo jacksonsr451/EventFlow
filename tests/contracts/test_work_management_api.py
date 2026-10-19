@@ -77,6 +77,9 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "POST /v1/workspaces/{workspace_id}/boards/{board_id}/columns",
     "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}",
     "DELETE /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/repositories",
+    "PATCH /v1/workspaces/{workspace_id}/projects/{project_id}/repositories/{repository_id}",
+    "DELETE /v1/workspaces/{workspace_id}/projects/{project_id}/repositories/{repository_id}",
     "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/comments",
     "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments",
 }
@@ -88,6 +91,7 @@ LIST_OPERATIONS = {
     "listBoardCards": "BoardCardPage",
     "listCardMovements": "CardMovementPage",
     "listEntityComments": "EntityCommentPage",
+    "listProjectRepositories": "ProjectRepositoryPage",
 }
 
 EXAMPLE_DEFINITIONS = {
@@ -492,6 +496,7 @@ def test_page_envelopes_are_defined(schema):
         "WorkItemPage",
         "BoardCardPage",
         "CardMovementPage",
+        "ProjectRepositoryPage",
     ):
         assert definition in schema["$defs"], f"{definition} is not defined"
         Draft202012Validator.check_schema(schema["$defs"][definition])

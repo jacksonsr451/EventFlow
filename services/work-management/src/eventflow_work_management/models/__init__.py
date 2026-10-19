@@ -37,6 +37,9 @@ from eventflow_work_management.models.membership import (
     WorkspaceInvitation,
     WorkspaceMembership,
 )
+from eventflow_work_management.models.project_repository import (
+    ProjectRepositoryLink,
+)
 from eventflow_work_management.models.proposal import Proposal
 from eventflow_work_management.models.proposal_evidence import ProposalEvidence
 from eventflow_work_management.models.proposal_revision import ProposalRevision
@@ -63,6 +66,7 @@ __all__ = [
     "ExternalIdentity",
     "OIDCLoginTransaction",
     "Project",
+    "ProjectRepositoryLink",
     "Proposal",
     "ProposalEvidence",
     "ProposalRevision",
