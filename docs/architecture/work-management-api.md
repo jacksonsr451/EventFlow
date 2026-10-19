@@ -405,6 +405,54 @@ both "version 1" and are distinguished by `proposal_id`.
   repeating effects. Audit actions are `proposal.created`, `proposal.revised`,
   `proposal.submitted`, and `proposal.duplicated`.
 
+### 8.5 Entity comments, generic attachments, and history (Issue #29)
+
+Issue #29 makes comments, attachments, and history available on every
+collaborable entity through one generic, entity-scoped route family. The path
+names the public collection (`consultations`, `proposals`, `work-items`,
+`board-cards`) and the entity id; the server resolves the target inside the
+caller's workspace and copies its project scope. Consultations keep their more
+specific Issue #4 attachment/evidence/history routes, which remain authoritative
+for that collection.
+
+| Operation | Method and path | Required role (`x-required-roles`) |
+|---|---|---|
+| Create comment | `POST .../{entity_collection}/{entity_id}/comments` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+| List comments | `GET .../{entity_collection}/{entity_id}/comments` | any member (incl. `viewer`) |
+| Read comment | `GET .../{entity_collection}/{entity_id}/comments/{comment_id}` | any member (incl. `viewer`) |
+| Delete comment | `DELETE .../{entity_collection}/{entity_id}/comments/{comment_id}` | author, or `owner`/`admin` |
+| Upload attachment | `POST .../{entity_collection}/{entity_id}/attachments` | `owner`, `admin`, `triager`, `approver`, `contributor` |
+| List attachments | `GET .../{entity_collection}/{entity_id}/attachments` | any member (incl. `viewer`) |
+| Read attachment | `GET .../{entity_collection}/{entity_id}/attachments/{attachment_id}` | any member (incl. `viewer`) |
+| Download content | `GET .../{entity_collection}/{entity_id}/attachments/{attachment_id}/content` | any member (incl. `viewer`) |
+| Delete attachment | `DELETE .../{entity_collection}/{entity_id}/attachments/{attachment_id}` | uploader, or `owner`/`admin` |
+| Read history | `GET .../{entity_collection}/{entity_id}/history` | any member (incl. `viewer`) |
+
+- **Collection resolution.** `board-cards` is a flat path
+  (`.../board-cards/{card_id}`); the other collections use their resource ids.
+  An unsupported collection, a missing entity, and an entity in another
+  workspace all return `404`, so a probe cannot distinguish "unsupported" from
+  "not visible".
+- **Comments.** `body` is trimmed and limited to 4,000 characters; empty bodies
+  are `400` and control characters are rejected with `422`. The author is taken
+  from the verified principal, never the body. Comments cannot be edited.
+  Deleting one stores a tombstone: the audit trail is unchanged and the API
+  returns `body: null`, `deleted: true`. Deleting an already-deleted comment is
+  a `204` no-op.
+- **Attachments.** The transport, content-type allowlist, size bound, fail-closed
+  scanning, `409 ATTACHMENT_QUARANTINED` download refusal, and per-entity quota
+  (`409 ATTACHMENT_LIMIT_REACHED`) match section 8.2. Proposals, work items, and
+  board cards use the generic pair. The same path shape for `consultations` is
+  served by the dedicated Issue #4 handlers, so consultation attachments always
+  use the evidence pipeline and never the generic tables.
+- **History.** History is a read-only, cursor-paginated projection of the
+  append-only audit trail for one entity, oldest first. It uses the same page
+  envelope as section 5. Entries can never be created, rewritten, or deleted
+  through the API.
+- **Idempotency.** Comment creation and attachment upload accept an optional
+  `Idempotency-Key`; an equivalent replay returns the original resource and a
+  different fingerprint returns `409 IDEMPOTENCY_CONFLICT`.
+
 ## 9. Internal events
 
 Versioned internal events (for example `work_item.created`,
@@ -426,6 +474,7 @@ not invent one.
 | Idempotency (A-02) | `Idempotency-Key` parameters | `test_idempotency_key_declared_on_retryable_operations` |
 | Authorization | `bearerAuth`, `x-required-roles` | `test_every_operation_requires_bearer_auth`, `test_every_operation_declares_authorization_roles` |
 | Consultation task proposals (Issue #6) | section 8.4, `Proposal*` DTOs | `services/work-management/tests/test_proposal_api_integration.py`, `services/work-management/tests/test_proposal_unit.py` |
+| Entity comments, attachments, history (Issue #29) | section 8.5, `EntityComment*`/`EntityAttachment*`/`EntityHistoryPage` DTOs | `services/work-management/tests/test_collaboration_integration.py` |
 | Per-flow examples | `contracts/examples/work-management/` | `test_per_flow_examples_validate` |
 
 ## 11. Related documents

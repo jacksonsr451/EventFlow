@@ -34,6 +34,9 @@ and does not depend on Order Processing code or tables.
 | `boards` / `board_cards` | Kanban placement | card `project_id` bound to board and WorkItem by composite FKs; unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)`; board `version` and `archived_at` |
 | `board_columns` | Independently managed columns | unique `(board_id, key)`, unique `(workspace_id, id)`; one row per board column with `position`, `mapped_status` and optional `wip_limit`; no FK from `board_cards.column_id` |
 | `card_movements` | Append-only card movement history | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; workspace-bound board and card FKs; column ids stored as bare keys |
+| `entity_comments` | Comments on consultations, proposals, work items, board cards | tombstone-only; block rewrite/`DELETE`/`TRUNCATE` triggers; composite project FK; entity type check; body length and deletion-consistency checks |
+| `entity_attachments` | Generic attachments for proposals, work items, board cards | status/scan-verdict checks; rejection/reason consistency; `sha256` checksum; opaque `storage_key`; composite project FK |
+| `entity_attachment_blobs` | Bytes for generic attachments | one row per attachment; rejected attachments store no blob; cascade from metadata and workspace |
 | `audit_records` | Append-only audit trail | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; `sha256` snapshot hash |
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
 | `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
@@ -91,6 +94,29 @@ Application code validates first; the database is the last line of defense.
   UPDATE`/`BEFORE DELETE`/`BEFORE TRUNCATE` triggers
   (`eventflow_card_movements_block_mutation`) raise, so the history is
   append-only.
+- **Comment immutability.** `entity_comments` is tombstone-only. A
+  `BEFORE UPDATE` trigger (`eventflow_entity_comments_block_rewrite`) rejects any
+  change to `workspace_id`, `project_id`, `entity_type`, `entity_id`,
+  `author_id`, `body`, or `created_at`, while allowing the deletion columns;
+  `BEFORE DELETE` and `BEFORE TRUNCATE` triggers
+  (`eventflow_entity_comments_block_mutation`) reject hard removal. The
+  `(deleted_at IS NULL) = (deleted_by IS NULL)` check keeps tombstones
+  consistent.
+- **Generic attachment lifecycle.** `entity_attachments` enforces the status
+  (`quarantined`/`available`/`rejected`) and scan-verdict
+  (`clean`/`infected`/`unknown`) vocabularies, requires a rejection reason
+  exactly when the status is `rejected`, and validates the SHA-256 checksum and
+  opaque storage key formats. `entity_attachment_blobs` is written only for
+  non-rejected objects, so quarantined and rejected bytes are never persisted or
+  served. Proposals, work items, and board cards use this pair; consultations
+  keep their Issue #4 tables.
+- **Polymorphic collaboration targets.** `entity_comments.entity_id` and
+  `entity_attachments.entity_id` are opaque UUIDs because one column can name
+  four tables. The application resolves the public collection segment inside the
+  caller's workspace and copies the resolved `project_id`; the composite FK to
+  `projects (workspace_id, id)` then guarantees that every comment or attachment
+  stays in one workspace and project. Unknown collections and foreign entities
+  are hidden as `404`.
 - **Remote reference integrity.** A `BEFORE INSERT/UPDATE` trigger requires a
   `remote_integration_references` row whose `entity_type` names a Work
   Management entity to reference an entity that exists in the same workspace.
@@ -155,8 +181,12 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 | Proposal independence and revision uniqueness | `uq_proposal_revisions_proposal_version`, `trg_proposal_revisions_no_update/_no_delete/_no_truncate` | `ProposalRepository.add`/`update_content`/`append_revision` | `test_independent_proposals_share_consultation`, `test_duplicate_proposal_revision_is_rejected`, `test_concurrent_proposals_create_independent_rows` |
 | Board column integrity | `uq_board_columns_board_key`, `uq_board_columns_workspace_id`, `ck_board_columns_*` | `BoardColumnRepository.add`/`update`/`delete` | `test_column_create_update_reorder_and_delete`, `test_last_column_cannot_be_deleted` |
 | Card movement history | `trg_card_movements_no_update/_no_delete/_no_truncate` | `CardMovementRepository.append` (insert only) | `test_card_move_updates_work_item_and_records_history`, `test_migrations_integration.py` |
+| Comment immutability and tombstones | `trg_entity_comments_no_rewrite/_no_delete/_no_truncate`, `ck_entity_comments_deletion_consistency` | `CommentService.create`/`delete`, `CommentRepository.soft_delete` | `test_comment_lifecycle_tombstone_and_history`, `test_comment_body_is_immutable_at_the_database_level` |
+| Generic attachments fail closed | `ck_entity_attachments_status_values`, `ck_entity_attachments_rejection_reason_consistency`, blob separation | `EntityAttachmentService.upload`/`download`/`delete`, `validate_upload`, `classify` | `test_entity_attachment_scan_lifecycle_on_proposal` |
+| Collaboration tenant isolation | composite FKs `fk_entity_comments_workspace_project`, `fk_entity_attachments_workspace_project` | `resolve_entity` + workspace-scoped repositories | `test_comment_rbac_and_tenant_isolation`, `test_comments_and_attachments_on_work_items_and_board_cards` |
+| Entity history projection | append-only `audit_records` | `EntityHistoryService.list_page` (read only) | `test_comment_lifecycle_tombstone_and_history`, `test_entity_attachment_scan_lifecycle_on_proposal` |
 | Deterministic ordering and transitions | integer `rank`/`position` columns, `uq_board_cards_board_column_rank` | `BoardCardService.move`, `BoardColumnService.create`/`update`/`delete` | `test_board_ranking_unit.py`, `test_card_move_rejects_invalid_transition_and_unknown_column`, `test_card_move_enforces_wip_limit` |
-| Migration reproducibility | Alembic `0001_initial`…`0008_kanban_boards_columns` | `support.run_migrations` | `test_migrations_integration.py` |
+| Migration reproducibility | Alembic `0001_initial`…`0009_entity_collaboration` | `support.run_migrations` | `test_migrations_integration.py` |
 
 ## Residual Risks and Deferred Controls
 
@@ -169,6 +199,11 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
   `eventflow_test_<12 hex>` databases. A shared application/test URL is still
   possible by configuration (as CI does), so point the test URL at a disposable
   database.
+- **Comment tombstones block cascaded parent deletion.** Because the comment
+  `BEFORE DELETE` trigger fires for cascades too, a project or workspace that
+  owns comments cannot be removed by a plain cascade. There is no project or
+  workspace delete endpoint today; a future archival path must handle comments
+  explicitly rather than relying on cascade.
 - **Remote references with unknown `entity_type`** are accepted without
   existence or workspace validation; provider integrations own those semantics.
 - **`updated_at`** is maintained by the ORM `onupdate`, not a database trigger,

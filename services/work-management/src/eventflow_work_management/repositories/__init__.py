@@ -11,8 +11,12 @@ from eventflow_work_management.repositories.board_repository import (
     BoardCardRepository,
     BoardRepository,
 )
+from eventflow_work_management.repositories.comment_repository import CommentRepository
 from eventflow_work_management.repositories.consultation_repository import (
     ConsultationRepository,
+)
+from eventflow_work_management.repositories.entity_attachment_repository import (
+    EntityAttachmentRepository,
 )
 from eventflow_work_management.repositories.errors import (
     AlreadyDecided,
@@ -46,8 +50,10 @@ __all__ = [
     "AuditRepository",
     "BoardCardRepository",
     "BoardRepository",
+    "CommentRepository",
     "ConsultationRepository",
     "DecisionResult",
+    "EntityAttachmentRepository",
     "EntityNotFound",
     "IdempotencyConflict",
     "IdempotencyRepository",

@@ -46,6 +46,11 @@ ATTACHMENT_STATUS_VALUES = ("quarantined", "available", "rejected")
 ATTACHMENT_SCAN_VERDICT_VALUES = ("clean", "infected", "unknown")
 EVIDENCE_KIND_VALUES = ("text", "link", "attachment")
 
+# Entity collaboration (Issue #29). One canonical singular vocabulary is shared
+# by comments and generic attachments; the public ``entity_collection`` path
+# segment maps onto it in ``services.entity_access``.
+ENTITY_TYPE_VALUES = ("consultation", "proposal", "work_item", "board_card")
+
 # Work Management authorization vocabulary (Issue #9). The role order is
 # intentional: it is roughly ascending privilege, with ``owner`` last so
 # assignability and elevation checks can compare positions.

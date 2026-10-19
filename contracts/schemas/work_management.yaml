@@ -78,6 +78,25 @@ $defs:
       Issue #9; this contract only names the roles an operation requires.
     enum: [owner, admin, triager, approver, contributor, viewer]
 
+  EntityCollection:
+    type: string
+    description: >-
+      Public path segment identifying the entity a comment or history entry
+      belongs to. Each segment maps to one canonical ``entity_type``.
+    enum: [consultations, proposals, work-items, board-cards]
+
+  AttachmentEntityCollection:
+    type: string
+    description: >-
+      Public path segment for generic attachments. Consultations keep their
+      dedicated Issue #4 attachment routes and are not valid here.
+    enum: [proposals, work-items, board-cards]
+
+  EntityType:
+    type: string
+    description: Canonical entity discriminator persisted with a comment or attachment.
+    enum: [consultation, proposal, work_item, board_card]
+
   EditorContext:
     type: object
     required: [repository, branch, commit_sha, file_path, line_start, line_end, consent_granted]
@@ -998,6 +1017,136 @@ $defs:
           - type: 'null'
 
   ConsultationHistoryPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ConsultationHistoryEntry'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  EntityComment:
+    type: object
+    description: >-
+      One collaborative comment. A deleted comment is a tombstone: the row and
+      its audit record remain, ``deleted`` is true, and ``body`` is null.
+    additionalProperties: false
+    required: [comment_id, workspace_id, project_id, entity_type, entity_id, author_id, body, deleted, created_at]
+    properties:
+      comment_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      entity_type:
+        $ref: '#/$defs/EntityType'
+      entity_id:
+        $ref: '#/$defs/UUID'
+      author_id:
+        $ref: '#/$defs/UUID'
+      body:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 4000
+          - type: 'null'
+        description: Null only for a deleted tombstone.
+      deleted:
+        type: boolean
+      deleted_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  CreateEntityCommentRequest:
+    type: object
+    description: Request DTO for POST .../comments.
+    additionalProperties: false
+    required: [body]
+    properties:
+      body:
+        type: string
+        minLength: 1
+        maxLength: 4000
+
+  EntityCommentPage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/EntityComment'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  EntityAttachment:
+    type: object
+    description: >-
+      Metadata for one attachment on a proposal, work item, or board card.
+      Consultation attachments keep their original resource shape. Object bytes
+      are never inlined; a quarantined or rejected object is never downloadable.
+    additionalProperties: false
+    required: [attachment_id, workspace_id, project_id, entity_type, entity_id, file_name, content_type, size_bytes, checksum_sha256, status, scan_verdict, uploaded_by, created_at]
+    properties:
+      attachment_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      entity_type:
+        $ref: '#/$defs/EntityType'
+      entity_id:
+        $ref: '#/$defs/UUID'
+      file_name:
+        type: string
+        minLength: 1
+        maxLength: 255
+      content_type:
+        type: string
+        minLength: 1
+        maxLength: 255
+      size_bytes:
+        type: integer
+        minimum: 0
+        maximum: 5242880
+      checksum_sha256:
+        type: string
+        pattern: ^[0-9a-f]{64}$
+      status:
+        $ref: '#/$defs/AttachmentStatus'
+      scan_verdict:
+        $ref: '#/$defs/AttachmentScanVerdict'
+      rejection_reason:
+        anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 120
+          - type: 'null'
+      uploaded_by:
+        $ref: '#/$defs/UUID'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  EntityAttachmentList:
+    type: object
+    additionalProperties: false
+    required: [items]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/EntityAttachment'
+
+  EntityHistoryPage:
     type: object
     additionalProperties: false
     required: [items, page_info]
