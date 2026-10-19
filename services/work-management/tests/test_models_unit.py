@@ -34,6 +34,9 @@ EXPECTED_TABLES = {
     "consultation_attachments",
     "consultation_attachment_blobs",
     "consultation_evidence",
+    "entity_comments",
+    "entity_attachments",
+    "entity_attachment_blobs",
 }
 
 AUTHENTICATION_TABLES = {

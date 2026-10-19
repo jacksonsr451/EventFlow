@@ -24,7 +24,12 @@ from eventflow_work_management.models.board import (
     BoardColumn,
     CardMovement,
 )
+from eventflow_work_management.models.comment import EntityComment
 from eventflow_work_management.models.consultation import Consultation
+from eventflow_work_management.models.entity_attachment import (
+    EntityAttachment,
+    EntityAttachmentBlob,
+)
 from eventflow_work_management.models.evidence import ConsultationEvidence
 from eventflow_work_management.models.idempotency import IdempotencyRecord
 from eventflow_work_management.models.integration import RemoteIntegrationReference
@@ -51,6 +56,9 @@ __all__ = [
     "ConsultationAttachment",
     "ConsultationAttachmentBlob",
     "ConsultationEvidence",
+    "EntityAttachment",
+    "EntityAttachmentBlob",
+    "EntityComment",
     "IdempotencyRecord",
     "ExternalIdentity",
     "OIDCLoginTransaction",

@@ -51,6 +51,10 @@ class Action(str, Enum):
     EVIDENCE_CREATE = "evidence:create"
     HISTORY_READ = "history:read"
 
+    COMMENT_READ = "comment:read"
+    COMMENT_CREATE = "comment:create"
+    COMMENT_DELETE = "comment:delete"
+
     PROPOSAL_READ = "proposal:read"
     PROPOSAL_CREATE = "proposal:create"
     PROPOSAL_UPDATE = "proposal:update"
@@ -73,6 +77,7 @@ _READ_ACTIONS: frozenset[Action] = frozenset(
         Action.ATTACHMENT_READ,
         Action.EVIDENCE_READ,
         Action.HISTORY_READ,
+        Action.COMMENT_READ,
         Action.PROPOSAL_READ,
         Action.WORK_ITEM_READ,
         Action.BOARD_READ,
@@ -97,6 +102,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.ATTACHMENT_UPLOAD,
             Action.ATTACHMENT_DELETE,
             Action.EVIDENCE_CREATE,
+            Action.COMMENT_CREATE,
+            Action.COMMENT_DELETE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.PROPOSAL_UPDATE,
@@ -121,6 +128,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.ATTACHMENT_UPLOAD,
             Action.ATTACHMENT_DELETE,
             Action.EVIDENCE_CREATE,
+            Action.COMMENT_CREATE,
+            Action.COMMENT_DELETE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.PROPOSAL_UPDATE,
@@ -139,6 +148,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.ATTACHMENT_UPLOAD,
             Action.ATTACHMENT_DELETE,
             Action.EVIDENCE_CREATE,
+            Action.COMMENT_CREATE,
+            Action.COMMENT_DELETE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.PROPOSAL_UPDATE,
@@ -154,6 +165,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.ATTACHMENT_UPLOAD,
             Action.ATTACHMENT_DELETE,
             Action.EVIDENCE_CREATE,
+            Action.COMMENT_CREATE,
+            Action.COMMENT_DELETE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.PROPOSAL_UPDATE,
@@ -169,6 +182,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.ATTACHMENT_UPLOAD,
             Action.ATTACHMENT_DELETE,
             Action.EVIDENCE_CREATE,
+            Action.COMMENT_CREATE,
+            Action.COMMENT_DELETE,
             Action.PROPOSAL_CREATE,
             Action.PROPOSAL_SUBMIT,
             Action.PROPOSAL_UPDATE,

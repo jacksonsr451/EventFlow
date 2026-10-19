@@ -19,6 +19,9 @@ from eventflow_work_management.api.attachment_routes import (
     router as attachment_router,
 )
 from eventflow_work_management.api.board_routes import router as board_router
+from eventflow_work_management.api.collaboration_routes import (
+    router as collaboration_router,
+)
 from eventflow_work_management.api.consultation_routes import (
     router as consultation_router,
 )
@@ -202,5 +205,8 @@ def create_app(
     app.include_router(approval_router)
     app.include_router(attachment_router)
     app.include_router(board_router)
+    # Registered last: the generic collaboration paths must not shadow the
+    # specific consultation attachment/history routes above.
+    app.include_router(collaboration_router)
 
     return app

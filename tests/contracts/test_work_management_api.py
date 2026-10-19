@@ -77,6 +77,8 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "POST /v1/workspaces/{workspace_id}/boards/{board_id}/columns",
     "PATCH /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}",
     "DELETE /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}",
+    "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/comments",
+    "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments",
 }
 
 LIST_OPERATIONS = {
@@ -85,6 +87,7 @@ LIST_OPERATIONS = {
     "listWorkItems": "WorkItemPage",
     "listBoardCards": "BoardCardPage",
     "listCardMovements": "CardMovementPage",
+    "listEntityComments": "EntityCommentPage",
 }
 
 EXAMPLE_DEFINITIONS = {

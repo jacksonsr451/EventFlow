@@ -36,6 +36,9 @@ EXPECTED_TABLES = {
     "consultation_evidence",
     "proposal_revisions",
     "proposal_evidence",
+    "entity_comments",
+    "entity_attachments",
+    "entity_attachment_blobs",
 }
 
 EXPECTED_TRIGGERS = {
@@ -50,6 +53,9 @@ EXPECTED_TRIGGERS = {
     "trg_card_movements_no_update",
     "trg_card_movements_no_delete",
     "trg_card_movements_no_truncate",
+    "trg_entity_comments_no_rewrite",
+    "trg_entity_comments_no_delete",
+    "trg_entity_comments_no_truncate",
 }
 
 EXPECTED_FUNCTIONS = {
@@ -58,6 +64,8 @@ EXPECTED_FUNCTIONS = {
     "eventflow_audit_records_block_mutation",
     "eventflow_proposal_revisions_block_mutation",
     "eventflow_card_movements_block_mutation",
+    "eventflow_entity_comments_block_rewrite",
+    "eventflow_entity_comments_block_mutation",
 }
 
 
@@ -113,7 +121,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         tables = _tables(engine)
         assert EXPECTED_TABLES <= tables
         assert "alembic_version" in tables
-        assert _revision(engine) == "0008_kanban_boards_columns"
+        assert _revision(engine) == "0009_entity_collaboration"
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
         assert EXPECTED_CONSTRAINTS <= _constraints(engine)
@@ -124,7 +132,7 @@ def test_upgrade_is_idempotent():
     with temporary_empty_database(admin_url) as (url, engine):
         run_migrations(url)
         run_migrations(url)
-        assert _revision(engine) == "0008_kanban_boards_columns"
+        assert _revision(engine) == "0009_entity_collaboration"
 
 
 def test_downgrade_removes_tables_triggers_and_functions():

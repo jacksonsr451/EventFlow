@@ -15,9 +15,6 @@ Uploads are hostile until proven otherwise. The service:
 
 from __future__ import annotations
 
-import base64
-import binascii
-import hashlib
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
@@ -39,63 +36,22 @@ from eventflow_work_management.repositories.idempotency_repository import (
     IdempotencyRepository,
 )
 from eventflow_work_management.security.attachment_scanner import (
-    CLEAN,
-    INFECTED,
     MalwareScanner,
     UnconfiguredMalwareScanner,
 )
 from eventflow_work_management.security.errors import ProblemError
+from eventflow_work_management.services.attachment_support import (
+    AVAILABLE_STATUS,
+    REJECTED_STATUS,
+    classify as _classify,
+    conflict as _conflict,
+    not_found as _not_found,
+    validate_upload,
+)
 
 UPLOAD_OPERATION = "attachment.upload"
 
-MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 MAX_ATTACHMENTS_PER_CONSULTATION = 25
-MAX_FILENAME_LENGTH = 255
-
-AVAILABLE_STATUS = "available"
-QUARANTINED_STATUS = "quarantined"
-REJECTED_STATUS = "rejected"
-
-MALWARE_REJECTION_REASON = "malware_detected"
-
-ALLOWED_CONTENT_TYPES = frozenset(
-    {
-        "image/png",
-        "image/jpeg",
-        "image/gif",
-        "application/pdf",
-        "text/plain",
-    }
-)
-
-_MAGIC_SIGNATURES: tuple[tuple[bytes, str], ...] = (
-    (b"\x89PNG\r\n\x1a\n", "image/png"),
-    (b"\xff\xd8\xff", "image/jpeg"),
-    (b"GIF87a", "image/gif"),
-    (b"GIF89a", "image/gif"),
-    (b"%PDF-", "application/pdf"),
-)
-
-_NOT_FOUND = "The requested resource was not found."
-
-
-def _not_found() -> ProblemError:
-    return ProblemError(
-        status_code=404, code="NOT_FOUND", detail=_NOT_FOUND, title="Not found"
-    )
-
-
-def _validation(detail: str, *, status_code: int = 400) -> ProblemError:
-    return ProblemError(
-        status_code=status_code,
-        code="VALIDATION_ERROR",
-        detail=detail,
-        title="Invalid request" if status_code == 400 else "Unprocessable entity",
-    )
-
-
-def _conflict(detail: str, *, code: str = "CONFLICT") -> ProblemError:
-    return ProblemError(status_code=409, code=code, detail=detail, title="Conflict")
 
 
 def attachment_etag(attachment: ConsultationAttachment) -> str:
@@ -112,56 +68,6 @@ def attachment_etag(attachment: ConsultationAttachment) -> str:
         )
         + '"'
     )
-
-
-def _normalize_file_name(file_name: str) -> str:
-    candidate = file_name.strip()
-    if not candidate:
-        raise _validation("The file name is required.")
-    if len(candidate) > MAX_FILENAME_LENGTH:
-        raise _validation("The file name is too long.", status_code=422)
-    if candidate in {".", ".."}:
-        raise _validation("The file name is invalid.", status_code=422)
-    if any(separator in candidate for separator in ("/", "\\")):
-        raise _validation("The file name must not contain a path.", status_code=422)
-    if any(ord(character) < 32 for character in candidate):
-        raise _validation(
-            "The file name must not contain control characters.", status_code=422
-        )
-    return candidate
-
-
-def _decode_content(content_base64: str) -> bytes:
-    try:
-        data = base64.b64decode(content_base64, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise _validation("The attachment content is not valid base64.") from exc
-    if not data:
-        raise _validation("The attachment content is empty.")
-    if len(data) > MAX_ATTACHMENT_BYTES:
-        raise _validation(
-            "The attachment exceeds the maximum size.", status_code=422
-        )
-    return data
-
-
-def _looks_like_text(data: bytes) -> bool:
-    if b"\x00" in data:
-        return False
-    try:
-        data.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    return True
-
-
-def _detect_content_type(data: bytes, declared: str) -> str | None:
-    for signature, content_type in _MAGIC_SIGNATURES:
-        if data.startswith(signature):
-            return content_type
-    if declared == "text/plain" and _looks_like_text(data):
-        return "text/plain"
-    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,20 +108,15 @@ class AttachmentService:
         idempotency_key: str | None = None,
         correlation_id: UUID | None = None,
     ) -> AttachmentResult:
-        normalized_name = _normalize_file_name(file_name)
-        if content_type not in ALLOWED_CONTENT_TYPES:
-            raise _validation(
-                "The attachment content type is not permitted.", status_code=422
-            )
-        data = _decode_content(content_base64)
-        detected = _detect_content_type(data, content_type)
-        if detected is None or detected != content_type:
-            raise _validation(
-                "The attachment content does not match its declared content type.",
-                status_code=422,
-            )
-
-        checksum = hashlib.sha256(data).hexdigest()
+        validated = validate_upload(
+            file_name=file_name,
+            content_type=content_type,
+            content_base64=content_base64,
+        )
+        normalized_name = validated.file_name
+        data = validated.data
+        detected = validated.content_type
+        checksum = validated.checksum_sha256
         request_fingerprint = fingerprint(
             {
                 "consultation_id": str(consultation_id),
@@ -439,11 +340,3 @@ class AttachmentService:
         if attachment is None:
             return None
         return AttachmentResult(attachment=attachment, replayed=True)
-
-
-def _classify(verdict: str) -> tuple[str, str | None, str]:
-    if verdict == CLEAN:
-        return AVAILABLE_STATUS, None, "attachment.uploaded"
-    if verdict == INFECTED:
-        return REJECTED_STATUS, MALWARE_REJECTION_REASON, "attachment.rejected"
-    return QUARANTINED_STATUS, None, "attachment.quarantined"

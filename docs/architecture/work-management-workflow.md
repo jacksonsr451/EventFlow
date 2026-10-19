@@ -430,6 +430,34 @@ values) and an optional `wip_limit`. Board and column mutations require
   architecture** until an authorizing decision exists (see ADR-008 Amendment
   A-03).
 
+### 3.7 Entity Collaboration: Comments, Attachments, and History (Issue #29)
+
+Consultations, proposals, work items, and board cards share one collaboration
+surface rooted at
+`/v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}`. The
+`entity_collection` segment is `consultations`, `proposals`, `work-items`, or
+`board-cards` (the last is flat: `/board-cards/{card_id}`). The server resolves
+the entity inside the workspace; an unknown collection and a foreign entity are
+both `404`.
+
+- **Comments.** Comments are annotations, never authoritative state. Creation
+  derives the author from the verified principal, trims and bounds the body
+  (1–4,000 characters), and appends `comment.created` to the audit trail.
+  Deletion is a tombstone: the row, author, and audit entry remain, but the API
+  returns a null body. There is no edit operation, and a database trigger rejects
+  any attempt to rewrite the author, body, target, or creation time.
+- **Attachments.** Proposals, work items, and board cards use the generic
+  attachment tables; consultations keep the Issue #4 pipeline. Both paths share
+  the same size bound, filename rules, content-type sniffing, malware scan, and
+  fail-closed quarantine. Quarantined or rejected objects are never
+  downloadable. Each entity holds at most 25 attachments.
+- **History.** `GET .../{entity_collection}/{entity_id}/history` projects the
+  append-only audit trail for that entity, oldest first. History entries can
+  never be created, rewritten, or deleted through the API. Consultation history
+  keeps its specific Issue #4 path.
+- **No downstream creation.** Commenting on or attaching a file to an entity
+  never creates a Proposal, Approval, WorkItem, or BoardCard.
+
 ---
 
 ## 4. Comprehensive Transition Matrix

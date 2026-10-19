@@ -20,6 +20,7 @@ tags:
   - name: Consultations
   - name: Triage
   - name: Attachments
+  - name: Comments
   - name: Evidence
   - name: History
   - name: Proposals
@@ -2726,6 +2727,452 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/comments:
+    post:
+      operationId: createEntityComment
+      tags: [Comments]
+      summary: Add a comment to an entity
+      description: >-
+        Records a collaborative comment authored by the verified principal. The
+        author is never taken from the body. Comments cannot be edited; deleting
+        one creates a tombstone that preserves the audit trail.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/EntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateEntityCommentRequest'
+      responses:
+        '201':
+          description: Comment recorded.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created comment resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityComment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listEntityComments
+      tags: [Comments]
+      summary: List an entity's comments
+      description: >-
+        Returns a stable keyset page ordered by creation time. Deleted comments
+        remain visible as tombstones with a null body.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [created_at]
+      x-default-sort-fields: [created_at]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/EntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of entity comments.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityCommentPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/comments/{comment_id}:
+    get:
+      operationId: getEntityComment
+      tags: [Comments]
+      summary: Read one comment
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/EntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/CommentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Comment metadata and body (null for a tombstone).
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityComment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    delete:
+      operationId: deleteEntityComment
+      tags: [Comments]
+      summary: Tombstone a comment
+      description: >-
+        Only the author or a workspace administrator may delete a comment. The
+        row is retained with a null body; the audit trail is unchanged.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/EntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/CommentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Comment tombstoned.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments:
+    post:
+      operationId: uploadEntityAttachment
+      tags: [Attachments]
+      summary: Upload an attachment for a proposal, work item, or board card
+      description: >-
+        Accepts a base64-encoded object, validates its size, filename, and
+        content type, scans it through the configured malware scanner, and
+        records the outcome. A quarantined or rejected object is never
+        downloadable.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AttachmentEntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateAttachmentRequest'
+      responses:
+        '201':
+          description: Attachment recorded; its status reflects the scan verdict.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created attachment resource.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityAttachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listEntityAttachments
+      tags: [Attachments]
+      summary: List an entity's attachments
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AttachmentEntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The entity's attachment metadata.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityAttachmentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments/{attachment_id}:
+    get:
+      operationId: getEntityAttachment
+      tags: [Attachments]
+      summary: Read one entity attachment's metadata
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AttachmentEntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Attachment metadata.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityAttachment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    delete:
+      operationId: deleteEntityAttachment
+      tags: [Attachments]
+      summary: Delete an entity attachment and its stored object
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AttachmentEntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Attachment metadata and object were removed.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments/{attachment_id}/content:
+    get:
+      operationId: downloadEntityAttachment
+      tags: [Attachments]
+      summary: Download an available entity attachment's object
+      description: >-
+        Serves the stored object as an opaque download with a nosniff header. A
+        quarantined or rejected attachment returns 409 and never exposes bytes.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AttachmentEntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The attachment object as an opaque byte stream.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Content-Disposition:
+              description: Forces the object to be saved rather than rendered.
+              schema:
+                type: string
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/history:
+    get:
+      operationId: listEntityHistory
+      tags: [History]
+      summary: Read an entity's audit timeline
+      description: >-
+        Returns the append-only audit timeline for a proposal, work item, or
+        board card, oldest first. Consultation history keeps its specific path.
+        History entries can never be created, rewritten, or deleted through this
+        API.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/EntityCollection'
+        - $ref: '#/components/parameters/EntityId'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of entity lifecycle events.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/EntityHistoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2854,6 +3301,39 @@ components:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
     BoardColumnId:
       name: column_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    EntityCollection:
+      name: entity_collection
+      in: path
+      required: true
+      description: >-
+        Public collection segment selecting the collaboration target. Unknown
+        values return 404 so an unsupported target is not distinguishable from a
+        hidden one.
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/EntityCollection'
+    AttachmentEntityCollection:
+      name: entity_collection
+      in: path
+      required: true
+      description: >-
+        Public collection segment selecting the generic attachment target.
+        Consultations keep their dedicated Issue #4 routes; an unsupported or
+        hidden target returns 404.
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/AttachmentEntityCollection'
+    EntityId:
+      name: entity_id
+      in: path
+      required: true
+      description: Identifier of the target entity within the selected collection.
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    CommentId:
+      name: comment_id
       in: path
       required: true
       schema:

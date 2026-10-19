@@ -254,6 +254,65 @@ retryable-idempotency and optimistic-concurrency scope. Verified by
 `services/work-management/tests/test_board_api_integration.py`,
 `test_board_ranking_unit.py`, `test_models_unit.py` and the migration tests.
 
+### Amendment A-04 — Entity comments and generic attachments (Issue #29)
+
+**Status:** Accepted.
+
+**Context.** [Issue #29](https://github.com/jacksonsr451/EventFlow/issues/29)
+requires collaborative comments, authorized attachments, and an immutable audit
+timeline for consultations, proposals, work items, and board cards. Issue #4
+already provides consultation attachments, evidence, and history. Duplicating
+that pipeline per entity type would let the upload rules, malware scanning, and
+tenant checks drift, while rewriting the existing consultation tables would
+break their released contract.
+
+**Decision.**
+
+- A new `entity_comments` table stores comments for all four entity types. It is
+  **tombstone-only**: `deleted_at`/`deleted_by` mark removal, and triggers
+  (`eventflow_entity_comments_block_rewrite`,
+  `eventflow_entity_comments_block_mutation`) reject rewrites of the workspace,
+  project, target, author, body, or creation time, and reject hard `DELETE` and
+  `TRUNCATE`. There is no edit operation; the API never returns a tombstoned
+  body.
+- A new `entity_attachments`/`entity_attachment_blobs` pair stores attachments
+  for proposals, work items, and board cards. Consultations keep their original
+  `consultation_attachments` tables. Both paths share
+  `services/attachment_support.py`, so the size bound, filename rules,
+  content-type sniffing, and fail-closed scan classification are identical.
+  Rejected objects store no blob; quarantined and rejected objects are never
+  downloadable.
+- `entity_comments.entity_id` and `entity_attachments.entity_id` are opaque
+  UUIDs without a foreign key because the target spans four tables. The
+  application resolves the public collection segment (`consultations`,
+  `proposals`, `work-items`, `board-cards`) inside the caller's workspace and
+  copies the resolved `project_id`; an unknown collection, a missing entity, or
+  a foreign entity is reported as `404`. Composite FKs to
+  `projects (workspace_id, id)` therefore keep every row in one workspace and
+  project even though the entity itself is polymorphic.
+- History is a read-only projection of the existing append-only
+  `audit_records` table. No history table is added and no history entry can be
+  created, rewritten, or deleted through the API. Actions are
+  `comment.created`, `comment.deleted`, `attachment.uploaded`,
+  `attachment.rejected`, and `attachment.deleted`.
+- The cascade from `projects`/`workspaces` to comments is intentionally blocked
+  by the `BEFORE DELETE` trigger once comments exist: evidence may not be
+  silently discarded by deleting a parent row. Parent removal requires a
+  controlled archival or maintenance path rather than an accidental cascade.
+- **No WorkItem or BoardCard creation endpoint is added.** Creating a comment or
+  attachment never fabricates downstream work.
+
+**Consequences.** Ten new HTTP operations (`createEntityComment`,
+`listEntityComments`, `getEntityComment`, `deleteEntityComment`,
+`uploadEntityAttachment`, `listEntityAttachments`, `getEntityAttachment`,
+`downloadEntityAttachment`, `deleteEntityAttachment`, `listEntityHistory`) join
+Amendment A-02's retryable-idempotency scope for the two POSTs (comment create
+and attachment upload). Consultation attachment/history routes keep their more
+specific Issue #4 paths and remain authoritative for consultations; the generic
+router is registered after them. Verified by
+`services/work-management/tests/test_collaboration_integration.py`,
+`test_models_unit.py`, and `test_migrations_integration.py`.
+
 ## Consequences
 
 ### Positive
