@@ -1434,6 +1434,107 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/boards:
+    get:
+      operationId: listBoards
+      tags: [Boards]
+      summary: List boards in a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - name: include_archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The boards visible to the caller in the workspace.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/work_management.yaml#/$defs/Board'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    post:
+      operationId: createBoard
+      tags: [Boards]
+      summary: Create a board with configurable columns
+      description: >-
+        Creates a project board and its ordered column definitions in one
+        transaction. When no columns are supplied a default set (including the
+        ready column used by approved work) is provisioned. This operation never
+        creates a WorkItem or a BoardCard.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateBoardRequest'
+      responses:
+        '201':
+          description: The created board and its column definitions.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Board'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
   /v1/workspaces/{workspace_id}/boards/{board_id}:
     get:
       operationId: getBoard
@@ -1466,6 +1567,246 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    patch:
+      operationId: updateBoard
+      tags: [Boards]
+      summary: Update a board's name or archival state
+      description: >-
+        Renames or archives/unarchives a board and increments its metadata
+        version. When If-Match is supplied, a stale validator yields 412.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateBoardRequest'
+      responses:
+        '200':
+          description: The updated board.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Board'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/boards/{board_id}/columns:
+    get:
+      operationId: listBoardColumns
+      tags: [Boards]
+      summary: List a board's columns in order
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The board's ordered column definitions.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../schemas/work_management.yaml#/$defs/BoardColumn'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    post:
+      operationId: createBoardColumn
+      tags: [Boards]
+      summary: Add a column definition to a board
+      description: >-
+        Adds an ordered column definition. Its key must be unique within the
+        board. When position is omitted the column is appended. This operation
+        never moves or recreates existing cards.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateBoardColumnRequest'
+      responses:
+        '201':
+          description: The created column definition.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/BoardColumn'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/boards/{board_id}/columns/{column_id}:
+    patch:
+      operationId: updateBoardColumn
+      tags: [Boards]
+      summary: Update a board column definition
+      description: >-
+        Updates a column's name, position, mapped status, or WIP limit. The
+        immutable key is never changed so existing cards keep resolving. When
+        If-Match is supplied, a stale validator yields 412.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/BoardColumnId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateBoardColumnRequest'
+      responses:
+        '200':
+          description: The updated column definition.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/BoardColumn'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    delete:
+      operationId: deleteBoardColumn
+      tags: [Boards]
+      summary: Remove an empty board column definition
+      description: >-
+        Removes a column definition only when it holds no cards and is not the
+        board's last column; otherwise the request is a conflict. Cards are never
+        deleted or silently moved. When If-Match is supplied, a stale validator
+        yields 412.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/BoardColumnId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: The column definition was removed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
         default:
@@ -1613,6 +1954,51 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/boards/{board_id}/cards/{card_id}/movements:
+    get:
+      operationId: listCardMovements
+      tags: [Boards]
+      summary: List the append-only movement history of a board card
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [occurred_at]
+      x-default-sort-fields: [occurred_at, movement_id]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/BoardCardId'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of card movements, oldest first.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/CardMovementPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
         default:
@@ -2462,6 +2848,12 @@ components:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
     BoardCardId:
       name: card_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    BoardColumnId:
+      name: column_id
       in: path
       required: true
       schema:

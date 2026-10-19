@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from eventflow_work_management.models import WorkItem
@@ -100,6 +100,64 @@ class WorkItemRepository(Repository):
             WorkItem.workspace_id == workspace_id, WorkItem.id == work_item_id
         )
         return self._session.execute(statement).scalar_one_or_none()
+
+    def get_for_update(
+        self, *, workspace_id: UUID, work_item_id: UUID
+    ) -> WorkItem | None:
+        statement = (
+            select(WorkItem)
+            .where(
+                WorkItem.workspace_id == workspace_id, WorkItem.id == work_item_id
+            )
+            .with_for_update()
+        )
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def list_page(
+        self,
+        *,
+        workspace_id: UUID,
+        project_id: UUID | None = None,
+        status: str | None = None,
+        category: str | None = None,
+        priority: str | None = None,
+        assignee_id: UUID | None = None,
+        sort_key: str = "created_at",
+        descending: bool = False,
+        limit: int,
+        after: tuple | None = None,
+    ) -> list[WorkItem]:
+        column = getattr(WorkItem, sort_key)
+        statement = select(WorkItem).where(WorkItem.workspace_id == workspace_id)
+        if project_id is not None:
+            statement = statement.where(WorkItem.project_id == project_id)
+        if status is not None:
+            statement = statement.where(WorkItem.status == status)
+        if category is not None:
+            statement = statement.where(WorkItem.category == category)
+        if priority is not None:
+            statement = statement.where(WorkItem.priority == priority)
+        if assignee_id is not None:
+            statement = statement.where(WorkItem.assignee_id == assignee_id)
+        if after is not None:
+            value, after_id = after
+            if descending:
+                statement = statement.where(
+                    tuple_(column, WorkItem.id) < tuple_(value, after_id)
+                )
+            else:
+                statement = statement.where(
+                    tuple_(column, WorkItem.id) > tuple_(value, after_id)
+                )
+        if descending:
+            statement = statement.order_by(column.desc(), WorkItem.id.desc())
+        else:
+            statement = statement.order_by(column, WorkItem.id)
+        return list(self._session.execute(statement.limit(limit)).scalars())
+
+    def set_status(self, work_item: WorkItem, *, status: str) -> None:
+        work_item.status = status
+        self._session.flush()
 
     def list_for_project(
         self, *, workspace_id: UUID, project_id: UUID

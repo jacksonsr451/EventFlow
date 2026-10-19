@@ -31,7 +31,9 @@ and does not depend on Order Processing code or tables.
 | `proposal_evidence` | Proposal→consultation evidence links | composite PK `(proposal_id, evidence_id)`; workspace-bound FKs |
 | `approvals` | One decision per proposal version | unique `(proposal_id, proposal_version)`; `sha256` hash |
 | `work_items` | Execution work | unique `origin_proposal_id`; origin trigger; project-bound proposal FK; composite FKs to project and approval |
-| `boards` / `board_cards` | Kanban placement | card `project_id` bound to board and WorkItem by composite FKs; unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)` |
+| `boards` / `board_cards` | Kanban placement | card `project_id` bound to board and WorkItem by composite FKs; unique `(board_id, work_item_id)`, unique `(board_id, column_id, rank)`; board `version` and `archived_at` |
+| `board_columns` | Independently managed columns | unique `(board_id, key)`, unique `(workspace_id, id)`; one row per board column with `position`, `mapped_status` and optional `wip_limit`; no FK from `board_cards.column_id` |
+| `card_movements` | Append-only card movement history | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; workspace-bound board and card FKs; column ids stored as bare keys |
 | `audit_records` | Append-only audit trail | block `UPDATE`/`DELETE`/`TRUNCATE` triggers; `sha256` snapshot hash |
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
 | `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
@@ -76,6 +78,19 @@ Application code validates first; the database is the last line of defense.
 - **Append-only audit.** `BEFORE UPDATE`, `BEFORE DELETE` and `BEFORE TRUNCATE`
   triggers on `audit_records` raise, preserving history against row and
   whole-table mutation.
+- **Board columns.** A board's columns are first-class rows in `board_columns`,
+  each with a stable `key`, an ordered `position`, a canonical `mapped_status`
+  (one of the WorkItem status values) and an optional positive `wip_limit`.
+  `key` is unique per board and constrained to a lowercase slug pattern.
+  `board_cards.column_id` intentionally has **no** foreign key to `board_columns`:
+  a card's column is a logical label that the application validates, so boards
+  materialized before Issue #8 (for example a card in `ready` with no column row)
+  remain valid.
+- **Card movement history.** Every accepted move appends an immutable
+  `card_movements` row with the source/target column, rank and status. `BEFORE
+  UPDATE`/`BEFORE DELETE`/`BEFORE TRUNCATE` triggers
+  (`eventflow_card_movements_block_mutation`) raise, so the history is
+  append-only.
 - **Remote reference integrity.** A `BEFORE INSERT/UPDATE` trigger requires a
   `remote_integration_references` row whose `entity_type` names a Work
   Management entity to reference an entity that exists in the same workspace.
@@ -138,7 +153,10 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 | Approval uniqueness | `uq_approvals_proposal_version` | `ApprovalRepository.decide` conflict handling | `test_new_key_for_decided_version_is_rejected` |
 | Remote reference uniqueness and integrity | `uq_remote_integration_references_resource`, `trg_remote_references_entity_guard` | `RemoteReferenceRepository.link` | `test_duplicate_remote_resource_is_rejected`, `test_reference_to_unknown_entity_is_rejected` |
 | Proposal independence and revision uniqueness | `uq_proposal_revisions_proposal_version`, `trg_proposal_revisions_no_update/_no_delete/_no_truncate` | `ProposalRepository.add`/`update_content`/`append_revision` | `test_independent_proposals_share_consultation`, `test_duplicate_proposal_revision_is_rejected`, `test_concurrent_proposals_create_independent_rows` |
-| Migration reproducibility | Alembic `0001_initial`…`0007_proposal_task_proposals` | `support.run_migrations` | `test_migrations_integration.py` |
+| Board column integrity | `uq_board_columns_board_key`, `uq_board_columns_workspace_id`, `ck_board_columns_*` | `BoardColumnRepository.add`/`update`/`delete` | `test_column_create_update_reorder_and_delete`, `test_last_column_cannot_be_deleted` |
+| Card movement history | `trg_card_movements_no_update/_no_delete/_no_truncate` | `CardMovementRepository.append` (insert only) | `test_card_move_updates_work_item_and_records_history`, `test_migrations_integration.py` |
+| Deterministic ordering and transitions | integer `rank`/`position` columns, `uq_board_cards_board_column_rank` | `BoardCardService.move`, `BoardColumnService.create`/`update`/`delete` | `test_board_ranking_unit.py`, `test_card_move_rejects_invalid_transition_and_unknown_column`, `test_card_move_enforces_wip_limit` |
+| Migration reproducibility | Alembic `0001_initial`…`0008_kanban_boards_columns` | `support.run_migrations` | `test_migrations_integration.py` |
 
 ## Residual Risks and Deferred Controls
 
