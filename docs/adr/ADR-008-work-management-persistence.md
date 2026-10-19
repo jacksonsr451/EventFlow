@@ -313,6 +313,52 @@ router is registered after them. Verified by
 `services/work-management/tests/test_collaboration_integration.py`,
 `test_models_unit.py`, and `test_migrations_integration.py`.
 
+### Amendment A-05 — Project repository configuration (Issue #44)
+
+**Status:** Accepted.
+
+**Context.** [Issue #44](https://github.com/jacksonsr451/EventFlow/issues/44)
+requires projects to reference GitHub or GitLab repositories without coupling
+Work Management to provider APIs. The existing
+`remote_integration_references` table maps an already-resolved remote resource
+(provider, installation id, resource type, resource id); it is not a
+project-level configuration record and must not be reused or overloaded. URL-only
+uniqueness is unsafe because a repository can move and SSH/HTTPS forms differ.
+Credentials must never be persisted.
+
+**Decision.**
+
+- A new `project_repositories` table owns project-level configuration. Its
+  unique key is
+  `(workspace_id, project_id, provider, provider_instance_id,
+  remote_repository_id)`. `provider_instance_id` is the provider host and is
+  deliberately distinct from an installation id.
+- `repository_url` is normalized to a credential-free `https://host/full/path`
+  form (`.git` removed) and is mutable metadata, not identity. HTTP, userinfo,
+  ports, query strings, fragments, and host/instance mismatches are rejected
+  before persistence. `repository_full_path` is stored for display and must
+  agree with the URL.
+- Status is `active`, `inactive`, or `archived`. `PATCH` may move only between
+  active and inactive; `archived` is terminal and is reached through `DELETE`.
+  `deactivated_at` is non-null exactly while inactive and `archived_at` exactly
+  while archived. Archived identities block re-linking with
+  `409 REPOSITORY_ARCHIVED`; only application-level deduplication is forbidden.
+- `version` supports strong `If-Match` validators, and the existing
+  `idempotency_records` primitive stores retry results for POST/PATCH/DELETE.
+  Audit actions are `project_repository.linked|updated|deactivated|reactivated|unlinked`.
+- **No provider integration is added.** There is no sync, clone, issue linking,
+  branch inspection, remote mutation, or credential storage. New links are
+  `verification_status = configured`; `verified` is reserved for a future
+  adapter. No WorkItem, BoardCard, Proposal, or Approval is created or changed.
+
+**Consequences.** Five HTTP operations (`createProjectRepository`,
+`listProjectRepositories`, `getProjectRepository`, `updateProjectRepository`,
+`unlinkProjectRepository`) are added. The existing remote-reference mapping is
+unchanged and remains a separate concern. Verified by
+`services/work-management/tests/test_project_repository_unit.py`,
+`test_project_repository_integration.py`, `test_models_unit.py`,
+`test_rbac_policy_unit.py`, and `test_migrations_integration.py`.
+
 ## Consequences
 
 ### Positive
@@ -323,9 +369,9 @@ router is registered after them. Verified by
 - Composite foreign keys make cross-tenant references unrepresentable.
 - Alembic migrations give reviewable, reversible schema history and avoid
   `create_all()` drift.
-- The idempotency table supports ADR-007 section 3.6. The implemented
-  `ApprovalRepository.decide` path uses it; other A-02 endpoint integrations
-  remain future runtime work.
+- The idempotency table supports ADR-007 section 3.6. The approval decision,
+  Kanban board operations, and project repository operations use it; other A-02
+  endpoint integrations remain future runtime work.
 
 ### Negative
 

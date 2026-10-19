@@ -115,6 +115,11 @@ def test_policy_matches_declared_openapi_roles():
         "listEntityHistory": Action.HISTORY_READ,
         "decideProposal": Action.APPROVAL_DECIDE,
         "moveBoardCard": Action.BOARD_MANAGE,
+        "createProjectRepository": Action.PROJECT_REPOSITORY_CREATE,
+        "listProjectRepositories": Action.PROJECT_REPOSITORY_READ,
+        "getProjectRepository": Action.PROJECT_REPOSITORY_READ,
+        "updateProjectRepository": Action.PROJECT_REPOSITORY_UPDATE,
+        "unlinkProjectRepository": Action.PROJECT_REPOSITORY_UNLINK,
     }
     operations = {}
     for item in openapi["paths"].values():

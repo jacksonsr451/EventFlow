@@ -458,6 +458,34 @@ both `404`.
 - **No downstream creation.** Commenting on or attaching a file to an entity
   never creates a Proposal, Approval, WorkItem, or BoardCard.
 
+### 3.8 Project Repository Configuration (Issue #44)
+
+A project may reference zero or more remote GitHub/GitLab repositories through
+`/v1/workspaces/{workspace_id}/projects/{project_id}/repositories`. This is
+configuration metadata only: it does not clone a repository, inspect branches,
+link issues, synchronize state, or mutate the provider, and it never creates a
+Proposal, Approval, WorkItem, or BoardCard.
+
+- **Stable identity.** A link is identified by provider, provider host
+  (`provider_instance_id`, not an installation id), and provider-assigned
+  repository id within one project. The same remote can be configured on
+  multiple projects; the same repository id on a different host is a different
+  remote. URL variants (HTTPS, SSH, scp-style, `.git`) cannot create duplicates.
+- **Lifecycle.** `active → inactive` deactivates the link; `PATCH status:
+  active` reactivates it. `DELETE` archives it, which is terminal and preserves
+  history; the remote repository is untouched. A subsequent link attempt for the
+  same identity is rejected until a future explicit re-link decision exists.
+  `PATCH status: archived` is not a supported transition.
+- **Authorization.** Reading requires workspace membership; creating, updating,
+  deactivating/reactivating, and archiving require `owner` or `admin`.
+- **Concurrency.** `PATCH` and `DELETE` accept `If-Match` and return `412` on a
+  stale validator. POST/PATCH/DELETE accept `Idempotency-Key`; equivalent
+  retries replay the stored result. Archive is idempotent (`204` when already
+  archived).
+
+Deliberately absent: provider credential storage, installation ids, webhooks,
+sync cursors, verification calls, cloning, and remote issue creation or updates.
+
 ---
 
 ## 4. Comprehensive Transition Matrix

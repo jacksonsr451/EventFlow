@@ -453,6 +453,54 @@ for that collection.
   `Idempotency-Key`; an equivalent replay returns the original resource and a
   different fingerprint returns `409 IDEMPOTENCY_CONFLICT`.
 
+### 8.6 Project repository configuration (Issue #44)
+
+Projects can be associated with external GitHub or GitLab repositories under
+`/v1/workspaces/{workspace_id}/projects/{project_id}/repositories`. Issue #44
+**configures** the association only: it does not call a provider, clone a
+repository, inspect branches, link issues, or mutate remote state, and it stores
+no provider credentials, installation ids, tokens, or sync cursors.
+
+| Operation | Method and path | Required role (`x-required-roles`) |
+|---|---|---|
+| Link repository | `POST .../repositories` | `owner`, `admin` |
+| List repositories | `GET .../repositories` | any member (incl. `viewer`) |
+| Read repository | `GET .../repositories/{repository_id}` | any member (incl. `viewer`) |
+| Update or deactivate/reactivate | `PATCH .../repositories/{repository_id}` | `owner`, `admin` |
+| Archive repository | `DELETE .../repositories/{repository_id}` | `owner`, `admin` |
+
+- **Identity and deduplication.** The unique key is
+  `(workspace_id, project_id, provider, provider_instance_id,
+  remote_repository_id)`; `provider_instance_id` is the provider host (for
+  example `github.com` or a self-hosted GitLab host) and is **not** an
+  installation id. The same repository can be linked to different projects, and
+  the same provider repository id on different instances is a different remote.
+  A duplicate active/inactive link returns `409 REPOSITORY_ALREADY_LINKED`; a
+  previously archived link returns `409 REPOSITORY_ARCHIVED`.
+- **Canonicalization.** HTTPS, `ssh://git@host/path`, and `git@host:path` forms
+  of the same repository normalize to one credential-free
+  `https://host/full/path` URL (`.git` removed). HTTP, userinfo/passwords,
+  ports, query strings, fragments, and whitespace are rejected with `400`. A
+  supplied `repository_full_path` must match the URL, and
+  `provider_instance_id` must equal the URL host. The URL is mutable metadata and
+  is never used for deduplication.
+- **Lifecycle.** `active ↔ inactive` is changed through `PATCH status`;
+  deactivation records `deactivated_at` and reactivation clears it. `archived`
+  is terminal and is reached only through `DELETE`, which preserves history and
+  never contacts the provider. `PATCH status: archived` is rejected (`400`), and
+  an archived link cannot be updated. Repeating `DELETE` returns `204`.
+- **Verification.** `verification_status` is `configured` for every link created
+  here; `verified` is reserved for a future provider adapter and is not produced
+  by this API.
+- **Concurrency and idempotency.** `POST`, `PATCH`, and `DELETE` accept an
+  optional `Idempotency-Key`; equivalent retries replay the stored result, while
+  a different fingerprint returns `409 IDEMPOTENCY_CONFLICT`. `PATCH` and
+  `DELETE` accept `If-Match` and return `412 PRECONDITION_FAILED` for a stale
+  strong validator; successful reads and mutations return an `ETag`.
+- **Audit.** Link, update, deactivate, reactivate, and archive append
+  `project_repository.linked|updated|deactivated|reactivated|unlinked` to the
+  workspace audit trail with `entity_type = "project_repository"`.
+
 ## 9. Internal events
 
 Versioned internal events (for example `work_item.created`,
@@ -475,6 +523,7 @@ not invent one.
 | Authorization | `bearerAuth`, `x-required-roles` | `test_every_operation_requires_bearer_auth`, `test_every_operation_declares_authorization_roles` |
 | Consultation task proposals (Issue #6) | section 8.4, `Proposal*` DTOs | `services/work-management/tests/test_proposal_api_integration.py`, `services/work-management/tests/test_proposal_unit.py` |
 | Entity comments, attachments, history (Issue #29) | section 8.5, `EntityComment*`/`EntityAttachment*`/`EntityHistoryPage` DTOs | `services/work-management/tests/test_collaboration_integration.py` |
+| Project repository configuration (Issue #44) | section 8.6, `ProjectRepository*` DTOs | `services/work-management/tests/test_project_repository_unit.py`, `test_project_repository_integration.py` |
 | Per-flow examples | `contracts/examples/work-management/` | `test_per_flow_examples_validate` |
 
 ## 11. Related documents
