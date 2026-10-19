@@ -535,6 +535,20 @@ def test_entity_attachment_scan_lifecycle_on_proposal():
             proposal_id = _seed_proposal(engine, workspace_id, project_id)
             url = _attachments_url(workspace_id, "proposals", proposal_id)
 
+            commented = _post_comment(
+                client,
+                "owner",
+                workspace_id,
+                "proposals",
+                proposal_id,
+                "Check the rollout plan.",
+            )
+            assert commented.status_code == 201, commented.text
+            assert commented.json()["entity_type"] == "proposal"
+            assert "comment.created" in _actions(
+                client, "owner", _history_url(workspace_id, "proposals", proposal_id)
+            )
+
             assert (
                 _upload(
                     client, "watch", workspace_id, "proposals", proposal_id
