@@ -9,12 +9,25 @@ They skip themselves when no test database is configured.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+from uuid import UUID, uuid4
+
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError, IntegrityError
+
 from eventflow_work_management.api.app import create_app
 from eventflow_work_management.db.engine import session_factory
 from eventflow_work_management.security.config import AuthSettings
 from eventflow_work_management.security.crypto import TokenCipher
-from support import require_database_url, temporary_database
+from support import (
+    create_project,
+    create_workspace,
+    require_database_url,
+    session_scope,
+    temporary_database,
+)
 
 ISSUER = "https://id.example.test/realms/eventflow"
 
@@ -145,18 +158,21 @@ def _custom_field_config() -> dict:
     }
 
 
-def _template_definition() -> dict:
+def _template_definition(max_length: int = 500, extra_field: dict | None = None) -> dict:
+    fields = [
+        {
+            "key": "repro_url",
+            "label": "Reproduction URL",
+            "type": "string",
+            "required": True,
+            "categories": ["bug"],
+            "max_length": max_length,
+        }
+    ]
+    if extra_field is not None:
+        fields.append(extra_field)
     return {
-        "fields": [
-            {
-                "key": "repro_url",
-                "label": "Reproduction URL",
-                "type": "string",
-                "required": True,
-                "categories": ["bug"],
-                "max_length": 500,
-            }
-        ],
+        "fields": fields,
         "required_fields": ["repro_url"],
         "workflow": {"require_template_for_new_triage": True},
     }
@@ -223,6 +239,19 @@ def _create_publish_activate(client, workspace_id, project_id, template_id):
     )
     assert activated.status_code == 200, activated.text
     return version_id
+
+
+def _post_concurrently(engine, requests: list[tuple[str, dict]]):
+    barrier = Barrier(len(requests))
+
+    def call(url, headers):
+        with _client(engine) as client:
+            barrier.wait(timeout=30)
+            return client.post(url, headers=headers)
+
+    with ThreadPoolExecutor(max_workers=len(requests)) as pool:
+        futures = [pool.submit(call, url, headers) for url, headers in requests]
+        return [future.result(timeout=60) for future in futures]
 
 
 def test_configuration_defaults_rbac_and_optimistic_concurrency():
@@ -317,6 +346,13 @@ def test_template_lifecycle_publish_activate_archive_and_deprecate():
             workspace_id = _make_workspace(client, "owner", "Lifecycle Co")
             project_id = _make_project(client, "owner", workspace_id)
             _invite_and_accept(client, "owner", workspace_id, "view", "viewer")
+            _invite_and_accept(client, "owner", workspace_id, "tina", "triager")
+
+            for subject in ("view", "tina"):
+                denied = _create_template(
+                    client, workspace_id, project_id, subject=subject
+                )
+                assert denied.status_code == 403, denied.text
 
             created = _create_template(client, workspace_id, project_id)
             assert created.status_code == 201, created.text
@@ -409,6 +445,14 @@ def test_template_lifecycle_publish_activate_archive_and_deprecate():
             assert after_archive.status_code == 200, after_archive.text
             assert after_archive.json()["activation"] is None
 
+            blocked_version = client.post(
+                f"{_template_url(workspace_id, project_id, template_id)}/versions",
+                json={"definition": _template_definition()},
+                headers=_bearer("owner"),
+            )
+            assert blocked_version.status_code == 409, blocked_version.text
+            assert blocked_version.json()["code"] == "TEMPLATE_VERSION_IMMUTABLE"
+
             archived_activate = client.post(
                 f"{_template_url(workspace_id, project_id, template_id)}/versions/"
                 f"{version_two}/publish",
@@ -440,6 +484,45 @@ def test_template_lifecycle_publish_activate_archive_and_deprecate():
             )
             assert deprecated.status_code == 200, deprecated.text
             assert deprecated.json()["status"] == "deprecated"
+
+            idempotent_body = {
+                "category": "bug",
+                "key": "bug-idempotent",
+                "name": "Idempotent bug template",
+                "definition": _template_definition(),
+            }
+            idempotent_headers = {
+                **_bearer("owner"),
+                "Idempotency-Key": "template-create-01",
+            }
+            idempotent = client.post(
+                _templates_url(workspace_id, project_id),
+                json=idempotent_body,
+                headers=idempotent_headers,
+            )
+            assert idempotent.status_code == 201, idempotent.text
+            replay = client.post(
+                _templates_url(workspace_id, project_id),
+                json=idempotent_body,
+                headers=idempotent_headers,
+            )
+            assert replay.status_code == 201, replay.text
+            assert replay.json()["template_id"] == idempotent.json()["template_id"]
+            replayed_detail = client.get(
+                _template_url(
+                    workspace_id, project_id, idempotent.json()["template_id"]
+                ),
+                headers=_bearer("owner"),
+            )
+            assert replayed_detail.status_code == 200, replayed_detail.text
+            assert len(replayed_detail.json()["versions"]) == 1
+            conflicted = client.post(
+                _templates_url(workspace_id, project_id),
+                json={**idempotent_body, "name": "Conflicting name"},
+                headers=idempotent_headers,
+            )
+            assert conflicted.status_code == 409, conflicted.text
+            assert conflicted.json()["code"] == "IDEMPOTENCY_CONFLICT"
 
 
 def test_custom_fields_validate_and_pin_the_effective_template():
@@ -659,6 +742,26 @@ def test_templates_and_configuration_are_tenant_isolated():
             assert template.status_code == 201, template.text
             template_id = template.json()["template_id"]
 
+            sibling_project = _make_project(
+                client, "owner", workspace_id, key="SEC"
+            )
+            sibling_listing = client.get(
+                _templates_url(workspace_id, sibling_project),
+                headers=_bearer("owner"),
+            )
+            assert sibling_listing.status_code == 200, sibling_listing.text
+            assert sibling_listing.json()["items"] == []
+            sibling_defaults = client.get(
+                _config_url(workspace_id, sibling_project), headers=_bearer("owner")
+            )
+            assert sibling_defaults.status_code == 200, sibling_defaults.text
+            assert sibling_defaults.json()["version"] == 0
+            hidden_sibling = client.get(
+                _template_url(workspace_id, sibling_project, template_id),
+                headers=_bearer("owner"),
+            )
+            assert hidden_sibling.status_code == 404, hidden_sibling.text
+
             other_workspace = _make_workspace(client, "other", "Beta Co")
             other_project = _make_project(client, "other", other_workspace, key="BET")
 
@@ -696,3 +799,452 @@ def test_templates_and_configuration_are_tenant_isolated():
                 headers=_bearer("view"),
             )
             assert readable.status_code == 200, readable.text
+
+
+def test_postgres_enforces_template_version_and_activation_constraints():
+    with temporary_database(require_database_url()) as (_, engine):
+        with session_scope(engine) as session:
+            workspace = create_workspace(session)
+            project = create_project(session, workspace)
+            other_project = create_project(session, workspace, key="SEC")
+        workspace_id = workspace.id
+        project_id = project.id
+        other_project_id = other_project.id
+        actor = uuid4()
+        template_id = uuid4()
+        other_template_id = uuid4()
+        version_one = uuid4()
+        version_two = uuid4()
+        other_version = uuid4()
+
+        def insert_template(connection, identity, scope_id, key):
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO project_triage_templates
+                        (id, workspace_id, project_id, category, key, name,
+                         description, status, created_by)
+                    VALUES
+                        (:id, :workspace_id, :project_id, 'bug', :key, 'Template',
+                         NULL, 'active', :actor)
+                    """
+                ),
+                {
+                    "id": identity,
+                    "workspace_id": workspace_id,
+                    "project_id": scope_id,
+                    "key": key,
+                    "actor": actor,
+                },
+            )
+
+        def insert_version(
+            connection,
+            identity,
+            scope_id,
+            owner_template,
+            number,
+            *,
+            status="draft",
+            published=False,
+        ):
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO project_triage_template_versions
+                        (id, workspace_id, project_id, template_id, version,
+                         schema_version, status, definition, created_by,
+                         published_at, published_by)
+                    VALUES
+                        (:id, :workspace_id, :project_id, :template_id, :version,
+                         1, :status, '{"fields": []}'::jsonb, :actor,
+                         CASE WHEN :published THEN now() ELSE NULL END,
+                         CASE WHEN :published THEN :actor ELSE NULL END)
+                    """
+                ),
+                {
+                    "id": identity,
+                    "workspace_id": workspace_id,
+                    "project_id": scope_id,
+                    "template_id": owner_template,
+                    "version": number,
+                    "status": status,
+                    "published": published,
+                    "actor": actor,
+                },
+            )
+
+        def insert_activation(connection, category, owner_template, version_id):
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO project_triage_template_activations
+                        (id, workspace_id, project_id, category, template_id,
+                         template_version_id, activated_by, activated_at)
+                    VALUES
+                        (:id, :workspace_id, :project_id, :category, :template_id,
+                         :template_version_id, :actor, now())
+                    """
+                ),
+                {
+                    "id": uuid4(),
+                    "workspace_id": workspace_id,
+                    "project_id": project_id,
+                    "category": category,
+                    "template_id": owner_template,
+                    "template_version_id": version_id,
+                    "actor": actor,
+                },
+            )
+
+        with engine.begin() as connection:
+            insert_template(connection, template_id, project_id, "bug-default")
+            insert_template(connection, other_template_id, other_project_id, "bug-other")
+            insert_version(
+                connection,
+                version_one,
+                project_id,
+                template_id,
+                1,
+                status="published",
+                published=True,
+            )
+            insert_version(connection, version_two, project_id, template_id, 2)
+            insert_version(
+                connection,
+                other_version,
+                other_project_id,
+                other_template_id,
+                1,
+                status="published",
+                published=True,
+            )
+
+        def expect(exc_type, statement, parameters):
+            try:
+                with engine.begin() as connection:
+                    connection.execute(text(statement), parameters)
+            except exc_type:
+                return
+            raise AssertionError(f"expected {exc_type.__name__} for {statement}")
+
+        expect(
+            IntegrityError,
+            """
+            INSERT INTO project_triage_templates
+                (id, workspace_id, project_id, category, key, name, status, created_by)
+            VALUES
+                (:id, :workspace_id, :project_id, 'bug', 'bug-default', 'Duplicate',
+                 'active', :actor)
+            """,
+            {
+                "id": uuid4(),
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "actor": actor,
+            },
+        )
+        expect(
+            IntegrityError,
+            """
+            INSERT INTO project_triage_template_versions
+                (id, workspace_id, project_id, template_id, version, schema_version,
+                 status, definition, created_by)
+            VALUES
+                (:id, :workspace_id, :project_id, :template_id, 1, 1, 'draft',
+                 '{}'::jsonb, :actor)
+            """,
+            {
+                "id": uuid4(),
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "template_id": template_id,
+                "actor": actor,
+            },
+        )
+        expect(
+            IntegrityError,
+            """
+            INSERT INTO project_triage_template_versions
+                (id, workspace_id, project_id, template_id, version, schema_version,
+                 status, definition, created_by)
+            VALUES
+                (:id, :workspace_id, :project_id, :template_id, 3, 1, 'bogus',
+                 '{}'::jsonb, :actor)
+            """,
+            {
+                "id": uuid4(),
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "template_id": template_id,
+                "actor": actor,
+            },
+        )
+        expect(
+            IntegrityError,
+            """
+            INSERT INTO project_triage_template_versions
+                (id, workspace_id, project_id, template_id, version, schema_version,
+                 status, definition, created_by, published_at, published_by)
+            VALUES
+                (:id, :workspace_id, :project_id, :template_id, 4, 1, 'published',
+                 '{}'::jsonb, :actor, NULL, :actor)
+            """,
+            {
+                "id": uuid4(),
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "template_id": template_id,
+                "actor": actor,
+            },
+        )
+
+        with engine.begin() as connection:
+            insert_activation(connection, "bug", template_id, version_one)
+
+        expect(
+            IntegrityError,
+            """
+            INSERT INTO project_triage_template_activations
+                (id, workspace_id, project_id, category, template_id,
+                 template_version_id, activated_by, activated_at)
+            VALUES
+                (:id, :workspace_id, :project_id, 'bug', :template_id,
+                 :template_version_id, :actor, now())
+            """,
+            {
+                "id": uuid4(),
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "template_id": template_id,
+                "template_version_id": version_two,
+                "actor": actor,
+            },
+        )
+        expect(
+            IntegrityError,
+            """
+            INSERT INTO project_triage_template_activations
+                (id, workspace_id, project_id, category, template_id,
+                 template_version_id, activated_by, activated_at)
+            VALUES
+                (:id, :workspace_id, :project_id, 'feature', :template_id,
+                 :template_version_id, :actor, now())
+            """,
+            {
+                "id": uuid4(),
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "template_id": other_template_id,
+                "template_version_id": other_version,
+                "actor": actor,
+            },
+        )
+
+        for statement in (
+            "UPDATE project_triage_template_versions "
+            "SET definition = '{\"tampered\": true}'::jsonb WHERE id = :id",
+            "DELETE FROM project_triage_template_versions WHERE id = :id",
+        ):
+            try:
+                with engine.begin() as connection:
+                    connection.execute(text(statement), {"id": version_one})
+            except DBAPIError as exc:
+                assert "55000" in str(exc) or "immutable" in str(exc).lower() or (
+                    "cannot be deleted" in str(exc).lower()
+                )
+            else:
+                raise AssertionError(
+                    "published template versions must reject direct mutation"
+                )
+
+
+def test_concurrent_publication_and_activation_are_serialized():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            workspace_id = _make_workspace(client, "owner", "Concurrency Co")
+            project_id = _make_project(client, "owner", workspace_id)
+            created = _create_template(client, workspace_id, project_id)
+            assert created.status_code == 201, created.text
+            template_id = created.json()["template_id"]
+            detail = client.get(
+                _template_url(workspace_id, project_id, template_id),
+                headers=_bearer("owner"),
+            )
+            version_one = detail.json()["versions"][0]["template_version_id"]
+            publish_url = (
+                f"{_template_url(workspace_id, project_id, template_id)}/versions/"
+                f"{version_one}/publish"
+            )
+
+            published = _post_concurrently(
+                engine,
+                [(publish_url, _bearer("owner")), (publish_url, _bearer("owner"))],
+            )
+            assert [response.status_code for response in published] == [200, 200], [
+                response.text for response in published
+            ]
+            detail = client.get(
+                _template_url(workspace_id, project_id, template_id),
+                headers=_bearer("owner"),
+            )
+            assert len(detail.json()["versions"]) == 1
+            assert detail.json()["versions"][0]["status"] == "published"
+
+            second = client.post(
+                f"{_template_url(workspace_id, project_id, template_id)}/versions",
+                json={"definition": _template_definition(max_length=1000)},
+                headers=_bearer("owner"),
+            )
+            assert second.status_code == 201, second.text
+            version_two = second.json()["template_version_id"]
+            assert (
+                client.post(
+                    f"{_template_url(workspace_id, project_id, template_id)}/versions/"
+                    f"{version_two}/publish",
+                    headers=_bearer("owner"),
+                ).status_code
+                == 200
+            )
+
+            activate_one = (
+                f"{_template_url(workspace_id, project_id, template_id)}/versions/"
+                f"{version_one}/activate"
+            )
+            activate_two = (
+                f"{_template_url(workspace_id, project_id, template_id)}/versions/"
+                f"{version_two}/activate"
+            )
+            activated = _post_concurrently(
+                engine,
+                [(activate_one, _bearer("owner")), (activate_two, _bearer("owner"))],
+            )
+            assert [response.status_code for response in activated] == [200, 200], [
+                response.text for response in activated
+            ]
+
+            final = client.get(
+                _template_url(workspace_id, project_id, template_id),
+                headers=_bearer("owner"),
+            )
+            assert final.status_code == 200, final.text
+            activation = final.json()["activation"]
+            assert activation is not None
+            assert activation["template_version_id"] in {version_one, version_two}
+            with engine.connect() as connection:
+                count = connection.execute(
+                    text(
+                        "SELECT count(*) FROM project_triage_template_activations "
+                        "WHERE workspace_id = :workspace_id AND project_id = :project_id"
+                    ),
+                    {
+                        "workspace_id": UUID(workspace_id),
+                        "project_id": UUID(project_id),
+                    },
+                ).scalar_one()
+            assert count == 1
+
+
+def test_activation_does_not_rewrite_historical_snapshot():
+    with temporary_database(require_database_url()) as (_, engine):
+        with _client(engine) as client:
+            workspace_id = _make_workspace(client, "owner", "History Co")
+            project_id = _make_project(client, "owner", workspace_id)
+            _invite_and_accept(client, "owner", workspace_id, "tina", "triager")
+            template = _create_template(client, workspace_id, project_id)
+            template_id = template.json()["template_id"]
+            version_one = _create_publish_activate(
+                client, workspace_id, project_id, template_id
+            )
+
+            first = _submit(client, "owner", workspace_id, project_id)
+            triaged = client.post(
+                f"/v1/workspaces/{workspace_id}/consultations/{first}/triage",
+                json=_triage_body(
+                    custom_fields={
+                        "repro_url": "https://reports.example.test/issue/41"
+                    }
+                ),
+                headers=_bearer("tina"),
+            )
+            assert triaged.status_code == 200, triaged.text
+            assert triaged.json()["triage_template_version"] == 1
+
+            second_version = client.post(
+                f"{_template_url(workspace_id, project_id, template_id)}/versions",
+                json={
+                    "definition": _template_definition(
+                        max_length=1000,
+                        extra_field={
+                            "key": "component",
+                            "label": "Component",
+                            "type": "string",
+                            "required": False,
+                            "categories": ["bug"],
+                        },
+                    )
+                },
+                headers=_bearer("owner"),
+            )
+            assert second_version.status_code == 201, second_version.text
+            version_two = second_version.json()["template_version_id"]
+            assert (
+                client.post(
+                    f"{_template_url(workspace_id, project_id, template_id)}/versions/"
+                    f"{version_two}/publish",
+                    headers=_bearer("owner"),
+                ).status_code
+                == 200
+            )
+            assert (
+                client.post(
+                    f"{_template_url(workspace_id, project_id, template_id)}/versions/"
+                    f"{version_two}/activate",
+                    headers=_bearer("owner"),
+                ).status_code
+                == 200
+            )
+
+            historical = client.get(
+                f"/v1/workspaces/{workspace_id}/consultations/{first}",
+                headers=_bearer("owner"),
+            )
+            assert historical.status_code == 200, historical.text
+            snapshot = historical.json()["triage_template_snapshot"]
+            assert historical.json()["triage_template_version"] == 1
+            assert snapshot["template"]["template_version_id"] == version_one
+            historical_fields = {
+                field["key"]: field for field in snapshot["fields"]
+            }
+            assert historical_fields["repro_url"]["max_length"] == 500
+            assert "component" not in historical_fields
+
+            latest = client.get(
+                _template_url(workspace_id, project_id, template_id),
+                headers=_bearer("owner"),
+            )
+            original = {
+                version["template_version_id"]: version
+                for version in latest.json()["versions"]
+            }[version_one]
+            assert original["status"] == "published"
+            assert original["definition"]["fields"][0]["max_length"] == 500
+
+            third = _submit(client, "owner", workspace_id, project_id)
+            triaged_latest = client.post(
+                f"/v1/workspaces/{workspace_id}/consultations/{third}/triage",
+                json=_triage_body(
+                    custom_fields={
+                        "repro_url": "https://reports.example.test/issue/42"
+                    }
+                ),
+                headers=_bearer("tina"),
+            )
+            assert triaged_latest.status_code == 200, triaged_latest.text
+            assert triaged_latest.json()["triage_template_version"] == 2
+            latest_snapshot = triaged_latest.json()["triage_template_snapshot"]
+            latest_fields = {
+                field["key"]: field for field in latest_snapshot["fields"]
+            }
+            assert latest_fields["repro_url"]["max_length"] == 1000
+            assert "component" in latest_fields

@@ -41,6 +41,10 @@ and does not depend on Order Processing code or tables.
 | `idempotency_records` | Stored responses per client key | unique `(workspace_id, operation, idempotency_key)` |
 | `remote_integration_references` | GitHub/GitLab identity mapping | unique external resource key; same-workspace entity guard |
 | `project_repositories` | Project→remote repository configuration | unique `(workspace_id, project_id, provider, provider_instance_id, remote_repository_id)`; canonical HTTPS URL; status/verification checks; composite project FK |
+| `project_triage_configurations` | One project-scoped triage policy | unique `(workspace_id, project_id)`; version, JSON shape and custom-field checks; composite project FK |
+| `project_triage_templates` | Triage template metadata by category | unique `(workspace_id, project_id, category)` and `(workspace_id, project_id, key)`; category/status/key/name checks; composite project FK |
+| `project_triage_template_versions` | Bounded, versioned template definitions | unique `(workspace_id, project_id, template_id, version)`; published timestamp/actor consistency; block `UPDATE`/`DELETE`/`TRUNCATE` after draft; composite template FK |
+| `project_triage_template_activations` | Active template version per project category | unique `(workspace_id, project_id, category)`; composite project, template and version FKs keep the activation in one project |
 | `sla_policies` | Immutable versioned SLA policies | unique `(workspace_id, project_id, name, version)`; partial unique active indexes per scope/name; at least one target; calendar/JSON checks; status timestamp consistency |
 | `sla_instances` | One durable SLA clock per WorkItem | unique `(workspace_id, work_item_id)`; versioned policy snapshot; composite FKs to project, WorkItem and policy; status/pause/cancel/breach checks |
 | `sla_pause_intervals` | Pause history for an SLA clock | composite FK to instance; closed-interval consistency (`ended_at` iff `seconds`); non-negative seconds |
@@ -138,6 +142,15 @@ Application code validates first; the database is the last line of defense.
   the same remote can be linked to multiple projects. `archived` is terminal,
   `deactivated_at` is non-null exactly while `inactive`, and `archived_at` is
   non-null exactly while `archived`.
+- **Project triage configuration and templates.** A project has at most one
+  configuration, one template per category, and one activation per category.
+  Templates and versions are bound to the project through composite FKs, and an
+  activation's template and version must share the same project. Once a version
+  leaves `draft`, `BEFORE UPDATE`, `BEFORE DELETE` and `BEFORE TRUNCATE`
+  triggers (`eventflow_triage_template_versions_block_mutation`) reject direct
+  mutation, so published definitions and the snapshots pinned on consultations
+  remain immutable. Archiving a template removes its activation but retains the
+  template, its versions and historical consultation snapshots.
 - **SLA policy versioning.** `sla_policies` rows are immutable versions. The
   unique key `(workspace_id, project_id, name, version)` prevents duplicate
   versions, and partial unique indexes `uq_sla_policies_active_workspace` and
@@ -234,8 +247,9 @@ it, the repository behavior, and the PostgreSQL-backed test that proves it.
 | Entity history projection | append-only `audit_records` | `EntityHistoryService.list_page` (read only) | `test_comment_lifecycle_tombstone_and_history`, `test_entity_attachment_scan_lifecycle_on_proposal` |
 | Deterministic ordering and transitions | integer `rank`/`position` columns, `uq_board_cards_board_column_rank` | `BoardCardService.move`, `BoardColumnService.create`/`update`/`delete` | `test_board_ranking_unit.py`, `test_card_move_rejects_invalid_transition_and_unknown_column`, `test_card_move_enforces_wip_limit` |
 | Project repository identity and lifecycle | `uq_project_repositories_identity`, `fk_project_repositories_workspace_project`, `ck_project_repositories_*` | `ProjectRepositoryLinkRepository.find_identity`, `ProjectRepositoryService.create`/`update`/`unlink` | `test_remote_identity_dedup_is_url_and_instance_aware`, `test_lifecycle_idempotency_tenant_isolation_rbac_and_audit`, `test_concurrent_duplicate_create_converges_on_one_row` |
+| Project triage rules and versioned templates | `uq_project_triage_*`, `fk_project_triage_*`, `trg_triage_template_versions_no_update/_no_delete/_no_truncate` | `TriageConfigurationService` and triage snapshot pinning in `ConsultationService` | `test_project_triage_configuration_integration.py`, `test_postgres_enforces_template_version_and_activation_constraints` |
 | Priority, SLA, dependencies, notifications | `ck_*business_*`, `uq_sla_policies_*`, `uq_sla_instances_work_item`, `uq_work_item_dependencies_edge`, `uq_notifications_workspace_dedup` | `PriorityService`, `SlaPolicyService`/`SlaService`, `DependencyService`, `NotificationService` | `test_priority_sla_unit.py`, `test_priority_sla_notification_integration.py` |
-| Migration reproducibility | Alembic `0001_initial`…`0011_priority_sla_dependencies` | `support.run_migrations` | `test_migrations_integration.py` |
+| Migration reproducibility | Alembic `0001_initial`…`0012_project_triage_config` | `support.run_migrations` | `test_migrations_integration.py` |
 
 ## Residual Risks and Deferred Controls
 

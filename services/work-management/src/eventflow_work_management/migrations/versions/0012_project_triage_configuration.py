@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0012_project_triage_configuration"
+revision = "0012_project_triage_config"
 down_revision = "0011_priority_sla_dependencies"
 branch_labels = None
 depends_on = None
@@ -90,18 +90,18 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "workspace_id", "id", name="uq_project_triage_configurations_workspace_id"
         ),
-        sa.CheckConstraint("version >= 1", name="ck_project_triage_configurations_version_positive"),
+        sa.CheckConstraint("version >= 1", name="version_positive"),
         sa.CheckConstraint(
             "jsonb_typeof(required_fields) = 'object'",
-            name="ck_project_triage_configurations_required_fields_is_object",
+            name="required_fields_is_object",
         ),
         sa.CheckConstraint(
             "jsonb_typeof(custom_fields) = 'array'",
-            name="ck_project_triage_configurations_custom_fields_is_array",
+            name="custom_fields_is_array",
         ),
         sa.CheckConstraint(
             "jsonb_typeof(workflow_rules) = 'object'",
-            name="ck_project_triage_configurations_workflow_rules_is_object",
+            name="workflow_rules_is_object",
         ),
     )
     op.create_index(
@@ -164,21 +164,21 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "workspace_id", "id", name="uq_project_triage_templates_workspace_id"
         ),
-        sa.CheckConstraint(_CATEGORIES, name="ck_project_triage_templates_category_values"),
+        sa.CheckConstraint(_CATEGORIES, name="category_values"),
         sa.CheckConstraint(
-            _TEMPLATE_STATUS, name="ck_project_triage_templates_status_values"
+            _TEMPLATE_STATUS, name="status_values"
         ),
         sa.CheckConstraint(
             "key ~ '^[a-z][a-z0-9-]{1,63}$'",
-            name="ck_project_triage_templates_key_format",
+            name="key_format",
         ),
         sa.CheckConstraint(
             "char_length(name) BETWEEN 1 AND 120",
-            name="ck_project_triage_templates_name_length",
+            name="name_length",
         ),
         sa.CheckConstraint(
             "description IS NULL OR char_length(description) <= 2000",
-            name="ck_project_triage_templates_description_length",
+            name="description_length",
         ),
     )
     op.create_index(
@@ -253,22 +253,22 @@ def upgrade() -> None:
             name="uq_project_triage_template_versions_workspace_id",
         ),
         sa.CheckConstraint(
-            "version >= 1", name="ck_project_triage_template_versions_version_positive"
+            "version >= 1", name="version_positive"
         ),
         sa.CheckConstraint(
-            _VERSION_STATUS, name="ck_project_triage_template_versions_status_values"
+            _VERSION_STATUS, name="status_values"
         ),
         sa.CheckConstraint(
             "jsonb_typeof(definition) = 'object'",
-            name="ck_project_triage_template_versions_definition_is_object",
+            name="definition_is_object",
         ),
         sa.CheckConstraint(
             "status = 'draft' OR published_at IS NOT NULL",
-            name="ck_project_triage_template_versions_published_at_consistency",
+            name="published_at_consistency",
         ),
         sa.CheckConstraint(
             "(published_at IS NULL) = (published_by IS NULL)",
-            name="ck_project_triage_template_versions_published_actor_consistency",
+            name="published_actor_consistency",
         ),
     )
     op.create_index(
@@ -330,13 +330,63 @@ def upgrade() -> None:
             name="uq_project_triage_template_activations_workspace_id",
         ),
         sa.CheckConstraint(
-            _CATEGORIES, name="ck_project_triage_template_activations_category_values"
+            _CATEGORIES, name="category_values"
         ),
     )
     op.create_index(
         "ix_project_triage_template_activations_project",
         "project_triage_template_activations",
         ["project_id", "category"],
+    )
+
+    # Published template versions are part of the historical triage record. Once
+    # a draft transitions to published, neither its definition nor its identity
+    # may change, and it may not be deleted or truncated.
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION eventflow_triage_template_versions_block_mutation()
+        RETURNS trigger AS $$
+        BEGIN
+            IF TG_OP = 'UPDATE' THEN
+                IF OLD.status <> 'draft' THEN
+                    RAISE EXCEPTION 'published triage template versions are immutable'
+                        USING ERRCODE = '55000';
+                END IF;
+                RETURN NEW;
+            END IF;
+            IF TG_OP = 'DELETE' THEN
+                IF OLD.status <> 'draft' THEN
+                    RAISE EXCEPTION 'published triage template versions cannot be deleted'
+                        USING ERRCODE = '55000';
+                END IF;
+                RETURN OLD;
+            END IF;
+            RAISE EXCEPTION 'triage template versions cannot be truncated'
+                USING ERRCODE = '55000';
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_triage_template_versions_no_update
+        BEFORE UPDATE ON project_triage_template_versions
+        FOR EACH ROW EXECUTE FUNCTION eventflow_triage_template_versions_block_mutation();
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_triage_template_versions_no_delete
+        BEFORE DELETE ON project_triage_template_versions
+        FOR EACH ROW EXECUTE FUNCTION eventflow_triage_template_versions_block_mutation();
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_triage_template_versions_no_truncate
+        BEFORE TRUNCATE ON project_triage_template_versions
+        FOR EACH STATEMENT EXECUTE FUNCTION eventflow_triage_template_versions_block_mutation();
+        """
     )
 
     op.add_column(
@@ -360,46 +410,61 @@ def upgrade() -> None:
         sa.Column("triage_custom_fields", postgresql.JSONB(), nullable=True),
     )
     op.create_check_constraint(
-        "ck_consultations_triage_template_version_positive",
+        "triage_template_version_positive",
         "consultations",
         "triage_template_version IS NULL OR triage_template_version >= 1",
     )
     op.create_check_constraint(
-        "ck_consultations_triage_template_schema_version_positive",
+        "triage_template_schema_version_positive",
         "consultations",
         "triage_template_schema_version IS NULL OR triage_template_schema_version >= 1",
     )
     op.create_check_constraint(
-        "ck_consultations_triage_template_snapshot_is_object",
+        "triage_template_snapshot_is_object",
         "consultations",
         "triage_template_snapshot IS NULL OR "
         "jsonb_typeof(triage_template_snapshot) = 'object'",
     )
     op.create_check_constraint(
-        "ck_consultations_triage_custom_fields_is_object",
+        "triage_custom_fields_is_object",
         "consultations",
         "triage_custom_fields IS NULL OR jsonb_typeof(triage_custom_fields) = 'object'",
     )
 
 
 def downgrade() -> None:
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_triage_template_versions_no_truncate "
+        "ON project_triage_template_versions"
+    )
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_triage_template_versions_no_delete "
+        "ON project_triage_template_versions"
+    )
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_triage_template_versions_no_update "
+        "ON project_triage_template_versions"
+    )
+    op.execute(
+        "DROP FUNCTION IF EXISTS eventflow_triage_template_versions_block_mutation()"
+    )
     op.drop_constraint(
-        "ck_consultations_triage_custom_fields_is_object",
+        "triage_custom_fields_is_object",
         "consultations",
         type_="check",
     )
     op.drop_constraint(
-        "ck_consultations_triage_template_snapshot_is_object",
+        "triage_template_snapshot_is_object",
         "consultations",
         type_="check",
     )
     op.drop_constraint(
-        "ck_consultations_triage_template_schema_version_positive",
+        "triage_template_schema_version_positive",
         "consultations",
         type_="check",
     )
     op.drop_constraint(
-        "ck_consultations_triage_template_version_positive",
+        "triage_template_version_positive",
         "consultations",
         type_="check",
     )
