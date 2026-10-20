@@ -35,6 +35,568 @@ tags:
   - name: Members
   - name: Invitations
 paths:
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-configuration:
+    get:
+      operationId: getProjectTriageConfiguration
+      tags: [Triage]
+      summary: Read the project's additive triage configuration
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The project triage configuration, or its disabled defaults.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    put:
+      operationId: updateProjectTriageConfiguration
+      tags: [Triage]
+      summary: Replace the project's additive triage configuration
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdateTriageConfigurationRequest'
+      responses:
+        '200':
+          description: The configuration was replaced.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates:
+    get:
+      operationId: listProjectTriageTemplates
+      tags: [Triage]
+      summary: List project-scoped versioned triage templates
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      x-allowed-sort-fields: [created_at]
+      x-default-sort-fields: [created_at]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/TriageCategory'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, deprecated, archived]
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: A page of project triage templates.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplatePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    post:
+      operationId: createProjectTriageTemplate
+      tags: [Triage]
+      summary: Create a project triage template with its first draft version
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateProjectTriageTemplateRequest'
+      responses:
+        '201':
+          description: The template and its first draft version were created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created template.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}:
+    get:
+      operationId: getProjectTriageTemplate
+      tags: [Triage]
+      summary: Read one project triage template with its versions and activation
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin, triager, approver, contributor, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The template, its immutable version history, and activation.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplateDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions:
+    post:
+      operationId: createProjectTriageTemplateVersion
+      tags: [Triage]
+      summary: Create a new draft version of a project triage template
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateProjectTriageTemplateVersionRequest'
+      responses:
+        '201':
+          description: A new immutable draft version was created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              description: URI of the created template version.
+              schema:
+                type: string
+                format: uri-reference
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplateVersion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions/{version_id}/publish:
+    post:
+      operationId: publishProjectTriageTemplateVersion
+      tags: [Triage]
+      summary: Publish a draft template version; published versions are immutable
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The version was published.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplateVersion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions/{version_id}/activate:
+    post:
+      operationId: activateProjectTriageTemplateVersion
+      tags: [Triage]
+      summary: Activate a published template version for its category
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The version is now the effective template for its category.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/archive:
+    post:
+      operationId: archiveProjectTriageTemplate
+      tags: [Triage]
+      summary: Archive a project triage template and remove its activation
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The template was archived.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/deprecate:
+    post:
+      operationId: deprecateProjectTriageTemplate
+      tags: [Triage]
+      summary: Deprecate a project triage template without removing history
+      security:
+        - bearerAuth: []
+      x-required-roles: [owner, admin]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The template was deprecated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/ProjectTriageTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/projects/{project_id}/triage-validation/preview:
+    post:
+      operationId: previewProjectTriageValidation
+      tags: [Triage]
+      summary: Preview the effective template and custom-field validation
+      description: >-
+        Validates a prospective triage payload against the project's active
+        template and configuration without recording a triage decision or an
+        idempotency key.
+      security:
+        - bearerAuth: []
+      x-required-roles: [triager, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/TriageValidationPreviewRequest'
+      responses:
+        '200':
+          description: The deterministic validation result.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/TriageValidationPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
   /v1/workspaces/{workspace_id}/consultations:
     post:
       operationId: createConsultation

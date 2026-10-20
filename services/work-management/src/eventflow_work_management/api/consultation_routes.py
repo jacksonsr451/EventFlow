@@ -84,6 +84,7 @@ class _TriageRequest(BaseModel):
         default=None, pattern="^(immediate|elevated|normal|low)$"
     )
     priority_override_reason: str | None = Field(default=None, min_length=10, max_length=300)
+    custom_fields: dict | None = None
 
 
 class BugTriageRequest(_TriageRequest):
@@ -178,6 +179,13 @@ def _consultation_payload(consultation: Consultation) -> dict:
         "editor_context": consultation.editor_context,
         "external_references": consultation.external_references,
         "active_proposal_id": consultation.active_proposal_id,
+        "triage_custom_fields": consultation.triage_custom_fields,
+        "triage_template_id": consultation.triage_template_id,
+        "triage_template_version": consultation.triage_template_version,
+        "triage_template_schema_version": (
+            consultation.triage_template_schema_version
+        ),
+        "triage_template_snapshot": consultation.triage_template_snapshot,
         "created_at": consultation.created_at,
         "updated_at": consultation.updated_at,
     }
@@ -377,6 +385,7 @@ def triage_consultation(
         priority=payload.priority,
         triage_notes=payload.triage_notes,
         criteria=_criteria_for(payload),
+        custom_fields=payload.custom_fields,
         business_impact=payload.business_impact,
         business_urgency=payload.business_urgency,
         priority_override_reason=payload.priority_override_reason,
@@ -409,6 +418,7 @@ def reclassify_consultation(
         triage_notes=triage.triage_notes,
         criteria=_criteria_for(triage),
         justification=payload.justification,
+        custom_fields=triage.custom_fields,
         business_impact=triage.business_impact,
         business_urgency=triage.business_urgency,
         priority_override_reason=triage.priority_override_reason,

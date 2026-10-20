@@ -58,6 +58,13 @@ MUTATING_METHODS = {"post", "put", "patch"}
 ERROR_SCHEMA_REF = "../schemas/work_management.yaml#/$defs/ErrorResponse"
 
 EXPECTED_IDEMPOTENCY_OPERATIONS = {
+    "PUT /v1/workspaces/{workspace_id}/projects/{project_id}/triage-configuration",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions/{version_id}/publish",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions/{version_id}/activate",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/archive",
+    "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/deprecate",
     "POST /v1/workspaces/{workspace_id}/consultations",
     "POST /v1/workspaces/{workspace_id}/consultations/drafts",
     "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
@@ -91,6 +98,7 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
 }
 
 LIST_OPERATIONS = {
+    "listProjectTriageTemplates": "ProjectTriageTemplatePage",
     "listConsultations": "ConsultationPage",
     "listProposals": "ProposalPage",
     "listWorkItems": "WorkItemPage",
@@ -510,6 +518,7 @@ def test_page_envelopes_are_defined(schema):
         "BoardCardPage",
         "CardMovementPage",
         "ProjectRepositoryPage",
+        "ProjectTriageTemplatePage",
         "SlaPolicyPage",
         "NotificationPage",
     ):

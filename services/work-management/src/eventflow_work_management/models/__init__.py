@@ -55,6 +55,12 @@ from eventflow_work_management.models.sla import (
     SlaPauseInterval,
     SlaPolicy,
 )
+from eventflow_work_management.models.triage import (
+    ProjectTriageConfiguration,
+    ProjectTriageTemplate,
+    ProjectTriageTemplateActivation,
+    ProjectTriageTemplateVersion,
+)
 from eventflow_work_management.models.work_item import WorkItem
 from eventflow_work_management.models.workspace import Project, Workspace
 
@@ -82,6 +88,10 @@ __all__ = [
     "OIDCLoginTransaction",
     "Project",
     "ProjectRepositoryLink",
+    "ProjectTriageConfiguration",
+    "ProjectTriageTemplate",
+    "ProjectTriageTemplateActivation",
+    "ProjectTriageTemplateVersion",
     "Proposal",
     "ProposalEvidence",
     "ProposalRevision",

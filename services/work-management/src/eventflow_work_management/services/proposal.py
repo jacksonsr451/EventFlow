@@ -51,6 +51,9 @@ from eventflow_work_management.repositories.proposal_repository import (
     ProposalRepository,
 )
 from eventflow_work_management.security.errors import ProblemError
+from eventflow_work_management.services.triage_configuration import (
+    TriageConfigurationService,
+)
 
 CREATE_OPERATION = "proposal.create"
 UPDATE_OPERATION = "proposal.update"
@@ -220,6 +223,7 @@ class ProposalService:
         self.evidence = EvidenceRepository(session)
         self.audit = AuditRepository(session)
         self.idempotency = IdempotencyRepository(session)
+        self.triage_configuration = TriageConfigurationService(session)
 
     # -- create / preview -------------------------------------------------
 
@@ -280,6 +284,7 @@ class ProposalService:
             if consultation is None:
                 raise _not_found()
             self._require_eligible(consultation)
+            self.triage_configuration.assert_proposal_eligible(context, consultation)
             self._require_evidence(context.workspace_id, consultation_id, evidence_ids)
             record = (
                 self.idempotency.reserve(
@@ -392,6 +397,7 @@ class ProposalService:
         if consultation is None:
             raise _not_found()
         self._require_eligible(consultation)
+        self.triage_configuration.assert_proposal_eligible(context, consultation)
         self._require_evidence(context.workspace_id, consultation_id, evidence_ids)
         return {
             "consultation_id": consultation_id,

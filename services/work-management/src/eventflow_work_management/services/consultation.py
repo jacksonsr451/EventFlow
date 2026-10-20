@@ -43,6 +43,9 @@ from eventflow_work_management.repositories.workspace_repository import (
 )
 from eventflow_work_management.security.errors import ProblemError
 from eventflow_work_management.services.priority import calculate_priority
+from eventflow_work_management.services.triage_configuration import (
+    TriageConfigurationService,
+)
 from eventflow_work_management.services.triage_criteria import validate_criteria
 
 CREATE_OPERATION = "consultation.create"
@@ -108,6 +111,23 @@ def _precondition_failed() -> ProblemError:
 def consultation_etag(consultation: Consultation) -> str:
     """Strong validator over the persisted consultation version."""
     return f'"{fingerprint(["consultation", str(consultation.id), consultation.updated_at.isoformat()])}"'
+
+
+def _template_columns(effective) -> dict:
+    """Map an effective triage context onto the consultation's snapshot columns."""
+    return {
+        "triage_template_id": (
+            effective.template.id if effective.template is not None else None
+        ),
+        "triage_template_version": (
+            effective.version.version if effective.version is not None else None
+        ),
+        "triage_template_schema_version": (
+            effective.version.schema_version if effective.version is not None else None
+        ),
+        "triage_template_snapshot": effective.snapshot,
+        "triage_custom_fields": effective.custom_fields,
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,6 +222,7 @@ class ConsultationService:
         self.projects = ProjectRepository(session)
         self.audit = AuditRepository(session)
         self.idempotency = IdempotencyRepository(session)
+        self.triage_configuration = TriageConfigurationService(session)
 
     # -- intake -----------------------------------------------------------
 
@@ -619,6 +640,7 @@ class ConsultationService:
         priority: str,
         triage_notes: str,
         criteria: dict,
+        custom_fields: dict | None = None,
         business_impact: str | None = None,
         business_urgency: str | None = None,
         priority_override_reason: str | None = None,
@@ -648,6 +670,7 @@ class ConsultationService:
                 "priority_override_reason": stored_override,
                 "triage_notes": triage_notes,
                 "criteria": criteria,
+                "custom_fields": custom_fields,
             }
         )
         if idempotency_key is not None:
@@ -670,6 +693,16 @@ class ConsultationService:
                     "The consultation is not in a state that can be triaged.",
                     code="INVALID_STATE",
                 )
+            effective = self.triage_configuration.effective_triage_context(
+                context,
+                project_id=consultation.project_id,
+                category=category,
+                custom_fields=custom_fields,
+                action="triage",
+                triage_notes=triage_notes,
+                business_impact=stored_impact,
+                business_urgency=stored_urgency,
+            )
             record = (
                 self.idempotency.reserve(
                     workspace_id=context.workspace_id,
@@ -692,6 +725,7 @@ class ConsultationService:
                 business_impact=stored_impact,
                 business_urgency=stored_urgency,
                 priority_override_reason=stored_override,
+                **_template_columns(effective),
             )
             self.audit.append(
                 workspace_id=context.workspace_id,
@@ -708,6 +742,9 @@ class ConsultationService:
                     "priority_override_reason": stored_override,
                     "status": "triaging",
                     "criteria": criteria,
+                    "triage_template": effective.snapshot.get("template"),
+                    "triage_template_snapshot": effective.snapshot,
+                    "triage_custom_fields": effective.custom_fields,
                 },
                 correlation_id=correlation_id,
             )
@@ -745,6 +782,7 @@ class ConsultationService:
         triage_notes: str,
         criteria: dict,
         justification: str,
+        custom_fields: dict | None = None,
         business_impact: str | None = None,
         business_urgency: str | None = None,
         priority_override_reason: str | None = None,
@@ -786,6 +824,7 @@ class ConsultationService:
                 "triage_notes": triage_notes,
                 "criteria": criteria,
                 "justification": justification,
+                "custom_fields": custom_fields,
             }
         )
         if idempotency_key is not None:
@@ -816,6 +855,18 @@ class ConsultationService:
                 )
             previous_category = consultation.category
             previous_criteria = consultation.triage_criteria
+            previous_template_snapshot = consultation.triage_template_snapshot
+            effective = self.triage_configuration.effective_triage_context(
+                context,
+                project_id=consultation.project_id,
+                category=category,
+                custom_fields=custom_fields,
+                action="reclassify",
+                current_category=previous_category,
+                triage_notes=triage_notes,
+                business_impact=stored_impact,
+                business_urgency=stored_urgency,
+            )
             record = (
                 self.idempotency.reserve(
                     workspace_id=context.workspace_id,
@@ -838,6 +889,7 @@ class ConsultationService:
                 business_impact=stored_impact,
                 business_urgency=stored_urgency,
                 priority_override_reason=stored_override,
+                **_template_columns(effective),
             )
             self.audit.append(
                 workspace_id=context.workspace_id,
@@ -851,6 +903,10 @@ class ConsultationService:
                     "category": category,
                     "previous_criteria": previous_criteria,
                     "criteria": criteria,
+                    "previous_triage_template_snapshot": previous_template_snapshot,
+                    "triage_template": effective.snapshot.get("template"),
+                    "triage_template_snapshot": effective.snapshot,
+                    "triage_custom_fields": effective.custom_fields,
                     "priority": effective_priority,
                     "business_impact": stored_impact,
                     "business_urgency": stored_urgency,

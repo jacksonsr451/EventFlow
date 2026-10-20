@@ -212,6 +212,11 @@ class ConsultationRepository(Repository):
         business_impact: str | None = None,
         business_urgency: str | None = None,
         priority_override_reason: str | None = None,
+        triage_template_id: UUID | None = None,
+        triage_template_version: int | None = None,
+        triage_template_schema_version: int | None = None,
+        triage_template_snapshot: dict | None = None,
+        triage_custom_fields: dict | None = None,
     ) -> None:
         consultation.category = category
         consultation.priority = priority
@@ -223,5 +228,10 @@ class ConsultationRepository(Repository):
         consultation.business_impact = business_impact
         consultation.business_urgency = business_urgency
         consultation.priority_override_reason = priority_override_reason
+        consultation.triage_template_id = triage_template_id
+        consultation.triage_template_version = triage_template_version
+        consultation.triage_template_schema_version = triage_template_schema_version
+        consultation.triage_template_snapshot = triage_template_snapshot
+        consultation.triage_custom_fields = triage_custom_fields
         consultation.updated_at = triaged_at
         self._session.flush()

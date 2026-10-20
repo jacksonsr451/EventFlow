@@ -35,9 +35,11 @@ class ProblemError(Exception):
         code: str,
         detail: str,
         title: str | None = None,
+        errors: list[dict] | None = None,
     ) -> None:
         super().__init__(detail)
         self.status_code = status_code
         self.code = code
         self.detail = detail
         self.title = title
+        self.errors = errors
