@@ -72,6 +72,11 @@ class Action(str, Enum):
     PROJECT_REPOSITORY_UPDATE = "project_repository:update"
     PROJECT_REPOSITORY_UNLINK = "project_repository:unlink"
 
+    TRIAGE_CONFIGURATION_READ = "triage_configuration:read"
+    TRIAGE_CONFIGURATION_MANAGE = "triage_configuration:manage"
+    TRIAGE_TEMPLATE_READ = "triage_template:read"
+    TRIAGE_TEMPLATE_MANAGE = "triage_template:manage"
+
     PRIORITY_OVERRIDE = "work_item:override_priority"
     SLA_POLICY_READ = "sla_policy:read"
     SLA_POLICY_MANAGE = "sla_policy:manage"
@@ -96,6 +101,8 @@ _READ_ACTIONS: frozenset[Action] = frozenset(
         Action.WORK_ITEM_READ,
         Action.BOARD_READ,
         Action.PROJECT_REPOSITORY_READ,
+        Action.TRIAGE_CONFIGURATION_READ,
+        Action.TRIAGE_TEMPLATE_READ,
         Action.SLA_POLICY_READ,
         Action.SLA_READ,
         Action.DEPENDENCY_READ,
@@ -133,6 +140,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROJECT_REPOSITORY_CREATE,
             Action.PROJECT_REPOSITORY_UPDATE,
             Action.PROJECT_REPOSITORY_UNLINK,
+            Action.TRIAGE_CONFIGURATION_MANAGE,
+            Action.TRIAGE_TEMPLATE_MANAGE,
             Action.SLA_POLICY_MANAGE,
             Action.PRIORITY_OVERRIDE,
             Action.DEPENDENCY_MANAGE,
@@ -166,6 +175,8 @@ _MUTATION_ACTIONS: dict[str, frozenset[Action]] = {
             Action.PROJECT_REPOSITORY_CREATE,
             Action.PROJECT_REPOSITORY_UPDATE,
             Action.PROJECT_REPOSITORY_UNLINK,
+            Action.TRIAGE_CONFIGURATION_MANAGE,
+            Action.TRIAGE_TEMPLATE_MANAGE,
             Action.SLA_POLICY_MANAGE,
             Action.PRIORITY_OVERRIDE,
             Action.DEPENDENCY_MANAGE,

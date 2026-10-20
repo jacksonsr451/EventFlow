@@ -345,6 +345,22 @@ $defs:
         anyOf:
           - $ref: '#/$defs/UUID'
           - type: 'null'
+      triage_custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
+      triage_template_id:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      triage_template_version:
+        type: [integer, 'null']
+        minimum: 1
+      triage_template_schema_version:
+        type: [integer, 'null']
+        minimum: 1
+      triage_template_snapshot:
+        type: [object, 'null']
       created_at:
         $ref: '#/$defs/RFC3339DateTime'
       updated_at:
@@ -1200,6 +1216,10 @@ $defs:
         minLength: 5
       bug_criteria:
         $ref: '#/$defs/BugCriteria'
+      custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
 
   FeatureTriageRequest:
     type: object
@@ -1228,6 +1248,10 @@ $defs:
         minLength: 5
       feature_criteria:
         $ref: '#/$defs/FeatureCriteria'
+      custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
 
   ChoreTriageRequest:
     type: object
@@ -1256,6 +1280,10 @@ $defs:
         minLength: 5
       chore_criteria:
         $ref: '#/$defs/ChoreCriteria'
+      custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
 
   DocsTriageRequest:
     type: object
@@ -1284,6 +1312,10 @@ $defs:
         minLength: 5
       docs_criteria:
         $ref: '#/$defs/DocsCriteria'
+      custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
 
   SecurityTriageRequest:
     type: object
@@ -1312,6 +1344,10 @@ $defs:
         minLength: 5
       security_criteria:
         $ref: '#/$defs/SecurityCriteria'
+      custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
 
   TriageConsultationRequest:
     description: >-
@@ -1387,6 +1423,427 @@ $defs:
         minItems: 1
         items:
           $ref: '#/$defs/TriageTemplate'
+
+  TriageCustomFields:
+    type: object
+    description: >-
+      Declarative custom-field values supplied with a triage decision. The
+      project configuration or active template defines which keys are accepted;
+      unknown keys are rejected by the backend.
+    maxProperties: 100
+    additionalProperties: true
+
+  TriageFieldError:
+    type: object
+    additionalProperties: false
+    required: [field, message]
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+
+  TriageWorkflowRules:
+    type: object
+    description: >-
+      Closed vocabulary of additive project workflow restrictions. Rules may
+      only strengthen the domain invariants; approval, WorkItem, and BoardCard
+      creation cannot be bypassed.
+    additionalProperties: false
+    properties:
+      require_template_for_new_triage:
+        type: boolean
+      require_priority_inputs:
+        type: boolean
+      triage_notes_min_length:
+        type: integer
+        minimum: 5
+        maximum: 5000
+      require_justification_for_reclassification:
+        const: true
+      allowed_triage_categories:
+        type: array
+        maxItems: 5
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/TriageCategory'
+      allowed_reclassification_targets:
+        type: array
+        maxItems: 5
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/TriageCategory'
+      require_evidence_for_categories:
+        type: array
+        maxItems: 5
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/TriageCategory'
+
+  ProjectTriageFieldDefinition:
+    type: object
+    description: >-
+      One bounded declarative custom-field descriptor. No regular expressions,
+      SQL, expressions, imports, or remote references are accepted.
+    additionalProperties: false
+    required: [key, label, type]
+    properties:
+      key:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{1,63}$'
+      label:
+        type: string
+        minLength: 1
+        maxLength: 120
+      description:
+        type: [string, 'null']
+        maxLength: 500
+      type:
+        type: string
+        enum:
+          - string
+          - multiline_text
+          - integer
+          - number
+          - boolean
+          - date
+          - datetime
+          - enum
+          - multi_select
+          - reference
+      required:
+        type: boolean
+        default: false
+      default: {}
+      allowed_values:
+        type: [array, 'null']
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 100
+      minimum:
+        type: [number, 'null']
+      maximum:
+        type: [number, 'null']
+      min_length:
+        type: [integer, 'null']
+        minimum: 0
+        maximum: 10000
+      max_length:
+        type: [integer, 'null']
+        minimum: 0
+        maximum: 10000
+      categories:
+        type: array
+        minItems: 1
+        maxItems: 5
+        uniqueItems: true
+        items:
+          $ref: '#/$defs/TriageCategory'
+      order:
+        type: integer
+        minimum: 0
+        maximum: 10000
+      status:
+        type: string
+        enum: [active, deprecated]
+
+  ProjectTriageTemplateDefinition:
+    type: object
+    additionalProperties: false
+    required: [fields]
+    properties:
+      fields:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ProjectTriageFieldDefinition'
+      required_fields:
+        type: array
+        maxItems: 100
+        uniqueItems: true
+        items:
+          type: string
+      defaults:
+        type: object
+        maxProperties: 100
+      workflow:
+        $ref: '#/$defs/TriageWorkflowRules'
+      presentation:
+        type: [object, 'null']
+
+  ProjectTriageConfiguration:
+    type: object
+    description: >-
+      Additive project-owned triage requirements layered over the authoritative
+      differentiated category contract. A missing row is represented with
+      ``version: 0`` and ``enabled: false``.
+    additionalProperties: false
+    required: [workspace_id, project_id, enabled, required_fields, custom_fields, workflow_rules, version, updated_at]
+    properties:
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      enabled:
+        type: boolean
+      required_fields:
+        type: object
+        additionalProperties:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+      custom_fields:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ProjectTriageFieldDefinition'
+      workflow_rules:
+        $ref: '#/$defs/TriageWorkflowRules'
+      version:
+        type: integer
+        minimum: 0
+      updated_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+
+  UpdateTriageConfigurationRequest:
+    type: object
+    additionalProperties: false
+    required: [enabled]
+    properties:
+      enabled:
+        type: boolean
+      required_fields:
+        type: object
+        additionalProperties:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+      custom_fields:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/$defs/ProjectTriageFieldDefinition'
+      workflow_rules:
+        $ref: '#/$defs/TriageWorkflowRules'
+
+  ProjectTriageTemplateActivation:
+    type: object
+    additionalProperties: false
+    required: [category, template_id, template_version_id, activated_by, activated_at]
+    properties:
+      category:
+        $ref: '#/$defs/TriageCategory'
+      template_id:
+        $ref: '#/$defs/UUID'
+      template_version_id:
+        $ref: '#/$defs/UUID'
+      activated_by:
+        $ref: '#/$defs/UUID'
+      activated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  ProjectTriageTemplate:
+    type: object
+    additionalProperties: false
+    required: [template_id, workspace_id, project_id, category, key, name, status, created_by, created_at, updated_at]
+    properties:
+      template_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      category:
+        $ref: '#/$defs/TriageCategory'
+      key:
+        type: string
+        pattern: '^[a-z][a-z0-9-]{1,63}$'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      description:
+        type: [string, 'null']
+        maxLength: 2000
+      status:
+        type: string
+        enum: [active, deprecated, archived]
+      created_by:
+        $ref: '#/$defs/UUID'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      activation:
+        anyOf:
+          - $ref: '#/$defs/ProjectTriageTemplateActivation'
+          - type: 'null'
+
+  ProjectTriageTemplateVersion:
+    type: object
+    additionalProperties: false
+    required: [template_version_id, template_id, workspace_id, project_id, version, schema_version, status, definition, created_by, created_at, updated_at]
+    properties:
+      template_version_id:
+        $ref: '#/$defs/UUID'
+      template_id:
+        $ref: '#/$defs/UUID'
+      workspace_id:
+        $ref: '#/$defs/UUID'
+      project_id:
+        $ref: '#/$defs/UUID'
+      version:
+        type: integer
+        minimum: 1
+      schema_version:
+        type: integer
+        minimum: 1
+      status:
+        type: string
+        enum: [draft, published, deprecated, archived]
+      definition:
+        $ref: '#/$defs/ProjectTriageTemplateDefinition'
+      created_by:
+        $ref: '#/$defs/UUID'
+      published_by:
+        anyOf:
+          - $ref: '#/$defs/UUID'
+          - type: 'null'
+      published_at:
+        anyOf:
+          - $ref: '#/$defs/RFC3339DateTime'
+          - type: 'null'
+      created_at:
+        $ref: '#/$defs/RFC3339DateTime'
+      updated_at:
+        $ref: '#/$defs/RFC3339DateTime'
+
+  ProjectTriageTemplateDetail:
+    type: object
+    additionalProperties: false
+    required: [template, versions, activation]
+    properties:
+      template:
+        $ref: '#/$defs/ProjectTriageTemplate'
+      versions:
+        type: array
+        items:
+          $ref: '#/$defs/ProjectTriageTemplateVersion'
+      activation:
+        anyOf:
+          - $ref: '#/$defs/ProjectTriageTemplateActivation'
+          - type: 'null'
+
+  ProjectTriageTemplatePage:
+    type: object
+    additionalProperties: false
+    required: [items, page_info]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/$defs/ProjectTriageTemplate'
+      page_info:
+        $ref: '#/$defs/PageInfo'
+
+  CreateProjectTriageTemplateRequest:
+    type: object
+    additionalProperties: false
+    required: [category, key, name, definition]
+    properties:
+      category:
+        $ref: '#/$defs/TriageCategory'
+      key:
+        type: string
+        pattern: '^[a-z][a-z0-9-]{1,63}$'
+      name:
+        type: string
+        minLength: 1
+        maxLength: 120
+      description:
+        type: [string, 'null']
+        maxLength: 2000
+      definition:
+        $ref: '#/$defs/ProjectTriageTemplateDefinition'
+
+  CreateProjectTriageTemplateVersionRequest:
+    type: object
+    additionalProperties: false
+    required: [definition]
+    properties:
+      definition:
+        $ref: '#/$defs/ProjectTriageTemplateDefinition'
+
+  TriageValidationPreviewRequest:
+    type: object
+    additionalProperties: false
+    required: [project_id, category]
+    properties:
+      project_id:
+        $ref: '#/$defs/UUID'
+      category:
+        $ref: '#/$defs/TriageCategory'
+      custom_fields:
+        anyOf:
+          - $ref: '#/$defs/TriageCustomFields'
+          - type: 'null'
+      triage_notes:
+        type: [string, 'null']
+        minLength: 1
+      business_impact:
+        anyOf:
+          - $ref: '#/$defs/BusinessImpact'
+          - type: 'null'
+      business_urgency:
+        anyOf:
+          - $ref: '#/$defs/BusinessUrgency'
+          - type: 'null'
+
+  EffectiveTriageTemplate:
+    type: object
+    additionalProperties: false
+    required: [template_id, template_version_id, version, schema_version, category]
+    properties:
+      template_id:
+        $ref: '#/$defs/UUID'
+      template_version_id:
+        $ref: '#/$defs/UUID'
+      version:
+        type: integer
+        minimum: 1
+      schema_version:
+        type: integer
+        minimum: 1
+      category:
+        $ref: '#/$defs/TriageCategory'
+
+  TriageValidationPreview:
+    type: object
+    additionalProperties: false
+    required: [valid, code, errors, effective_template, normalized_custom_fields]
+    properties:
+      valid:
+        type: boolean
+      code:
+        type: [string, 'null']
+      errors:
+        type: array
+        items:
+          $ref: '#/$defs/TriageFieldError'
+      effective_template:
+        anyOf:
+          - $ref: '#/$defs/EffectiveTriageTemplate'
+          - type: 'null'
+      normalized_custom_fields:
+        anyOf:
+          - type: object
+          - type: 'null'
 
   CreateProposalRequest:
     type: object

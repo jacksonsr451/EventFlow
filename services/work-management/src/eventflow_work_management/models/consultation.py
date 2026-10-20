@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKeyConstraint,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -62,6 +63,17 @@ class Consultation(TimestampMixin, Base):
     )
     triage_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     triage_criteria: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Immutable project-template context captured at triage time. A later
+    # activation or archive never rewrites these columns.
+    triage_template_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True
+    )
+    triage_template_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    triage_template_schema_version: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    triage_template_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    triage_custom_fields: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     business_impact: Mapped[str | None] = mapped_column(String(16), nullable=True)
     business_urgency: Mapped[str | None] = mapped_column(String(16), nullable=True)
     priority_override_reason: Mapped[str | None] = mapped_column(
@@ -118,6 +130,25 @@ class Consultation(TimestampMixin, Base):
         CheckConstraint(
             "triage_criteria IS NULL OR jsonb_typeof(triage_criteria) = 'object'",
             name="triage_criteria_is_object",
+        ),
+        CheckConstraint(
+            "triage_template_version IS NULL OR triage_template_version >= 1",
+            name="triage_template_version_positive",
+        ),
+        CheckConstraint(
+            "triage_template_schema_version IS NULL OR "
+            "triage_template_schema_version >= 1",
+            name="triage_template_schema_version_positive",
+        ),
+        CheckConstraint(
+            "triage_template_snapshot IS NULL OR "
+            "jsonb_typeof(triage_template_snapshot) = 'object'",
+            name="triage_template_snapshot_is_object",
+        ),
+        CheckConstraint(
+            "triage_custom_fields IS NULL OR "
+            "jsonb_typeof(triage_custom_fields) = 'object'",
+            name="triage_custom_fields_is_object",
         ),
         CheckConstraint(
             "triage_notes IS NULL OR char_length(triage_notes) >= 5",

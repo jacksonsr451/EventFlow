@@ -107,6 +107,31 @@ SLA_EVENT_TYPE_VALUES = (
     "cancelled",
 )
 
+# Project-scoped triage configuration and versioned templates (Issue #41).
+# A template groups versions for one category; only a published version may be
+# activated. Published versions are immutable and are never physically deleted
+# so historical consultations keep a resolvable snapshot reference.
+TRIAGE_TEMPLATE_STATUS_VALUES = ("active", "deprecated", "archived")
+TRIAGE_TEMPLATE_VERSION_STATUS_VALUES = (
+    "draft",
+    "published",
+    "deprecated",
+    "archived",
+)
+TRIAGE_FIELD_TYPE_VALUES = (
+    "string",
+    "multiline_text",
+    "integer",
+    "number",
+    "boolean",
+    "date",
+    "datetime",
+    "enum",
+    "multi_select",
+    "reference",
+)
+TRIAGE_FIELD_STATUS_VALUES = ("active", "deprecated")
+
 # Durable notifications (Issue #30). Delivery state is separate from read
 # state; ``unavailable`` means no configured provider could accept the message
 # and the transport is deliberately not claimed as delivered.

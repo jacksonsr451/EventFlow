@@ -610,6 +610,50 @@ own.
   `override-priority.request.json`, `dependencies.response.json`,
   `notifications.page.json`).
 
+### 8.8 Project triage rules and versioned templates (Issue #41)
+
+Issue #41 adds project-owned, additive triage requirements without replacing the
+Issue #5 category contract. Reads use the new `triage_configuration:read` and
+`triage_template:read` actions available to every workspace role; mutations
+require `triage_configuration:manage` or `triage_template:manage`, held by
+`owner` and `admin`.
+
+| Operation | Method and path | Required role (`x-required-roles`) |
+|---|---|---|
+| Read configuration | `GET .../projects/{project_id}/triage-configuration` | any member (incl. `viewer`) |
+| Replace configuration | `PUT .../projects/{project_id}/triage-configuration` | `owner`, `admin` |
+| List templates | `GET .../projects/{project_id}/triage-templates` | any member (incl. `viewer`) |
+| Create template | `POST .../projects/{project_id}/triage-templates` | `owner`, `admin` |
+| Read template | `GET .../projects/{project_id}/triage-templates/{template_id}` | any member (incl. `viewer`) |
+| Create version | `POST .../triage-templates/{template_id}/versions` | `owner`, `admin` |
+| Publish version | `POST .../versions/{version_id}/publish` | `owner`, `admin` |
+| Activate version | `POST .../versions/{version_id}/activate` | `owner`, `admin` |
+| Archive template | `POST .../triage-templates/{template_id}/archive` | `owner`, `admin` |
+| Deprecate template | `POST .../triage-templates/{template_id}/deprecate` | `owner`, `admin` |
+| Preview validation | `POST .../triage-validation/preview` | `triager`, `admin`, `owner` |
+
+- **Defaults and precedence.** A project without a configuration row returns
+  `enabled: false`, `version: 0`, empty collections, and `updated_at: null`.
+  Effective fields are baseline criteria → active template → enabled
+  configuration. `PUT` replaces the configuration and requires `enabled`.
+- **Template detail.** `GET .../triage-templates/{template_id}` embeds the
+  immutable version history and the current activation; there is no separate
+  list-versions endpoint. Template pages use `limit`, `cursor`, and
+  `sort=created_at` / `sort=-created_at`.
+- **Lifecycle.** Versions start as `draft`; publishing is irreversible and a
+  published version cannot be edited. Activation requires a published version
+  and an active (not archived) template. Archiving removes the activation but
+  keeps versions and consultation snapshots.
+- **Preview.** The preview endpoint validates a prospective payload against the
+  effective template and configuration, returns per-field errors and normalized
+  values, and records neither a triage decision nor an idempotency key. The body
+  `project_id` must match the path.
+- **Concurrency and idempotency.** Configuration update, activation, archive,
+  and deprecate accept `If-Match`; all mutations except preview accept
+  `Idempotency-Key`. A stale validator returns `412`; a reused key with a
+  different fingerprint returns `409 IDEMPOTENCY_CONFLICT`; activation races
+  return `409 TEMPLATE_VERSION_CONFLICT`.
+
 ## 9. Internal events
 
 Versioned internal events (for example `work_item.created`,

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from sqlalchemy import Engine, text
 
 from support import (
@@ -48,6 +51,10 @@ EXPECTED_TABLES = {
     "notifications",
     "notification_preferences",
     "notification_deliveries",
+    "project_triage_configurations",
+    "project_triage_templates",
+    "project_triage_template_versions",
+    "project_triage_template_activations",
 }
 
 EXPECTED_TRIGGERS = {
@@ -65,6 +72,9 @@ EXPECTED_TRIGGERS = {
     "trg_entity_comments_no_rewrite",
     "trg_entity_comments_no_delete",
     "trg_entity_comments_no_truncate",
+    "trg_triage_template_versions_no_update",
+    "trg_triage_template_versions_no_delete",
+    "trg_triage_template_versions_no_truncate",
 }
 
 EXPECTED_FUNCTIONS = {
@@ -75,6 +85,7 @@ EXPECTED_FUNCTIONS = {
     "eventflow_card_movements_block_mutation",
     "eventflow_entity_comments_block_rewrite",
     "eventflow_entity_comments_block_mutation",
+    "eventflow_triage_template_versions_block_mutation",
 }
 
 
@@ -115,7 +126,47 @@ EXPECTED_CONSTRAINTS = {
     "fk_project_repositories_workspace_project",
     "uq_project_repositories_identity",
     "uq_project_repositories_workspace_id",
+    "uq_project_triage_configurations_workspace_project",
+    "uq_project_triage_configurations_workspace_id",
+    "fk_project_triage_configurations_workspace_project",
+    "ck_project_triage_configurations_version_positive",
+    "ck_project_triage_configurations_required_fields_is_object",
+    "ck_project_triage_configurations_custom_fields_is_array",
+    "ck_project_triage_configurations_workflow_rules_is_object",
+    "uq_project_triage_templates_scope_key",
+    "uq_project_triage_templates_scope_id",
+    "uq_project_triage_templates_workspace_id",
+    "fk_project_triage_templates_workspace_project",
+    "ck_project_triage_templates_category_values",
+    "ck_project_triage_templates_status_values",
+    "ck_project_triage_templates_key_format",
+    "ck_project_triage_templates_name_length",
+    "ck_project_triage_templates_description_length",
+    "uq_project_triage_template_versions_scope_version",
+    "uq_project_triage_template_versions_scope_id",
+    "uq_project_triage_template_versions_workspace_id",
+    "fk_project_triage_template_versions_scope_template",
+    "ck_project_triage_template_versions_version_positive",
+    "ck_project_triage_template_versions_status_values",
+    "ck_project_triage_template_versions_definition_is_object",
+    "ck_project_triage_template_versions_published_at_consistency",
+    "ck_project_triage_template_versions_published_actor_consistency",
+    "uq_project_triage_template_activations_scope_category",
+    "uq_project_triage_template_activations_workspace_id",
+    "fk_project_triage_template_activations_workspace_project",
+    "fk_project_triage_template_activations_scope_template",
+    "fk_project_triage_template_activations_scope_version",
+    "ck_project_triage_template_activations_category_values",
+    "ck_consultations_triage_template_version_positive",
+    "ck_consultations_triage_template_schema_version_positive",
+    "ck_consultations_triage_template_snapshot_is_object",
+    "ck_consultations_triage_custom_fields_is_object",
 }
+
+EXPECTED_HEAD = "0012_project_triage_config"
+VERSIONS_DIR = Path(__file__).resolve().parents[1] / (
+    "src/eventflow_work_management/migrations/versions"
+)
 
 
 def _revision(engine: Engine) -> str | None:
@@ -133,7 +184,7 @@ def test_upgrade_creates_schema_guards_and_revision():
         tables = _tables(engine)
         assert EXPECTED_TABLES <= tables
         assert "alembic_version" in tables
-        assert _revision(engine) == "0011_priority_sla_dependencies"
+        assert _revision(engine) == EXPECTED_HEAD
         assert EXPECTED_TRIGGERS <= _triggers(engine)
         assert EXPECTED_FUNCTIONS <= _functions(engine)
         assert EXPECTED_CONSTRAINTS <= _constraints(engine)
@@ -144,7 +195,21 @@ def test_upgrade_is_idempotent():
     with temporary_empty_database(admin_url) as (url, engine):
         run_migrations(url)
         run_migrations(url)
-        assert _revision(engine) == "0011_priority_sla_dependencies"
+        assert _revision(engine) == EXPECTED_HEAD
+
+
+def test_revision_ids_fit_the_alembic_version_column():
+    for path in sorted(VERSIONS_DIR.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        match = re.search(
+            r'^revision(?:: str)? = "([^"]+)"', source, re.MULTILINE
+        )
+        assert match is not None, f"{path.name} does not declare a revision"
+        revision = match.group(1)
+        assert len(revision) <= 32, (
+            f"{path.name} revision {revision!r} exceeds the 32-character "
+            "alembic_version column"
+        )
 
 
 def test_downgrade_removes_tables_triggers_and_functions():

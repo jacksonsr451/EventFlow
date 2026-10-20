@@ -530,6 +530,57 @@ priority matrix is `services/priority.py`.
 Deliberately absent: an external notification provider, webhook delivery, and
 cross-workspace recipient discovery.
 
+### 3.10 Project Triage Rules and Versioned Templates (Issue #41)
+
+Issue #41 lets project owners and admins add *additive* triage requirements on
+top of the authoritative differentiated category contract in section 2. It never
+replaces category criteria, never changes the approval gate, and never creates a
+WorkItem or BoardCard.
+
+- **Configuration versus templates.** A project configuration holds
+  per-category extra `required_fields`, flat declarative `custom_fields`, and a
+  closed set of `workflow_rules`. A template holds the same field descriptors
+  plus defaults and presentation hints, grouped by one category. At most one
+  template version is active per `(workspace_id, project_id, category)`.
+- **Precedence.** The effective field set is: baseline category criteria →
+  active project template → enabled project configuration. The template version
+  active at triage time is pinned on the consultation
+  (`triage_template_id`, `triage_template_version`,
+  `triage_template_schema_version`, `triage_template_snapshot`,
+  `triage_custom_fields`), and reclassification records both the previous and
+  new snapshots. Templates are *not* required to draft or submit a consultation;
+  they are enforced at triage.
+- **Immutable versions.** A template starts at version 1 in `draft`. Publishing
+  is irreversible; a published version can never be edited. Changing a template
+  means creating a new draft version and activating it. Template statuses are
+  `active`, `deprecated`, and `archived`; version statuses add `draft` and
+  `published`. Archiving removes the project/category activation but keeps all
+  history and pinned consultation snapshots readable.
+- **Safe declarative fields.** Field types are `string`, `multiline_text`,
+  `integer`, `number`, `boolean`, `date`, `datetime`, `enum`, `multi_select`,
+  and `reference`. Definitions are bounded (100 fields, 100 enum choices, 64 KiB,
+  depth 6, 2000 nodes, 10 000-character strings) and reject regular expressions,
+  SQL, expressions, imports, remote references, and executable constructs.
+  Unknown submitted keys are rejected; defaults are applied before validation.
+- **Workflow rules.** Rules can only strengthen invariants:
+  `require_template_for_new_triage`, `require_priority_inputs`,
+  `triage_notes_min_length`, `allowed_triage_categories`,
+  `allowed_reclassification_targets`, and `require_evidence_for_categories`.
+  `require_justification_for_reclassification` is always true and cannot be
+  disabled. Bypass-style keys (approval, WorkItem, BoardCard, auto-approve) are
+  rejected.
+- **Authorization and consistency.** Reads are available to every workspace role;
+  configuration and template mutations require the dedicated
+  `triage_configuration:manage` / `triage_template:manage` grants (owner and
+  admin). Mutations take an optional `Idempotency-Key`; configuration updates,
+  activation, archive, and deprecate accept `If-Match`. Activation is serialized
+  per `(workspace_id, project_id, category)`, and every change emits an audit
+  record.
+
+Deliberately absent: executable validation hooks, cross-project template reuse,
+published-version edits, and any mechanism that lets project rules bypass
+approval, WorkItem, or BoardCard creation.
+
 ---
 
 ## 4. Comprehensive Transition Matrix

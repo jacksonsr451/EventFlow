@@ -39,6 +39,9 @@ from eventflow_work_management.api.proposal_routes import router as proposal_rou
 from eventflow_work_management.api.priority_sla_notification_routes import (
     router as priority_sla_notification_router,
 )
+from eventflow_work_management.api.triage_configuration_routes import (
+    router as triage_configuration_router,
+)
 from eventflow_work_management.api.workspace_routes import router as workspace_router
 from eventflow_work_management.config import database_url
 from eventflow_work_management.db.engine import create_engine_from_url, session_factory
@@ -213,6 +216,7 @@ def create_app(
     app.include_router(board_router)
     app.include_router(project_repository_router)
     app.include_router(priority_sla_notification_router)
+    app.include_router(triage_configuration_router)
     # Registered last: the generic collaboration paths must not shadow the
     # specific consultation attachment/history routes above.
     app.include_router(collaboration_router)

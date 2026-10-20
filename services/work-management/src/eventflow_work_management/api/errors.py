@@ -23,6 +23,7 @@ class ProblemDetails(BaseModel):
     detail: str
     correlation_id: UUID
     code: str
+    errors: list[dict] | None = None
 
 
 def _correlation_id(request: Request) -> UUID:
@@ -39,6 +40,7 @@ def problem_response(
     title: str,
     detail: str,
     code: str,
+    errors: list[dict] | None = None,
 ) -> JSONResponse:
     body = ProblemDetails(
         title=title,
@@ -46,6 +48,7 @@ def problem_response(
         detail=detail,
         correlation_id=_correlation_id(request),
         code=code,
+        errors=errors,
     )
     return JSONResponse(
         status_code=status_code,
@@ -90,6 +93,7 @@ async def problem_error_handler(request: Request, exc: ProblemError):
         title=title,
         detail=exc.detail,
         code=exc.code,
+        errors=exc.errors,
     )
 
 

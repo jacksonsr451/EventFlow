@@ -80,6 +80,20 @@ path and session context. See
 [`contracts/openapi/work-management.yaml`](../../contracts/openapi/work-management.yaml)
 for the current endpoints.
 
+## Project Triage Configuration
+
+Project triage rules and versioned templates are scoped by the composite key
+`(workspace_id, project_id)`. Every repository query filters on both values, and
+composite foreign keys make a template, version, or activation that references a
+project in another workspace impossible to persist. Template ids supplied in a
+path are locators only: a template from another project or workspace resolves to
+`404 Not Found`. The `project_id` in a triage preview body must match the path.
+
+Configuration and template reads follow the normal membership rules; mutations
+require `triage_configuration:manage` or `triage_template:manage`, which only
+owner and admin hold. Pinned consultation snapshots are tenant-scoped data and
+must be returned only through the consultation read path.
+
 ## Non-Disclosure Rules
 
 - Error bodies must not contain resource owner identifiers, other workspace

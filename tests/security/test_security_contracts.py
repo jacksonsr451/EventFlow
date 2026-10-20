@@ -308,6 +308,13 @@ def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
             if "Idempotency-Key" in names:
                 operations.append(f"{method.upper()} {path}")
     assert operations == [
+        "PUT /v1/workspaces/{workspace_id}/projects/{project_id}/triage-configuration",
+        "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates",
+        "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions",
+        "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions/{version_id}/publish",
+        "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/versions/{version_id}/activate",
+        "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/archive",
+        "POST /v1/workspaces/{workspace_id}/projects/{project_id}/triage-templates/{template_id}/deprecate",
         "POST /v1/workspaces/{workspace_id}/consultations",
         "POST /v1/workspaces/{workspace_id}/consultations/drafts",
         "POST /v1/workspaces/{workspace_id}/consultations/{consultation_id}/triage",
