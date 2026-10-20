@@ -36,6 +36,9 @@ from eventflow_work_management.api.errors import (
     problem_response,
 )
 from eventflow_work_management.api.proposal_routes import router as proposal_router
+from eventflow_work_management.api.priority_sla_notification_routes import (
+    router as priority_sla_notification_router,
+)
 from eventflow_work_management.api.workspace_routes import router as workspace_router
 from eventflow_work_management.config import database_url
 from eventflow_work_management.db.engine import create_engine_from_url, session_factory
@@ -104,7 +107,7 @@ def create_app(
         CORSMiddleware,
         allow_origins=list(auth_settings.allowed_origins),
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
             "Authorization",
             "Content-Type",
@@ -113,7 +116,7 @@ def create_app(
             "If-Match",
             "Idempotency-Key",
         ],
-        expose_headers=["X-Correlation-ID"],
+        expose_headers=["X-Correlation-ID", "ETag", "Location"],
         max_age=600,
     )
 
@@ -209,6 +212,7 @@ def create_app(
     app.include_router(attachment_router)
     app.include_router(board_router)
     app.include_router(project_repository_router)
+    app.include_router(priority_sla_notification_router)
     # Registered last: the generic collaboration paths must not shadow the
     # specific consultation attachment/history routes above.
     app.include_router(collaboration_router)

@@ -486,6 +486,50 @@ Proposal, Approval, WorkItem, or BoardCard.
 Deliberately absent: provider credential storage, installation ids, webhooks,
 sync cursors, verification calls, cloning, and remote issue creation or updates.
 
+### 3.9 Business Priority, SLA, Dependencies and Notifications (Issue #30)
+
+Issue #30 attaches business-facing scheduling to an approved WorkItem without
+changing the approval gate. The single source of truth for the business
+priority matrix is `services/priority.py`.
+
+- **Priority.** `business_impact` and `business_urgency` are optional triage
+  inputs that must be supplied together; a disagreement with the submitted
+  `priority` requires a `priority_override_reason`. Bug and security severity
+  are separate criteria and never feed the matrix. An explicit WorkItem override
+  preserves the matrix-derived `calculated_priority`, requires a 10-300
+  character reason, is audited, and notifies the assignee.
+- **SLA policy versions.** Policy versions are immutable; a change creates a
+  new version. At most one version is active per name and scope (workspace
+  default or project), and activation retires the previous one. Each version
+  pins the response/resolution budgets, timezone, business hours, holidays,
+  pause statuses, and warning threshold.
+- **Durable clocks.** Starting a WorkItem creates one SLA instance pinned to the
+  policy version snapshot, with `started_at` at WorkItem creation. Working time
+  excludes holidays and non-working hours, and pauses (default `blocked`) shift
+  the due dates. Warning thresholds are measured in elapsed business minutes
+  with the same calendar and shift by the same accumulated pause duration.
+  Statuses are `pending`, `running`, `paused`, `fulfilled`, `breached`, and
+  `cancelled`. Events and pause intervals are append-only; warnings and breaches
+  are recorded during read as well as by the worker.
+- **Dependencies.** A directed edge records that one WorkItem blocks another.
+  Duplicate edges converge, self-edges are rejected, and cycles are rejected
+  (`409 DEPENDENCY_CYCLE`) under a workspace-scoped advisory lock. Moving a
+  WorkItem to `done` while a blocker is unresolved is rejected
+  (`409 DEPENDENCIES_UNRESOLVED`).
+- **Notifications.** Emission is transactional with the domain change,
+  deduplicated per `(workspace_id, dedup_key)`, and uses trusted recipients
+  only; a missing recipient is a no-op. Concurrent duplicate emitters converge
+  through a savepoint without aborting the domain transaction. In-app delivery
+  is immediate; email has no transport in this scope (`unavailable`) and uses
+  bounded retries. Actors read and mark only their own notifications and manage
+  their own per-event channel preferences. Security-category notifications are
+  always metadata-only: titles, vulnerability descriptions, evidence, related
+  WorkItem titles, and restricted triage metadata are replaced by a generic
+  redaction message and the primary WorkItem identifier.
+
+Deliberately absent: an external notification provider, webhook delivery, and
+cross-workspace recipient discovery.
+
 ---
 
 ## 4. Comprehensive Transition Matrix
@@ -520,7 +564,7 @@ follows: *Any Authenticated / Author / Proposer / Assignee* → `contributor`;
 | **WorkItem** | `None` | `READY` | `System (Approval Handler)` | Generated exclusively via valid, authorized `Approval` | Copies immutable acceptance criteria snapshot | Atomically placed on initial Board column | `500 Internal Error` (atomic rollback) |
 | **WorkItem** | `READY` | `IN_PROGRESS` | `Assignee`, `Maintainer` | Assignee assigned; WIP limits respected | Status updated to `IN_PROGRESS` | Card position synchronized | `409 Conflict` |
 | **WorkItem** | `IN_PROGRESS` | `IN_REVIEW` | `Assignee` | Linked PR or execution artifacts submitted | Status updated to `IN_REVIEW` | Card position synchronized | `400 Bad Request` |
-| **WorkItem** | `IN_REVIEW` | `DONE` | `Maintainer`, `Reviewer` | All acceptance criteria checked; tests passing in CI | Status set to `DONE`; Consultation marked `CLOSED` | `work_item.completed` event published | `422 Unprocessable Entity` |
+| **WorkItem** | `IN_REVIEW` | `DONE` | `Maintainer`, `Reviewer` | All acceptance criteria checked; tests passing in CI; all blocking dependencies resolved | Status set to `DONE`; Consultation marked `CLOSED`; SLA clock fulfilled | `work_item.completed` event published | `409 DEPENDENCIES_UNRESOLVED`, `422 Unprocessable Entity` |
 
 ---
 

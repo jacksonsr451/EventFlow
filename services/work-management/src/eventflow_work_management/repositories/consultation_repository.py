@@ -209,6 +209,9 @@ class ConsultationRepository(Repository):
         triage_criteria: dict,
         triaged_by: UUID,
         triaged_at: datetime,
+        business_impact: str | None = None,
+        business_urgency: str | None = None,
+        priority_override_reason: str | None = None,
     ) -> None:
         consultation.category = category
         consultation.priority = priority
@@ -217,5 +220,8 @@ class ConsultationRepository(Repository):
         consultation.triage_criteria = triage_criteria
         consultation.triaged_by = triaged_by
         consultation.triaged_at = triaged_at
+        consultation.business_impact = business_impact
+        consultation.business_urgency = business_urgency
+        consultation.priority_override_reason = priority_override_reason
         consultation.updated_at = triaged_at
         self._session.flush()

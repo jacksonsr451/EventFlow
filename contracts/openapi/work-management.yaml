@@ -1,4 +1,4 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 info:
   title: EventFlow Work Management API
   version: 1.0.0
@@ -27,6 +27,8 @@ tags:
   - name: Approvals
   - name: WorkItems
   - name: Boards
+  - name: SLA
+  - name: Notifications
   - name: Project repositories
   - name: Workspaces
   - name: Projects
@@ -3431,6 +3433,646 @@ paths:
         default:
           $ref: '#/components/responses/UnexpectedError'
 
+  /v1/workspaces/{workspace_id}/sla-policies:
+    post:
+      operationId: createSlaPolicy
+      tags: [SLA]
+      summary: Create and optionally activate a versioned SLA policy
+      description: >-
+        Creates one immutable policy version. At most one policy per name and
+        scope (workspace default or project) is active; activating a version
+        retires the previously active one. Policy versions snapshot the
+        business calendar used by WorkItem SLA clocks.
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateSlaPolicyRequest'
+      responses:
+        '201':
+          description: SLA policy version created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/SlaPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    get:
+      operationId: listSlaPolicies
+      tags: [SLA]
+      summary: List SLA policy versions in a workspace
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [created_at]
+      x-default-sort-fields: [created_at, policy_id]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/UUID'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/work_management.yaml#/$defs/SlaPolicyStatus'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: One page of SLA policy versions, including workspace defaults.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/SlaPolicyPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/sla-policies/{policy_id}:
+    get:
+      operationId: getSlaPolicy
+      tags: [SLA]
+      summary: Retrieve one SLA policy version
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/PolicyId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The requested SLA policy version.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/SlaPolicy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/sla-policies/{policy_id}/versions:
+    post:
+      operationId: createSlaPolicyVersion
+      tags: [SLA]
+      summary: Create the next immutable version of an SLA policy
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/PolicyId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateSlaPolicyVersionRequest'
+      responses:
+        '201':
+          description: New SLA policy version created.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/SlaPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/sla-policies/{policy_id}/activate:
+    post:
+      operationId: activateSlaPolicy
+      tags: [SLA]
+      summary: Activate one SLA policy version
+      description: >-
+        Activation retires the previously active version for the same name and
+        scope. The instance clocks already created keep their pinned version.
+      security:
+        - bearerAuth: []
+      x-required-roles: [admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/PolicyId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Policy activated or already active (idempotent replay).
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/SlaPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/work-items/{work_item_id}/sla:
+    get:
+      operationId: getWorkItemSla
+      tags: [WorkItems]
+      summary: Retrieve the durable SLA clock for one WorkItem
+      description: >-
+        Reading the clock also advances durable evaluation, so warnings and
+        breaches are recorded even when the background worker has not run.
+        Events and pause intervals are append-only.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkItemId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: The WorkItem SLA view; the instance is null when no policy applies.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/WorkItemSla'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/work-items/{work_item_id}/priority:
+    patch:
+      operationId: overrideWorkItemPriority
+      tags: [WorkItems]
+      summary: Apply a reasoned priority override to a WorkItem
+      description: >-
+        The matrix-derived calculated priority is preserved so the divergence
+        stays visible. A reason of 10 to 300 characters is mandatory and the
+        change is audited and notified.
+      security:
+        - bearerAuth: []
+      x-required-roles: [triager, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkItemId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/OverridePriorityRequest'
+      responses:
+        '200':
+          description: Priority override applied.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/PriorityOverrideResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies:
+    get:
+      operationId: listWorkItemDependencies
+      tags: [WorkItems]
+      summary: List the blockers and dependents of one WorkItem
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkItemId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Directed dependency edges for this WorkItem.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/DependencyList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+    post:
+      operationId: createWorkItemDependency
+      tags: [WorkItems]
+      summary: Record that another WorkItem blocks this WorkItem
+      description: >-
+        Duplicate edges replay the existing edge. Self-edges are rejected and a
+        cycle returns 409 DEPENDENCY_CYCLE; detection is enforced in the
+        database transaction under a workspace lock.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkItemId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/CreateDependencyRequest'
+      responses:
+        '201':
+          description: Dependency edge recorded or replayed.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/WorkItemDependency'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies/{dependency_id}:
+    delete:
+      operationId: deleteWorkItemDependency
+      tags: [WorkItems]
+      summary: Remove a dependency edge from this WorkItem
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, admin, owner]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkItemId'
+        - $ref: '#/components/parameters/DependencyId'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Dependency edge removed (or already absent for a replay).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/notifications:
+    get:
+      operationId: listNotifications
+      tags: [Notifications]
+      summary: List the authenticated actor's durable notifications
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      x-allowed-sort-fields: [created_at]
+      x-default-sort-fields: [created_at, notification_id]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: unread_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: One page of notifications addressed to the actor.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/NotificationPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/notifications/{notification_id}:
+    patch:
+      operationId: markNotification
+      tags: [Notifications]
+      summary: Mark one of the actor's notifications read or unread
+      description: |
+        Marking an already-read notification or clearing an already-unread
+        notification leaves its representation and ETag unchanged. This operation
+        is naturally idempotent and does not accept an ``Idempotency-Key``.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotificationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/MarkNotificationRequest'
+      responses:
+        '200':
+          description: Notification read state updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/Notification'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/notification-preferences:
+    get:
+      operationId: listNotificationPreferences
+      tags: [Notifications]
+      summary: List the actor's notification channel preferences
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Explicit per-event preferences for the actor.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/NotificationPreferenceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
+  /v1/workspaces/{workspace_id}/notification-preferences/{event_type}:
+    put:
+      operationId: updateNotificationPreference
+      tags: [Notifications]
+      summary: Set the actor's channel preference for one event type
+      description: |
+        Re-writing identical channel values leaves the representation and ETag
+        unchanged. This operation is naturally idempotent and does not accept an
+        ``Idempotency-Key``.
+      security:
+        - bearerAuth: []
+      x-required-roles: [contributor, triager, approver, admin, owner, viewer]
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/NotificationEventType'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/work_management.yaml#/$defs/UpdatePreferenceRequest'
+      responses:
+        '200':
+          description: Preference stored for the actor.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/work_management.yaml#/$defs/NotificationPreference'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3557,6 +4199,36 @@ components:
       required: true
       schema:
         $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    WorkItemId:
+      name: work_item_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    PolicyId:
+      name: policy_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    DependencyId:
+      name: dependency_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    NotificationId:
+      name: notification_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/UUID'
+    NotificationEventType:
+      name: event_type
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/work_management.yaml#/$defs/NotificationEventType'
     BoardColumnId:
       name: column_id
       in: path

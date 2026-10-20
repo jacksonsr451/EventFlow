@@ -38,6 +38,14 @@ EXPECTED_TABLES = {
     "entity_comments",
     "entity_attachments",
     "entity_attachment_blobs",
+    "sla_policies",
+    "sla_instances",
+    "sla_pause_intervals",
+    "sla_events",
+    "work_item_dependencies",
+    "notifications",
+    "notification_preferences",
+    "notification_deliveries",
 }
 
 AUTHENTICATION_TABLES = {

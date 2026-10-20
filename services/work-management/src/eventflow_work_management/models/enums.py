@@ -71,3 +71,59 @@ WORKSPACE_ROLE_VALUES = (
 )
 MEMBERSHIP_STATE_VALUES = ("active", "revoked")
 INVITATION_STATE_VALUES = ("pending", "accepted", "revoked", "expired")
+
+# Business priority inputs (Issue #30). Business impact and urgency are the
+# authoritative inputs of the priority matrix; the resulting priority uses the
+# existing four-value ``PRIORITY_VALUES`` vocabulary so no parallel priority
+# system is introduced. Bug severity and security severity remain independent
+# triage criteria and never feed this matrix implicitly.
+BUSINESS_IMPACT_VALUES = ("critical", "high", "moderate", "low")
+BUSINESS_URGENCY_VALUES = ("immediate", "elevated", "normal", "low")
+
+# SLA policy lifecycle. A policy is versioned; exactly one version per scope
+# (workspace default or project) may be active at a time.
+SLA_POLICY_STATUS_VALUES = ("draft", "active", "retired")
+
+# SLA instance lifecycle. ``paused`` is driven by explicit pause intervals
+# (for example when the WorkItem is blocked); ``breached`` records that at least
+# one target was missed and is terminal for evaluation purposes.
+SLA_INSTANCE_STATUS_VALUES = (
+    "pending",
+    "running",
+    "paused",
+    "fulfilled",
+    "breached",
+    "cancelled",
+)
+SLA_EVENT_TYPE_VALUES = (
+    "started",
+    "paused",
+    "resumed",
+    "warning_response",
+    "warning_resolution",
+    "breach_response",
+    "breach_resolution",
+    "fulfilled",
+    "cancelled",
+)
+
+# Durable notifications (Issue #30). Delivery state is separate from read
+# state; ``unavailable`` means no configured provider could accept the message
+# and the transport is deliberately not claimed as delivered.
+NOTIFICATION_EVENT_VALUES = (
+    "dependency.created",
+    "dependency.removed",
+    "sla.warning",
+    "sla.breached",
+    "sla.fulfilled",
+    "work_item.priority_overridden",
+    "work_item.blocked",
+)
+NOTIFICATION_CHANNEL_VALUES = ("in_app", "email")
+NOTIFICATION_DELIVERY_STATUS_VALUES = (
+    "pending",
+    "delivered",
+    "failed",
+    "unavailable",
+    "exhausted",
+)

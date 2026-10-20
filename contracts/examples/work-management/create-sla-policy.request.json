@@ -1,0 +1,18 @@
+{
+  "name": "Default support SLA",
+  "project_id": null,
+  "response_minutes": 120,
+  "resolution_minutes": 960,
+  "timezone": "America/Sao_Paulo",
+  "business_hours": {
+    "mon": [["09:00", "18:00"]],
+    "tue": [["09:00", "18:00"]],
+    "wed": [["09:00", "18:00"]],
+    "thu": [["09:00", "18:00"]],
+    "fri": [["09:00", "18:00"]]
+  },
+  "holidays": ["2026-12-25"],
+  "pause_statuses": ["blocked"],
+  "warning_threshold_percent": 75,
+  "activate": true
+}

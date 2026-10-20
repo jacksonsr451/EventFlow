@@ -42,6 +42,7 @@ from eventflow_work_management.repositories.workspace_repository import (
     ProjectRepository,
 )
 from eventflow_work_management.security.errors import ProblemError
+from eventflow_work_management.services.priority import calculate_priority
 from eventflow_work_management.services.triage_criteria import validate_criteria
 
 CREATE_OPERATION = "consultation.create"
@@ -115,6 +116,35 @@ class IntakeResult:
 
     consultation: Consultation
     replayed: bool
+
+
+def _resolve_priority(
+    priority: str,
+    business_impact: str | None,
+    business_urgency: str | None,
+    priority_override_reason: str | None,
+) -> tuple[str, str | None, str | None, str | None]:
+    """Return the effective priority and its stored inputs.
+
+    When both business inputs are supplied the matrix is authoritative. A
+    differing effective priority is only accepted with a reasoned override.
+    """
+    if (business_impact is None) != (business_urgency is None):
+        raise _validation(
+            "business_impact and business_urgency must be supplied together."
+        )
+    if business_impact is None:
+        return priority, None, None, None
+    calculated = calculate_priority(business_impact, business_urgency)
+    if priority != calculated:
+        if not priority_override_reason or len(priority_override_reason) < 10:
+            raise _validation(
+                "An override reason is required when the effective priority "
+                "differs from the calculated priority.",
+                status_code=400,
+            )
+        return priority, business_impact, business_urgency, priority_override_reason
+    return calculated, business_impact, business_urgency, None
 
 
 def _encode_cursor(sort_key: str, descending: bool, value, consultation_id: UUID) -> str:
@@ -589,6 +619,9 @@ class ConsultationService:
         priority: str,
         triage_notes: str,
         criteria: dict,
+        business_impact: str | None = None,
+        business_urgency: str | None = None,
+        priority_override_reason: str | None = None,
         if_match: str | None = None,
         idempotency_key: str | None = None,
         correlation_id: UUID | None = None,
@@ -596,12 +629,23 @@ class ConsultationService:
         self._validate_category(category, required=True)
         self._validate_priority(priority, required=True)
         criteria = validate_criteria(category, criteria)
+        (
+            effective_priority,
+            stored_impact,
+            stored_urgency,
+            stored_override,
+        ) = _resolve_priority(
+            priority, business_impact, business_urgency, priority_override_reason
+        )
 
         request_fingerprint = fingerprint(
             {
                 "consultation_id": str(consultation_id),
                 "category": category,
-                "priority": priority,
+                "priority": effective_priority,
+                "business_impact": stored_impact,
+                "business_urgency": stored_urgency,
+                "priority_override_reason": stored_override,
                 "triage_notes": triage_notes,
                 "criteria": criteria,
             }
@@ -639,12 +683,15 @@ class ConsultationService:
             self.consultations.apply_triage(
                 consultation,
                 category=category,
-                priority=priority,
+                priority=effective_priority,
                 status="triaging",
                 triage_notes=triage_notes,
                 triage_criteria=criteria,
                 triaged_by=context.actor_id,
                 triaged_at=_now(),
+                business_impact=stored_impact,
+                business_urgency=stored_urgency,
+                priority_override_reason=stored_override,
             )
             self.audit.append(
                 workspace_id=context.workspace_id,
@@ -655,7 +702,10 @@ class ConsultationService:
                 snapshot={
                     "consultation_id": str(consultation.id),
                     "category": category,
-                    "priority": priority,
+                    "priority": effective_priority,
+                    "business_impact": stored_impact,
+                    "business_urgency": stored_urgency,
+                    "priority_override_reason": stored_override,
                     "status": "triaging",
                     "criteria": criteria,
                 },
@@ -695,6 +745,9 @@ class ConsultationService:
         triage_notes: str,
         criteria: dict,
         justification: str,
+        business_impact: str | None = None,
+        business_urgency: str | None = None,
+        priority_override_reason: str | None = None,
         if_match: str | None = None,
         idempotency_key: str | None = None,
         correlation_id: UUID | None = None,
@@ -713,12 +766,23 @@ class ConsultationService:
             raise _validation(
                 "A reclassification justification is required.", status_code=422
             )
+        (
+            effective_priority,
+            stored_impact,
+            stored_urgency,
+            stored_override,
+        ) = _resolve_priority(
+            priority, business_impact, business_urgency, priority_override_reason
+        )
 
         request_fingerprint = fingerprint(
             {
                 "consultation_id": str(consultation_id),
                 "category": category,
-                "priority": priority,
+                "priority": effective_priority,
+                "business_impact": stored_impact,
+                "business_urgency": stored_urgency,
+                "priority_override_reason": stored_override,
                 "triage_notes": triage_notes,
                 "criteria": criteria,
                 "justification": justification,
@@ -765,12 +829,15 @@ class ConsultationService:
             self.consultations.apply_triage(
                 consultation,
                 category=category,
-                priority=priority,
+                priority=effective_priority,
                 status=consultation.status,
                 triage_notes=triage_notes,
                 triage_criteria=criteria,
                 triaged_by=context.actor_id,
                 triaged_at=_now(),
+                business_impact=stored_impact,
+                business_urgency=stored_urgency,
+                priority_override_reason=stored_override,
             )
             self.audit.append(
                 workspace_id=context.workspace_id,
@@ -784,7 +851,10 @@ class ConsultationService:
                     "category": category,
                     "previous_criteria": previous_criteria,
                     "criteria": criteria,
-                    "priority": priority,
+                    "priority": effective_priority,
+                    "business_impact": stored_impact,
+                    "business_urgency": stored_urgency,
+                    "priority_override_reason": stored_override,
                     "justification": justification,
                     "status": consultation.status,
                 },

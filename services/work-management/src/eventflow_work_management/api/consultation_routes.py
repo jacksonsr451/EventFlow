@@ -77,6 +77,13 @@ class _TriageRequest(BaseModel):
 
     priority: str = Field(pattern=PRIORITY_PATTERN)
     triage_notes: str = Field(min_length=5)
+    business_impact: str | None = Field(
+        default=None, pattern="^(critical|high|moderate|low)$"
+    )
+    business_urgency: str | None = Field(
+        default=None, pattern="^(immediate|elevated|normal|low)$"
+    )
+    priority_override_reason: str | None = Field(default=None, min_length=10, max_length=300)
 
 
 class BugTriageRequest(_TriageRequest):
@@ -370,6 +377,9 @@ def triage_consultation(
         priority=payload.priority,
         triage_notes=payload.triage_notes,
         criteria=_criteria_for(payload),
+        business_impact=payload.business_impact,
+        business_urgency=payload.business_urgency,
+        priority_override_reason=payload.priority_override_reason,
         if_match=request.headers.get("if-match"),
         idempotency_key=_idempotency_key(request),
         correlation_id=request_correlation_id,
@@ -399,6 +409,9 @@ def reclassify_consultation(
         triage_notes=triage.triage_notes,
         criteria=_criteria_for(triage),
         justification=payload.justification,
+        business_impact=triage.business_impact,
+        business_urgency=triage.business_urgency,
+        priority_override_reason=triage.priority_override_reason,
         if_match=request.headers.get("if-match"),
         idempotency_key=_idempotency_key(request),
         correlation_id=request_correlation_id,

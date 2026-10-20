@@ -332,6 +332,12 @@ def test_idempotency_key_declared_on_retryable_operations(wm_openapi):
         "DELETE /v1/workspaces/{workspace_id}/projects/{project_id}/repositories/{repository_id}",
         "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/comments",
         "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments",
+        "POST /v1/workspaces/{workspace_id}/sla-policies",
+        "POST /v1/workspaces/{workspace_id}/sla-policies/{policy_id}/versions",
+        "POST /v1/workspaces/{workspace_id}/sla-policies/{policy_id}/activate",
+        "PATCH /v1/workspaces/{workspace_id}/work-items/{work_item_id}/priority",
+        "POST /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies",
+        "DELETE /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies/{dependency_id}",
     ], f"unexpected Idempotency-Key declarations: {operations}"
 
 

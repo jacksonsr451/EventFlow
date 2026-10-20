@@ -82,6 +82,12 @@ EXPECTED_IDEMPOTENCY_OPERATIONS = {
     "DELETE /v1/workspaces/{workspace_id}/projects/{project_id}/repositories/{repository_id}",
     "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/comments",
     "POST /v1/workspaces/{workspace_id}/{entity_collection}/{entity_id}/attachments",
+    "POST /v1/workspaces/{workspace_id}/sla-policies",
+    "POST /v1/workspaces/{workspace_id}/sla-policies/{policy_id}/versions",
+    "POST /v1/workspaces/{workspace_id}/sla-policies/{policy_id}/activate",
+    "PATCH /v1/workspaces/{workspace_id}/work-items/{work_item_id}/priority",
+    "POST /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies",
+    "DELETE /v1/workspaces/{workspace_id}/work-items/{work_item_id}/dependencies/{dependency_id}",
 }
 
 LIST_OPERATIONS = {
@@ -92,6 +98,8 @@ LIST_OPERATIONS = {
     "listCardMovements": "CardMovementPage",
     "listEntityComments": "EntityCommentPage",
     "listProjectRepositories": "ProjectRepositoryPage",
+    "listSlaPolicies": "SlaPolicyPage",
+    "listNotifications": "NotificationPage",
 }
 
 EXAMPLE_DEFINITIONS = {
@@ -102,6 +110,11 @@ EXAMPLE_DEFINITIONS = {
     "decide-proposal.response.json": "DecideProposalResponse",
     "move-board-card.request.json": "MoveBoardCardRequest",
     "consultations.page.json": "ConsultationPage",
+    "create-sla-policy.request.json": "CreateSlaPolicyRequest",
+    "work-item-sla.response.json": "WorkItemSla",
+    "override-priority.request.json": "OverridePriorityRequest",
+    "dependencies.response.json": "DependencyList",
+    "notifications.page.json": "NotificationPage",
     "problem.json": "ErrorResponse",
 }
 
@@ -497,6 +510,8 @@ def test_page_envelopes_are_defined(schema):
         "BoardCardPage",
         "CardMovementPage",
         "ProjectRepositoryPage",
+        "SlaPolicyPage",
+        "NotificationPage",
     ):
         assert definition in schema["$defs"], f"{definition} is not defined"
         Draft202012Validator.check_schema(schema["$defs"][definition])
