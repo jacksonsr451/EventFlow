@@ -14,6 +14,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  frontend:
+    name: Webapp quality and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Activate pnpm
+        run: corepack enable && corepack prepare pnpm@11.0.8 --activate
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Regenerate OpenAPI client types and verify they are committed
+        run: |
+          pnpm codegen
+          git diff --exit-code -- packages/domain/src/work-management.schema.d.ts
+
+      - name: Run lint, typecheck, unit tests, and production build
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @eventflow/webapp exec playwright install --with-deps chromium
+
+      - name: Run deterministic browser tests
+        run: pnpm test:e2e
+
   contracts:
     name: Contract validation
     runs-on: ubuntu-latest

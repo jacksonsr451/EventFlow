@@ -72,6 +72,7 @@ Development documents describe how contributors will work with the repository
 and how future implementations should be validated.
 
 - [Getting started](development/getting-started.md): current repository status and future workflow.
+- [Webapp development](development/webapp.md): frontend setup, architecture, authentication, API boundaries, and validation.
 - [Conventions](development/conventions.md): terminology and architectural constraints.
 - [Monorepo layout](development/monorepo-layout.md): directories, contracts and bounded-context rules.
 - [Testing strategy](development/testing-strategy.md): implemented contract coverage plus planned invariant and resilience coverage.

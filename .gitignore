@@ -100,8 +100,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -191,6 +191,26 @@ spring-shell.log
 **/application-local.yml
 **/application-local.yaml
 **/application-local.properties
+
+
+# ============================================================
+# Node.js / TypeScript
+# ============================================================
+
+node_modules/
+**/node_modules/
+.pnpm-store/
+*.tsbuildinfo
+coverage/
+**/coverage/
+.vite/
+**/.vite/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+blob-report/
+**/blob-report/
 
 
 # ============================================================

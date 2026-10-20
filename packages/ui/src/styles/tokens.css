@@ -1,0 +1,92 @@
+:root {
+  color-scheme: light;
+
+  --background: 220 20% 98%;
+  --foreground: 222 24% 12%;
+  --surface: 0 0% 100%;
+  --surface-muted: 220 16% 95%;
+  --surface-raised: 0 0% 100%;
+  --primary: 216 64% 34%;
+  --primary-hover: 216 64% 29%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 16% 91%;
+  --secondary-foreground: 222 24% 16%;
+  --accent: 210 55% 92%;
+  --accent-foreground: 216 64% 25%;
+  --muted: 220 16% 94%;
+  --muted-foreground: 220 10% 40%;
+  --border: 220 15% 86%;
+  --border-strong: 220 13% 72%;
+  --input: 0 0% 100%;
+  --ring: 214 84% 48%;
+  --destructive: 0 66% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 154 62% 27%;
+  --success-foreground: 0 0% 100%;
+  --warning: 36 88% 34%;
+  --warning-foreground: 0 0% 100%;
+  --info: 203 78% 34%;
+  --info-foreground: 0 0% 100%;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-sm: 0 1px 2px hsl(220 20% 10% / 0.06);
+  --shadow-md: 0 8px 24px hsl(220 20% 10% / 0.1);
+  --shadow-lg: 0 20px 48px hsl(220 20% 10% / 0.16);
+  --shadow-focus: 0 0 0 3px hsl(var(--ring) / 0.28);
+
+  --sidebar-width: 16.5rem;
+  --sidebar-width-collapsed: 4.5rem;
+  --header-height: 3.75rem;
+  --content-max-width: 90rem;
+
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-drawer: 40;
+  --z-overlay: 50;
+  --z-toast: 60;
+  --z-tooltip: 70;
+
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms ease;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: 222 22% 8%;
+  --foreground: 210 24% 96%;
+  --surface: 222 20% 11%;
+  --surface-muted: 222 18% 15%;
+  --surface-raised: 222 19% 13%;
+  --primary: 211 76% 64%;
+  --primary-hover: 211 80% 70%;
+  --primary-foreground: 222 24% 9%;
+  --secondary: 222 16% 18%;
+  --secondary-foreground: 210 24% 96%;
+  --accent: 215 35% 20%;
+  --accent-foreground: 210 80% 82%;
+  --muted: 222 16% 16%;
+  --muted-foreground: 218 13% 70%;
+  --border: 222 14% 24%;
+  --border-strong: 220 12% 36%;
+  --input: 222 18% 13%;
+  --ring: 211 86% 68%;
+  --destructive: 0 72% 64%;
+  --destructive-foreground: 222 24% 9%;
+  --success: 152 52% 55%;
+  --success-foreground: 222 24% 9%;
+  --warning: 38 92% 62%;
+  --warning-foreground: 222 24% 9%;
+  --info: 205 82% 66%;
+  --info-foreground: 222 24% 9%;
+
+  --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.28);
+  --shadow-md: 0 8px 24px hsl(0 0% 0% / 0.38);
+  --shadow-lg: 0 20px 56px hsl(0 0% 0% / 0.48);
+  --shadow-focus: 0 0 0 3px hsl(var(--ring) / 0.38);
+}

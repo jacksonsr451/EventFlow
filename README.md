@@ -14,9 +14,9 @@ for explicit service boundaries and failure modes.
 ## Current Status
 
 EventFlow is in **Phase 0: architecture, contracts, and backend foundations**.
-The Work Management persistence foundation and Issue #10 authentication/BFF
-foundation are implemented; Work Management business HTTP workflows and the Web,
-Desktop, and VS Code applications are not. Contracts and documentation
+The Work Management persistence foundation, Issue #10 authentication/BFF
+foundation, and the initial Issue #13 Web application shell are implemented.
+Desktop and VS Code applications remain planned. Contracts and documentation
 distinguish implemented foundations from runtime behavior that is still planned.
 CI validates contracts and PostgreSQL persistence; Continuous Deployment is not
 configured because production deployment environments do not exist yet.
@@ -119,7 +119,22 @@ OpenAPI, AsyncAPI, JSON Schema and the common event envelope.
 - [Order workflow](docs/architecture/order-workflow.md)
 - [Architecture Decision Records](docs/adr/README.md)
 - [Development getting started](docs/development/getting-started.md)
+- [Webapp development](docs/development/webapp.md)
 - [Reproducible local Keycloak setup](services/work-management/README.md#reproducible-local-authentication-environment)
+
+## Web Application
+
+The React webapp is in `clients/webapp` and uses the pnpm workspace packages
+`@eventflow/domain`, `@eventflow/api-client`, and `@eventflow/ui`. Start it with
+`pnpm install --ignore-scripts` followed by `pnpm dev`. The development server
+proxies `/v1` to the Work Management API at `http://localhost:8000`.
+
+The shell includes workspace/project context, responsive navigation, dashboard,
+consultations, proposals, work items, boards, projects, workspace membership,
+settings, notifications, light/dark/system theme selection, and explicit
+loading/empty/forbidden/error states. See
+[Webapp development](docs/development/webapp.md) for API limitations and
+validation commands.
 
 The `contracts/` directory contains the initial OpenAPI, AsyncAPI and JSON
 Schema baseline. Service implementations and contract-driven tests remain

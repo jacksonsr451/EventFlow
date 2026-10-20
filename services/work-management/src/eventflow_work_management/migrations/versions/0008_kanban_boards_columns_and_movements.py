@@ -40,6 +40,27 @@ def upgrade() -> None:
     op.create_check_constraint(
         op.f("ck_boards_version_positive"), "boards", "version >= 1"
     )
+    # Older databases may have been created from a pre-constraint version of
+    # 0001. Fresh databases already receive this constraint from 0001, so the
+    # repair must be idempotent.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'uq_boards_workspace_project_id'
+                  AND conrelid = 'boards'::regclass
+            ) THEN
+                ALTER TABLE boards
+                    ADD CONSTRAINT uq_boards_workspace_project_id
+                    UNIQUE (workspace_id, project_id, id);
+            END IF;
+        END;
+        $$;
+        """
+    )
 
     op.create_table(
         "board_columns",
