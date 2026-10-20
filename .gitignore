@@ -194,6 +194,26 @@ spring-shell.log
 
 
 # ============================================================
+# Node.js / TypeScript
+# ============================================================
+
+node_modules/
+**/node_modules/
+.pnpm-store/
+*.tsbuildinfo
+coverage/
+**/coverage/
+.vite/
+**/.vite/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+blob-report/
+**/blob-report/
+
+
+# ============================================================
 # Logs
 # ============================================================
 

@@ -5,12 +5,34 @@ infrastructure described by the architecture are not implemented yet. The first
 machine-readable contract baseline exists under `contracts/`, and the Work
 Management service has its PostgreSQL persistence foundation
 ([ADR-008](../adr/ADR-008-work-management-persistence.md)). `docker-compose.yml`
-today provides only the local PostgreSQL instance, and `Makefile` is still
-empty, so the repository does not provide a runnable distributed system.
+provides local PostgreSQL and an opt-in Keycloak authentication stack, while
+the `Makefile` is still empty, so the repository does not provide a runnable
+distributed system.
 
 The intended sequence is architecture, contracts, domain tests, service
 implementation and infrastructure. Do not treat `make up` or `make test` as
 available commands until their implementations exist.
+
+The implemented Web application additionally uses Node.js 22 or newer and
+pnpm 11.0.8. See [Webapp development](webapp.md) for the frontend workspace,
+BFF authentication flow, API limitations, and browser-test commands.
+
+## Work Management Service
+
+The service has an independent Poetry project. Install its locked dependencies
+from the service directory rather than relying on the repository-level test
+environment:
+
+```text
+cd services/work-management
+poetry install
+poetry run testrunner tests -v --disable-plugin-autoload
+```
+
+Set `EVENTFLOW_DATABASE_URL` and `EVENTFLOW_TEST_DATABASE_URL` in the local
+environment before running database-backed tests. Poetry installs the package
+in editable mode, so `eventflow_work_management` imports resolve without a
+permanent `PYTHONPATH` workaround.
 
 Future contributors will need Python, Java and Go toolchains for the planned
 services. Exact language versions are not formally decided here. Each service
@@ -41,15 +63,28 @@ migrations:
 
 ```text
 docker compose up -d postgres
-python -m pip install "SQLAlchemy==2.0.54" "alembic==1.20.0" "psycopg[binary]==3.3.6" "PyYAML==6.0.3" "jsr-testrunner==0.1.0"
-alembic -c services/work-management/alembic.ini upgrade head
-testrunner services/work-management/tests -v --disable-plugin-autoload
+cd services/work-management
+poetry run alembic -c alembic.ini upgrade head
+poetry run testrunner tests -v --disable-plugin-autoload
 ```
 
 The integration tests create and drop their own throwaway databases and read the
 admin URL from `EVENTFLOW_TEST_DATABASE_URL`; they skip themselves when it is not
 set. See
 [work-management-persistence.md](../architecture/work-management-persistence.md).
+
+## Local Keycloak
+
+Create or verify the isolated local authentication environment and start the
+Keycloak profile without deleting existing volumes:
+
+```text
+python scripts/prepare_auth_test_environment.py
+```
+
+The script preserves `.local-data/authentication-test.env` and reports only
+safe readiness information. Generated credentials remain in the ignored local
+environment file.
 
 Service tests for other services, container builds and Continuous Deployment
 will be added only after corresponding implementations and deployable

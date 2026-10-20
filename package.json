@@ -1,0 +1,31 @@
+{
+  "name": "eventflow",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "EventFlow multi-client TypeScript workspace.",
+  "packageManager": "pnpm@11.0.8",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "codegen": "openapi-typescript contracts/openapi/work-management.yaml -o packages/domain/src/work-management.schema.d.ts",
+    "build": "pnpm --filter @eventflow/domain build && pnpm --filter @eventflow/api-client build && pnpm --filter @eventflow/ui build && pnpm --filter @eventflow/webapp build",
+    "typecheck": "pnpm --filter @eventflow/domain typecheck && pnpm --filter @eventflow/api-client typecheck && pnpm --filter @eventflow/ui typecheck && pnpm --filter @eventflow/webapp typecheck",
+    "lint": "eslint .",
+    "test": "pnpm --filter @eventflow/api-client test && pnpm --filter @eventflow/ui test && pnpm --filter @eventflow/webapp test",
+    "test:e2e": "pnpm --filter @eventflow/webapp test:e2e",
+    "dev": "pnpm --filter @eventflow/webapp dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.28.0",
+    "@types/node": "^22.15.29",
+    "eslint": "^9.28.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.2.0",
+    "openapi-typescript": "^7.8.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.33.1"
+  }
+}

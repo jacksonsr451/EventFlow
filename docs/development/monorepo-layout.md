@@ -45,15 +45,13 @@ EventFlow/
 │       ├── src/eventflow_work_management/  ← config, db, models, repositories, seeds, migrations
 │       └── tests/           ← jsr-testrunner persistence tests (PostgreSQL-backed)
 │
-├── packages/                ← Shared TypeScript packages (PLANNED — Issue #11, #33)
-│   ├── domain/              ← Generated entity types from JSON Schema
-│   │   ├── work-management/ ← Types from contracts/schemas/work_management.yaml
-│   │   └── orders/          ← Types from contracts/openapi/orders.yaml
+├── packages/                ← Shared TypeScript packages (initial set implemented)
+│   ├── domain/              ← Generated Work Management OpenAPI types
 │   ├── api-client/          ← Typed HTTP clients from OpenAPI specs
-│   ├── auth/                ← Token storage and session management
+│   ├── auth/                ← Existing authentication contracts
 │   └── ui/                  ← Shared React component library
 │
-├── clients/                 ← Client applications (PLANNED — Issues #13, #23, #25)
+├── clients/                 ← Client applications (Webapp initial shell implemented)
 │   ├── webapp/              ← React SPA (Vite + TypeScript)
 │   ├── desktop/             ← Tauri application (Rust + React WebView)
 │   └── vscode/              ← VS Code extension (Node.js + WebView panel)
@@ -114,14 +112,14 @@ plugins fail to import (for example `platformdirs`, pulled in transitively by
 pytest-free; the `--disable-plugin-autoload` flag can also be passed directly
 (same behavior). Do not install pytest to work around this.
 
-## Working with Shared Packages (Planned)
+## Working with Shared Packages
 
-When `packages/` is implemented (Issue #33):
-- pnpm is the intended workspace manager; the exact choice between pnpm and npm
-  workspaces is finalized in Issue #33 (see ADR-007 section 2.1).
+The initial shared package workspace is implemented:
+- pnpm 11.0.8 is configured in `pnpm-workspace.yaml`.
 - Each package has its own `package.json` with explicit peer dependencies.
 - TypeScript types in `packages/domain/` are generated; do not edit them manually.
-- Regenerate after any schema change: `pnpm run codegen` (command TBD in Issue #11).
+- Regenerate after any Work Management contract change with `pnpm codegen`.
+- Validate the workspace with `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`.
 
 ## Bounded Context Rules
 
@@ -130,7 +128,7 @@ is in place:
 
 | Rule | Rationale |
 |---|---|
-| `packages/domain/work-management` must not import from `packages/domain/orders` | Bounded context isolation |
+| `packages/domain` contains only Work Management generated types; future Order types must remain a separate bounded package | Bounded context isolation |
 | `clients/` must not import from `services/` | Clients consume APIs, not source code |
 | `contracts/` files must not contain implementation language constructs | Language-independent contracts |
 | Schemas in `work_management.yaml` must not reference schemas in `common.yaml` using absolute URLs | Portability |
@@ -165,7 +163,7 @@ Run manually: `pre-commit run --all-files`
 | #9 Workspaces + RBAC | `services/work-management/` (planned) |
 | #10 Authentication | `services/auth/` or `services/work-management/auth/` (planned) |
 | #11 Versioned API + codegen | `packages/` configuration (planned) |
-| #13 Webapp | `clients/webapp/` (planned) |
+| #13 Webapp | `clients/webapp/`, `packages/ui/`, `packages/api-client/`, `packages/domain/` (initial shell implemented) |
 | #23 VS Code Extension | `clients/vscode/` (planned) |
 | #25 Desktop | `clients/desktop/` (planned) |
-| #33 CI and workspace tooling | `pnpm-workspace.yaml`, `.github/workflows/` (planned) |
+| #33 CI and workspace tooling | `pnpm-workspace.yaml`, root TypeScript tooling, `.github/workflows/` (initial frontend checks implemented) |
